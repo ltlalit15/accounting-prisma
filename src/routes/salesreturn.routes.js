@@ -33,7 +33,7 @@ import {
   getSalesReturnById,
   updateSalesReturn,
   deleteSalesReturn
-} from "../controllers/salesReturn.controller.js";
+} from "../controllers/salesreturn.controller.js";
 
 const router = Router();
 
