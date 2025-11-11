@@ -99,7 +99,7 @@ model users {
   // 🔗 Relations
   user_plans      user_plans[]
   accounts        accounts[]
-  vendorsCustomer vendorsCustomer[]
+  vendorscustomer vendorscustomer[]
   transactions    transactions[]
   adjustments     adjustments[]
 
@@ -208,7 +208,7 @@ model accounts {
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
 }
 
-// ----- vendorsCustomer model -------- //
+// ----- vendorscustomer model -------- //
 
 model vendorscustomer {
   id         Int @id @default(autoincrement())
@@ -606,7 +606,7 @@ model pos_invoices {
   updated_at     DateTime @updatedAt
 
   products pos_invoice_products[]
-  customer vendorsCustomer        @relation(fields: [customer_id], references: [id])
+  customer vendorscustomer        @relation(fields: [customer_id], references: [id])
   tax_class tax_classes? @relation(fields: [tax_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
 }
