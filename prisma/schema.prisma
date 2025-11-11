@@ -210,7 +210,7 @@ model accounts {
 
 // ----- vendorsCustomer model -------- //
 
-model vendorsCustomer {
+model vendorscustomer {
   id         Int @id @default(autoincrement())
   company_id Int // 🔗 Company (relation)
 

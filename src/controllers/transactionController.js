@@ -97,7 +97,7 @@ export const getTransactionsByCompany = async (req, res) => {
     ];
 
     // 3️⃣ Fetch all vendor/customer details
-    const vendorCustomers = await prisma.vendorsCustomer.findMany({
+    const vendorCustomers = await prisma.vendorscustomer.findMany({
       where: { id: { in: vendorCustomerIds } },
       select: {
         id: true,
@@ -178,7 +178,7 @@ export const getAllTransactions = async (req, res) => {
     ];
 
     // 3️⃣ Fetch their details
-    const vendorCustomers = await prisma.vendorsCustomer.findMany({
+    const vendorCustomers = await prisma.vendorscustomer.findMany({
       where: { id: { in: vendorCustomerIds } },
       select: {
         id: true,
@@ -316,7 +316,7 @@ export const getTransactionById = async (req, res) => {
     let fromEntity = null;
 
     if (["vender", "vendor", "customer"].includes(fType)) {
-      fromEntity = await prisma.vendorsCustomer.findUnique({
+      fromEntity = await prisma.vendorscustomer.findUnique({
         where: { id: transaction.from_id },
         select: {
           id: true,

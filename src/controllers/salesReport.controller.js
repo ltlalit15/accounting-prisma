@@ -185,7 +185,7 @@ export const getSalesReport = async (req, res) => {
         let customerArabicName = null;
         if (order.qoutation_to_customer_name || order.bill_to_customer_name) {
           const customerName = order.qoutation_to_customer_name || order.bill_to_customer_name;
-          const customer = await prisma.vendorsCustomer.findFirst({
+          const customer = await prisma.vendorscustomer.findFirst({
             where: {
               name_english: { contains: customerName },
               type: 'customer',
@@ -315,7 +315,7 @@ export const getSalesReportOptimized = async (req, res) => {
     });
 
     // Batch fetch customers
-    const customers = await prisma.vendorsCustomer.findMany({
+    const customers = await prisma.vendorscustomer.findMany({
       where: {
         name_english: { in: customerNames },
         type: 'customer',

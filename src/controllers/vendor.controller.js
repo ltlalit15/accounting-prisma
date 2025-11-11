@@ -60,7 +60,7 @@ export const createVendor = async (req, res) => {
     }
 
     // ✅ Save Vendor
-    const vendor = await prisma.vendorsCustomer.create({
+    const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
         name_english,
@@ -107,7 +107,7 @@ export const createVendor = async (req, res) => {
 
 export const getAllVendors = async (req, res) => {
   try {
-    const vendors = await prisma.vendorsCustomer.findMany({
+    const vendors = await prisma.vendorscustomer.findMany({
       orderBy: { created_at: "desc" },
       include: { company: { select: { id: true, name: true, email: true } } },
     });
@@ -125,7 +125,7 @@ export const getVendorsByCompanyId = async (req, res) => {
   try {
     const { company_id } = req.params;
     const { type } = req.query;
-    const vendors = await prisma.vendorsCustomer.findMany({
+    const vendors = await prisma.vendorscustomer.findMany({
       where: {
         company_id: parseInt(company_id),
         type,
@@ -147,7 +147,7 @@ export const getVendorsByCompanyId = async (req, res) => {
 export const getVendorById = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendor = await prisma.vendorsCustomer.findUnique({
+    const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: parseInt(id) },
       include: { company: { select: { id: true, name: true } } },
     });
@@ -172,7 +172,7 @@ export const updateVendor = async (req, res) => {
     const { id } = req.params;
     const data = req.body;
 
-    const vendor = await prisma.vendorsCustomer.findUnique({
+    const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: parseInt(id) },
     });
 
@@ -226,7 +226,7 @@ export const updateVendor = async (req, res) => {
     };
 
     // ✅ Merge and update vendor
-    const updatedVendor = await prisma.vendorsCustomer.update({
+    const updatedVendor = await prisma.vendorscustomer.update({
       where: { id: parseInt(id) },
       data: {
         ...data,
@@ -251,7 +251,7 @@ export const deleteVendor = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const vendor = await prisma.vendorsCustomer.findUnique({
+    const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: parseInt(id) },
     });
 
@@ -273,7 +273,7 @@ export const deleteVendor = async (req, res) => {
     }
 
     // ✅ Delete vendor record from DB
-    await prisma.vendorsCustomer.delete({ where: { id: parseInt(id) } });
+    await prisma.vendorscustomer.delete({ where: { id: parseInt(id) } });
 
     res.status(200).json({
       success: true,
@@ -780,7 +780,7 @@ export const getVendorLedger = async (req, res) => {
     const vendorId = Number(vendor_id);
 
     // 1️⃣ Get Vendor Info
-    const vendor = await prisma.vendorsCustomer.findUnique({
+    const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: vendorId },
       include: {
         company: {
