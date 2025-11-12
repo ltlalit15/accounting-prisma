@@ -766,234 +766,191 @@ export const deleteVendor = async (req, res) => {
 
 export const getVendorLedger = async (req, res) => {
   try {
+    // Match the route param names
     const { vendor_id, company_id } = req.params;
-    const { from_date, to_date } = req.query;
 
-    if (!vendor_id || !company_id) {
-      return res.status(400).json({
-        success: false,
-        message: "vendor_id and company_id are required",
-      });
+    const vendorIdNum = Number(vendor_id);
+    const companyIdNum = Number(company_id);
+
+    if (isNaN(vendorIdNum) || isNaN(companyIdNum)) {
+      return res.status(400).json({ message: "Invalid vendor or company ID" });
     }
 
-    const companyId = Number(company_id);
-    const vendorId = Number(vendor_id);
-
-    // 1️⃣ Get Vendor Info
+    // --- Fetch Vendor Info ---
     const vendor = await prisma.vendorscustomer.findUnique({
-      where: { id: vendorId },
+      where: { id: vendorIdNum },
       include: {
         company: {
           select: {
-            id: true,
             name: true,
             email: true,
-            company_logo_url: true,
+            phone: true,
+            // company_logo_url: true,
           },
         },
       },
     });
 
     if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: "Vendor not found",
-      });
+      return res.status(404).json({ message: "Vendor not found" });
     }
 
-    // 2️⃣ Build Transaction Filter
-    const where = {
-      company_id: companyId,
-      OR: [
-        { from_id: vendorId },
-        { account_type: "vendor" },
-        { from_type: "vendor" },
-      ],
-    };
+    // --- Fetch All Transactions ---
+    const [purchases, purchaseReturns, payments] = await Promise.all([
+      prisma.purchaseorder.findMany({
+        where: {
+          company_id: companyIdNum,
+          bill_to_vendor_name: vendor.name_english,
+        },
+        include: { purchaseorderitems: true },
+      }),
 
-    if (from_date && to_date) {
-      where.date = {
-        gte: String(from_date),
-        lte: String(to_date),
-      };
-    }
+      prisma.purchase_return.findMany({
+        where: {
+          company_id: companyIdNum,
+          vendor_id: vendorIdNum,
+        },
+        include: { purchase_return_items: true },
+      }),
 
-    // 3️⃣ Fetch vendor-specific transactions
-    const transactions = await prisma.transactions.findMany({
-      where,
-      orderBy: { id: "asc" },
-    });
-
-    let totalDebit = 0;
-    let totalCredit = 0;
-    const formattedTxns = [];
-
-    // 4️⃣ Opening Balance
-    let currentBalance = 0;
-    let currentBalanceType = "Cr";
-
-    if (vendor.account_balance && vendor.account_balance !== 0) {
-      const isDebit =
-        vendor.balance_type?.toLowerCase() === "dr" ||
-        vendor.balance_type?.toLowerCase() === "debit";
-      const isCredit =
-        vendor.balance_type?.toLowerCase() === "cr" ||
-        vendor.balance_type?.toLowerCase() === "credit";
-
-      const openingDebit = isDebit ? Number(vendor.account_balance) : 0;
-      const openingCredit = isCredit ? Number(vendor.account_balance) : 0;
-
-      currentBalance = Math.abs(openingCredit - openingDebit);
-      currentBalanceType = openingCredit > openingDebit ? "Cr" : "Dr";
-
-      formattedTxns.push({
-        date: vendor.creation_date
-          ? vendor.creation_date.toISOString().split("T")[0]
-          : "-",
-        particulars: "Opening Balance",
-        vch_no: "--",
-        vch_type: "Opening",
-        debit: openingDebit.toFixed(2),
-        credit: openingCredit.toFixed(2),
-        balance_type: currentBalanceType,
-        balance: `₹${currentBalance.toLocaleString("en-IN", {
-          minimumFractionDigits: 2,
-        })} ${currentBalanceType}`,
-      });
-
-      totalDebit += openingDebit;
-      totalCredit += openingCredit;
-    }
-
-    // 5️⃣ Loop through transactions
-    transactions.forEach((t) => {
-      const type = (t.balance_type || "").toLowerCase();
-      const voucherType = (t.voucher_type || "").toLowerCase();
-
-      const isDebit =
-        ["dr", "debit", "payment", "make payment"].includes(type) ||
-        ["payment", "purchase return"].includes(voucherType);
-
-      const isCredit =
-        ["cr", "credit", "purchase"].includes(type) ||
-        ["purchase"].includes(voucherType);
-
-      const debit = isDebit ? Number(t.amount) : 0;
-      const credit = isCredit ? Number(t.amount) : 0;
-
-      totalDebit += debit;
-      totalCredit += credit;
-
-      // 🧮 Running Balance Logic
-      if (currentBalanceType === "Cr") {
-        if (credit > 0) currentBalance += credit;
-        else if (debit > 0) currentBalance -= debit;
-      } else {
-        if (debit > 0) currentBalance += debit;
-        else if (credit > 0) currentBalance -= credit;
-      }
-
-      if (currentBalance < 0) {
-        currentBalance = Math.abs(currentBalance);
-        currentBalanceType = currentBalanceType === "Cr" ? "Dr" : "Cr";
-      }
-
-      formattedTxns.push({
-        date: t.date || "-",
-        particulars: t.note || "-",
-        vch_no: t.voucher_no || "-",
-        vch_type: t.voucher_type || "-",
-        debit: debit.toFixed(2),
-        credit: credit.toFixed(2),
-        balance_type: currentBalanceType,
-        balance: `₹${currentBalance.toLocaleString("en-IN", {
-          minimumFractionDigits: 2,
-        })} ${currentBalanceType}`,
-      });
-    });
-
-    // 6️⃣ Outstanding Balance
-    const outstandingBalance = totalCredit - totalDebit;
-    const finalType = outstandingBalance >= 0 ? "Cr" : "Dr";
-
-    // 7️⃣ Global Transaction Summary
-    const [
-      openingBalanceCount,
-      purchaseCount,
-      paymentCount,
-      purchaseReturnCount,
-      expenseCount,
-      receiptCount,
-      salesReturnCount,
-      manufacturingCount,
-      stockJournalCount,
-      stockAdjustmentCount,
-      bankingCount,
-      journalCount,
-    ] = await Promise.all([
-      prisma.accounts.count({ where: { company_id: companyId } }),
-      prisma.purchaseorder.count({ where: { company_id: companyId } }),
-      prisma.expensevouchers.count({ where: { company_id: companyId } }),
-      prisma.purchase_return.count({ where: { company_id: companyId } }),
-      prisma.expensevouchers.count({ where: { company_id: companyId } }),
-      prisma.income_vouchers.count({ where: { company_id: companyId } }),
-      prisma.sales_return.count({ where: { company_id: companyId } }),
-      Promise.resolve(0),
-      prisma.transfers.count({ where: { company_id: companyId } }),
-      prisma.adjustments.count({ where: { company_id: companyId } }),
-      prisma.contra_vouchers.count({ where: { company_id: companyId } }),
-      prisma.vouchers.count({ where: { company_id: companyId } }),
+      prisma.expensevouchers.findMany({
+        where: {
+          company_id: companyIdNum,
+          expensevoucher_items: { some: { vendor_id: vendorIdNum } },
+        },
+        include: { expensevoucher_items: true },
+      }),
     ]);
 
+    // --- Prepare Transactions ---
+    const transactions = [];
+    let openingBalance = 0;
+
+    if (vendor.account_balance && vendor.account_balance !== 0) {
+      const type = vendor.balance_type || "Dr";
+      openingBalance = type === "Dr" ? vendor.account_balance : -vendor.account_balance;
+
+      transactions.push({
+        date: vendor.creation_date || vendor.created_at || new Date(),
+        particulars: "Opening Balance",
+        vch_type: "Opening",
+        vch_no: "--",
+        debit: type === "Dr" ? vendor.account_balance : 0,
+        credit: type === "Cr" ? vendor.account_balance : 0,
+        balance: openingBalance,
+        items: [],
+      });
+    }
+
+    let runningBalance = openingBalance;
+
+    // 🧾 Purchases (Debit)
+    purchases.forEach((p) => {
+      const total = p.total.toNumber();
+      runningBalance += total;
+      transactions.push({
+        date: p.created_at,
+        particulars: `Purchase Invoice ${p.PO_no || ""}`,
+        vch_type: "Purchase",
+        vch_no: p.PO_no,
+        debit: total,
+        credit: 0,
+        balance: runningBalance,
+        items: p.purchaseorderitems.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.qty.toNumber(),
+          rate: i.rate.toNumber(),
+          value: i.amount.toNumber(),
+        })),
+      });
+    });
+
+    // 🔁 Purchase Returns (Credit)
+    purchaseReturns.forEach((r) => {
+      const total = r.grand_total.toNumber();
+      runningBalance -= total;
+      transactions.push({
+        date: r.return_date,
+        particulars: `Purchase Return ${r.return_no}`,
+        vch_type: "Purchase Return",
+        vch_no: r.return_no,
+        debit: 0,
+        credit: total,
+        balance: runningBalance,
+        items: r.purchase_return_items.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.quantity.toNumber(),
+          rate: i.rate.toNumber(),
+          value: i.amount.toNumber(),
+        })),
+      });
+    });
+
+    // 💵 Payments (Credit)
+    payments.forEach((p) => {
+      const total = p.total_amount?.toNumber() || 0;
+      runningBalance -= total;
+      transactions.push({
+        date: p.voucher_date,
+        particulars: `Payment ${p.auto_receipt_no}`,
+        vch_type: "Payment",
+        vch_no: p.auto_receipt_no,
+        debit: 0,
+        credit: total,
+        balance: runningBalance,
+        items: [],
+      });
+    });
+
+    // --- Sort by Date ---
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // --- Transaction Summary ---
     const transactionSummary = {
-      opening_balance: openingBalanceCount,
-      purchase: purchaseCount,
-      payment: paymentCount,
-      purchase_return: purchaseReturnCount,
-      expense: expenseCount,
-      receipt: receiptCount,
-      sales_return: salesReturnCount,
-      manufacturing: manufacturingCount,
-      stock_journal: stockJournalCount,
-      stock_adjustment: stockAdjustmentCount,
-      banking: bankingCount,
-      journal: journalCount,
+      opening_balance: vendor.account_balance ? 1 : 0,
+      purchase: purchases.length,
+      payment: payments.length,
+      purchase_return: purchaseReturns.length,
+      receipt: 0,
+      sales_return: 0,
+      manufacturing: 0,
+      stock_journal: 0,
+      stock_adjustment: 0,
+      banking: 0,
+      journal: 0,
     };
 
-    const totalTransactions = Object.values(transactionSummary).reduce(
-      (a, b) => a + b,
-      0
-    );
+    const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
 
-    // 8️⃣ Final Response
-    res.json({
-      success: true,
-      vendor: {
-        id: vendor.id,
-        name: vendor.name_english,
-        company_name: vendor.company_name || "",
-        phone: vendor.phone,
-        email: vendor.email,
-        company_logo_url: vendor.company?.company_logo_url || null,
-      },
-      ledger_summary: {
-        total_payments: Number(totalDebit.toFixed(2)),
-        total_purchases: Number(totalCredit.toFixed(2)),
-        outstanding_balance: Math.abs(Number(outstandingBalance.toFixed(2))),
-        balance_type: finalType,
-      },
-      transactions: formattedTxns,
+    // --- Ledger Summary ---
+    const totalPurchase = purchases.reduce((a, b) => a + b.total.toNumber(), 0);
+    const totalPayment = payments.reduce((a, b) => a + (b.total_amount?.toNumber() || 0), 0);
+    const totalReturn = purchaseReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+
+    const closingBalance = openingBalance + totalPurchase - (totalPayment + totalReturn);
+
+    const ledgerSummary = {
+      opening_balance: Math.abs(vendor.account_balance || 0),
+      opening_balance_type: vendor.balance_type || "Dr",
+      total_purchases: totalPurchase,
+      total_returns: totalReturn,
+      total_payments: totalPayment,
+      balance: Math.abs(closingBalance),
+      balance_type: closingBalance > 0 ? "Cr" : "Dr",
+    };
+
+    // --- Response ---
+    return res.status(200).json({
+      vendor,
+      transactions,
+      ledger_summary: ledgerSummary,
       transaction_summary: {
         ...transactionSummary,
         total_transactions: totalTransactions,
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching vendor ledger:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching vendor ledger",
-      error: error.message,
-    });
+    console.error("Error fetching vendor ledger:", error);
+    res.status(500).json({ message: "Internal server error", error });
   }
 };
