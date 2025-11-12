@@ -307,6 +307,145 @@ export const createSuperAdmin = async (req, res) => {
 
 // ---------- Company Controllers All Controllers----------
 
+// export const createCompany = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       email,
+//       password,
+//       startDate,
+//       expireDate,
+//       plan_id,
+//       planType,
+//       address,
+//       country,
+//       state,
+//       city,
+//       postal_code,
+//       currency,
+//     } = req.body;
+
+//     // ✅ Validate required fields
+//     if (
+//       !name ||
+//       !email ||
+//       !password ||
+//       !startDate ||
+//       !expireDate ||
+//       !plan_id ||
+//       !planType
+//     ) {
+//       return res
+//         .status(400)
+//         .json({ message: "All required fields must be provided" });
+//     }
+
+//     // ✅ Check if company email exists
+//     const existingUser = await prisma.users.findUnique({ where: { email } });
+//     if (existingUser) {
+//       return res
+//         .status(409)
+//         .json({ message: "Company with this email already exists" });
+//     }
+
+//     // ✅ Hash password
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // 🖼️ Upload multiple company images (if provided)
+//     let company_icon_url = null;
+//     let favicon_url = null;
+//     let company_logo_url = null;
+//     let company_dark_logo_url = null;
+
+//     if (req.files) {
+//       if (req.files.company_icon) {
+//         company_icon_url = await uploadToCloudinary(
+//           req.files.company_icon[0].buffer,
+//           "company_icons"
+//         );
+//       }
+//       if (req.files.favicon) {
+//         favicon_url = await uploadToCloudinary(
+//           req.files.favicon[0].buffer,
+//           "company_favicons"
+//         );
+//       }
+//       if (req.files.company_logo) {
+//         company_logo_url = await uploadToCloudinary(
+//           req.files.company_logo[0].buffer,
+//           "company_logos"
+//         );
+//       }
+//       if (req.files.company_dark_logo) {
+//         company_dark_logo_url = await uploadToCloudinary(
+//           req.files.company_dark_logo[0].buffer,
+//           "company_dark_logos"
+//         );
+//       }
+//     }
+
+//     // ✅ Create company record
+//     const newCompany = await prisma.users.create({
+//       data: {
+//         name,
+//         email,
+//         password: hashedPassword,
+//         role: "COMPANY",
+//         startDate: new Date(startDate),
+//         expireDate: new Date(expireDate),
+//         address,
+//         country,
+//         state,
+//         city,
+//         postal_code,
+//         currency,
+//         company_icon_url,
+//         favicon_url,
+//         company_logo_url,
+//         company_dark_logo_url,
+//         user_plans: {
+//           create: {
+//             plan_id: parseInt(plan_id),
+//             planType,
+//           },
+//         },
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         role: true,
+//         startDate: true,
+//         expireDate: true,
+//         address: true,
+//         country: true,
+//         state: true,
+//         city: true,
+//         postal_code: true,
+//         currency: true,
+//         company_icon_url: true,
+//         favicon_url: true,
+//         company_logo_url: true,
+//         company_dark_logo_url: true,
+//         user_plans: true,
+//         created_at: true,
+//       },
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "✅ Company created successfully",
+//       data: newCompany,
+//     });
+//   } catch (error) {
+//     console.error("❌ Create company error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
 export const createCompany = async (req, res) => {
   try {
     const {
@@ -323,9 +462,14 @@ export const createCompany = async (req, res) => {
       city,
       postal_code,
       currency,
+      bank_name,
+      account_number,
+      account_holder,
+      ifsc_code,
+      notes,
+      terms_and_conditions,
     } = req.body;
 
-    // ✅ Validate required fields
     if (
       !name ||
       !email ||
@@ -335,56 +479,32 @@ export const createCompany = async (req, res) => {
       !plan_id ||
       !planType
     ) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be provided" });
+      return res.status(400).json({ message: "All required fields must be provided" });
     }
 
-    // ✅ Check if company email exists
     const existingUser = await prisma.users.findUnique({ where: { email } });
     if (existingUser) {
-      return res
-        .status(409)
-        .json({ message: "Company with this email already exists" });
+      return res.status(409).json({ message: "Company with this email already exists" });
     }
 
-    // ✅ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🖼️ Upload multiple company images (if provided)
-    let company_icon_url = null;
-    let favicon_url = null;
-    let company_logo_url = null;
-    let company_dark_logo_url = null;
-
+    let company_icon_url = null, favicon_url = null, company_logo_url = null, company_dark_logo_url = null;
     if (req.files) {
       if (req.files.company_icon) {
-        company_icon_url = await uploadToCloudinary(
-          req.files.company_icon[0].buffer,
-          "company_icons"
-        );
+        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
       }
       if (req.files.favicon) {
-        favicon_url = await uploadToCloudinary(
-          req.files.favicon[0].buffer,
-          "company_favicons"
-        );
+        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
       }
       if (req.files.company_logo) {
-        company_logo_url = await uploadToCloudinary(
-          req.files.company_logo[0].buffer,
-          "company_logos"
-        );
+        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
       }
       if (req.files.company_dark_logo) {
-        company_dark_logo_url = await uploadToCloudinary(
-          req.files.company_dark_logo[0].buffer,
-          "company_dark_logos"
-        );
+        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
       }
     }
 
-    // ✅ Create company record
     const newCompany = await prisma.users.create({
       data: {
         name,
@@ -403,12 +523,15 @@ export const createCompany = async (req, res) => {
         favicon_url,
         company_logo_url,
         company_dark_logo_url,
-        user_plans: {
-          create: {
-            plan_id: parseInt(plan_id),
-            planType,
-          },
-        },
+        user_plans: { create: { plan_id: parseInt(plan_id), planType } },
+
+        // 💳 Bank details
+        bank_name: bank_name || null,
+        account_number: account_number || null,
+        account_holder: account_holder || null,
+        ifsc_code: ifsc_code || null,
+        notes: notes || null,
+        terms_and_conditions: terms_and_conditions || null,
       },
       select: {
         id: true,
@@ -427,6 +550,12 @@ export const createCompany = async (req, res) => {
         favicon_url: true,
         company_logo_url: true,
         company_dark_logo_url: true,
+        bank_name: true,
+        account_number: true,
+        account_holder: true,
+        ifsc_code: true,
+        notes: true,
+        terms_and_conditions: true,
         user_plans: true,
         created_at: true,
       },
@@ -434,7 +563,7 @@ export const createCompany = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "✅ Company created successfully",
+      message: "✅ Company created successfully with bank details",
       data: newCompany,
     });
   } catch (error) {
@@ -446,6 +575,7 @@ export const createCompany = async (req, res) => {
     });
   }
 };
+
 
 // export const updateCompany = async (req, res) => {
 //   try {
@@ -583,6 +713,138 @@ export const createCompany = async (req, res) => {
 //   }
 // };
 
+// export const updateCompany = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const {
+//       name,
+//       email,
+//       phone,
+//       startDate,
+//       expireDate,
+//       plan_id,
+//       planType,
+//       address,
+//       country,
+//       state,
+//       city,
+//       postal_code,
+//       currency,
+//     } = req.body;
+
+//     const companyId = parseInt(id);
+
+//     // ✅ 1. Find existing company
+//     const existingCompany = await prisma.users.findUnique({
+//       where: { id: companyId },
+//       include: { user_plans: true },
+//     });
+
+//     if (!existingCompany || existingCompany.role !== "COMPANY") {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Company not found",
+//       });
+//     }
+
+//     // ✅ 2. Keep old URLs unless new ones are uploaded
+//     let {
+//       company_icon_url,
+//       favicon_url,
+//       company_logo_url,
+//       company_dark_logo_url,
+//     } = existingCompany;
+
+//     // ✅ 3. Handle uploaded files from multer-storage-cloudinary
+//     if (req.files) {
+//       console.log("🟢 Incoming files:", Object.keys(req.files));
+
+//       if (req.files.companyIcon) {
+//         company_icon_url = req.files.companyIcon[0].path; // Cloudinary URL
+//       }
+
+//       if (req.files.favicon) {
+//         favicon_url = req.files.favicon[0].path;
+//       }
+
+//       if (req.files.companyLogo) {
+//         company_logo_url = req.files.companyLogo[0].path;
+//       }
+
+//       if (req.files.companyDarkLogo) {
+//         company_dark_logo_url = req.files.companyDarkLogo[0].path;
+//       }
+//     }
+
+//     // ✅ 4. Prepare update data
+//     const updateData = {
+//       name: name ?? existingCompany.name,
+//       email: email ?? existingCompany.email,
+//       phone: phone ?? existingCompany.phone,
+//       startDate: startDate ? new Date(startDate) : existingCompany.startDate,
+//       expireDate: expireDate
+//         ? new Date(expireDate)
+//         : existingCompany.expireDate,
+//       address: address ?? existingCompany.address,
+//       country: country ?? existingCompany.country,
+//       state: state ?? existingCompany.state,
+//       city: city ?? existingCompany.city,
+//       postal_code: postal_code ?? existingCompany.postal_code,
+//       currency: currency ?? existingCompany.currency,
+//       company_icon_url,
+//       favicon_url,
+//       company_logo_url,
+//       company_dark_logo_url,
+//     };
+
+//     // ✅ 5. Update or create plan
+//     if (plan_id || planType) {
+//       const lastPlan = await prisma.user_plans.findFirst({
+//         where: { user_id: companyId },
+//         orderBy: { id: "desc" },
+//       });
+
+//       if (lastPlan) {
+//         await prisma.user_plans.update({
+//           where: { id: lastPlan.id },
+//           data: {
+//             plan_id: plan_id ? parseInt(plan_id) : lastPlan.plan_id,
+//             planType: planType ?? lastPlan.planType,
+//           },
+//         });
+//       } else {
+//         await prisma.user_plans.create({
+//           data: {
+//             user_id: companyId,
+//             plan_id: parseInt(plan_id),
+//             planType,
+//           },
+//         });
+//       }
+//     }
+
+//     // ✅ 6. Update company record in DB
+//     const updatedCompany = await prisma.users.update({
+//       where: { id: companyId },
+//       data: updateData,
+//       include: { user_plans: true },
+//     });
+
+//     // ✅ 7. Respond with success
+//     return res.status(200).json({
+//       success: true,
+//       message: "✅ Company updated successfully",
+//       data: updatedCompany,
+//     });
+//   } catch (error) {
+//     console.error("❌ Update company error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
 export const updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
@@ -600,6 +862,12 @@ export const updateCompany = async (req, res) => {
       city,
       postal_code,
       currency,
+      bank_name,
+      account_number,
+      account_holder,
+      ifsc_code,
+      notes,
+      terms_and_conditions
     } = req.body;
 
     const companyId = parseInt(id);
@@ -665,6 +933,13 @@ export const updateCompany = async (req, res) => {
       favicon_url,
       company_logo_url,
       company_dark_logo_url,
+      // Add new fields to the update data
+      bank_name: bank_name ?? existingCompany.bank_name,
+      account_number: account_number ?? existingCompany.account_number,
+      account_holder: account_holder ?? existingCompany.account_holder,
+      ifsc_code: ifsc_code ?? existingCompany.ifsc_code,
+      notes: notes ?? existingCompany.notes,
+      terms_and_conditions: terms_and_conditions ?? existingCompany.terms_and_conditions,
     };
 
     // ✅ 5. Update or create plan
@@ -715,6 +990,113 @@ export const updateCompany = async (req, res) => {
     });
   }
 };
+
+// export const getCompanyById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Company ID is required",
+//       });
+//     }
+
+//     // 🔹 Fetch company details with related data
+//     const company = await prisma.users.findUnique({
+//       where: { id: Number(id) },
+//       include: {
+//         user_plans: true,
+//         created_users: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//             role: true,
+//             created_at: true,
+//           },
+//         },
+//       },
+//     });
+
+//     if (!company || company.role !== "COMPANY") {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Company not found",
+//       });
+//     }
+
+//     // ✅ Format response to match schema and UI needs
+//     const formattedCompany = {
+//       id: company.id,
+//       name: company.name,
+//       email: company.email,
+//       phone: company.phone,
+//       role: company.role,
+//       user_role: company.user_role,
+//       address: company.address,
+//       country: company.country,
+//       state: company.state,
+//       city: company.city,
+//       postal_code: company.postal_code,
+//       currency: company.currency,
+//       startDate: company.startDate,
+//       expireDate: company.expireDate,
+//       UserStatus: company.UserStatus,
+//       created_at: company.created_at,
+//       branding: {
+//         company_logo_url: company.company_logo_url,
+//         company_dark_logo_url: company.company_dark_logo_url,
+//         company_icon_url: company.company_icon_url,
+//         favicon_url: company.favicon_url,
+//       },
+//       user_plans: company.user_plans,
+//       team_members: company.created_users, // 👈 users created under this company
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Company fetched successfully",
+//       data: formattedCompany,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get company by ID error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// export const getAllCompanies = async (req, res) => {
+//   try {
+//     const companies = await prisma.users.findMany({
+//       where: { role: "COMPANY" },
+//       include: {
+//         user_plans: {
+//           include: {
+//             plan: true, // ✅ Fetch related plan details
+//           },
+//         },
+//       },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     return res.status(200).json({
+//       message: "Companies fetched successfully",
+//       data: companies,
+//     });
+//   } catch (error) {
+//     console.error("Get all companies error:", error);
+//     return res.status(500).json({
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
 export const getCompanyById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -768,12 +1150,24 @@ export const getCompanyById = async (req, res) => {
       expireDate: company.expireDate,
       UserStatus: company.UserStatus,
       created_at: company.created_at,
+
+      // Include bank details, notes, and terms & conditions
+      bank_details: {
+        bank_name: company.bank_name,
+        account_number: company.account_number,
+        account_holder: company.account_holder,
+        ifsc_code: company.ifsc_code,
+      },
+      notes: company.notes,
+      terms_and_conditions: company.terms_and_conditions,
+
       branding: {
         company_logo_url: company.company_logo_url,
         company_dark_logo_url: company.company_dark_logo_url,
         company_icon_url: company.company_icon_url,
         favicon_url: company.favicon_url,
       },
+
       user_plans: company.user_plans,
       team_members: company.created_users, // 👈 users created under this company
     };
@@ -793,32 +1187,96 @@ export const getCompanyById = async (req, res) => {
   }
 };
 
+
 // export const getAllCompanies = async (req, res) => {
 //   try {
+//     // 🔹 Fetch all companies (role = COMPANY)
 //     const companies = await prisma.users.findMany({
 //       where: { role: "COMPANY" },
 //       include: {
 //         user_plans: {
 //           include: {
-//             plan: true, // ✅ Fetch related plan details
+//             plan: true, // ✅ Include related plan info
+//           },
+//         },
+//         created_users: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//             role: true,
+//             created_at: true,
 //           },
 //         },
 //       },
 //       orderBy: { created_at: "desc" },
 //     });
 
+//     if (!companies || companies.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No companies found",
+//       });
+//     }
+
+//     // 🔹 Format each company into a clean UI-ready structure
+//     const formattedCompanies = companies.map((company) => ({
+//       id: company.id,
+//       name: company.name,
+//       email: company.email,
+//       phone: company.phone,
+//       role: company.role,
+//       user_role: company.user_role,
+//       address: company.address,
+//       country: company.country,
+//       state: company.state,
+//       city: company.city,
+//       postal_code: company.postal_code,
+//       currency: company.currency,
+//       startDate: company.startDate,
+//       expireDate: company.expireDate,
+//       UserStatus: company.UserStatus,
+//       created_at: company.created_at,
+//       branding: {
+//         company_logo_url: company.company_logo_url,
+//         company_dark_logo_url: company.company_dark_logo_url,
+//         company_icon_url: company.company_icon_url,
+//         favicon_url: company.favicon_url,
+//       },
+//       user_plans: company.user_plans.map((planData) => ({
+//         id: planData.id,
+//         status: planData.status,
+//         start_date: planData.start_date,
+//         end_date: planData.end_date,
+//         plan: planData.plan
+//           ? {
+//               id: planData.plan.id,
+//               plan_name: planData.plan.plan_name,
+//               duration: planData.plan.duration,
+//               amount: planData.plan.amount,
+//             }
+//           : null,
+//       })),
+//       team_members: company.created_users,
+//     }));
+
+//     // ✅ Send formatted response
 //     return res.status(200).json({
+//       success: true,
 //       message: "Companies fetched successfully",
-//       data: companies,
+//       count: formattedCompanies.length,
+//       data: formattedCompanies,
 //     });
 //   } catch (error) {
-//     console.error("Get all companies error:", error);
+//     console.error("❌ Get all companies error:", error);
 //     return res.status(500).json({
+//       success: false,
 //       message: "Internal server error",
 //       error: error.message,
 //     });
 //   }
 // };
+
 
 export const getAllCompanies = async (req, res) => {
   try {
@@ -869,12 +1327,25 @@ export const getAllCompanies = async (req, res) => {
       expireDate: company.expireDate,
       UserStatus: company.UserStatus,
       created_at: company.created_at,
+
+      // Include bank details, notes, and terms & conditions
+      bank_details: {
+        bank_name: company.bank_name,
+        account_number: company.account_number,
+        account_holder: company.account_holder,
+        ifsc_code: company.ifsc_code,
+      },
+      notes: company.notes,
+      terms_and_conditions: company.terms_and_conditions,
+
       branding: {
         company_logo_url: company.company_logo_url,
         company_dark_logo_url: company.company_dark_logo_url,
         company_icon_url: company.company_icon_url,
         favicon_url: company.favicon_url,
       },
+
+      // User plan details
       user_plans: company.user_plans.map((planData) => ({
         id: planData.id,
         status: planData.status,
@@ -889,6 +1360,8 @@ export const getAllCompanies = async (req, res) => {
             }
           : null,
       })),
+      
+      // Team members associated with the company
       team_members: company.created_users,
     }));
 
@@ -908,6 +1381,7 @@ export const getAllCompanies = async (req, res) => {
     });
   }
 };
+
 
 export const deleteCompany = async (req, res) => {
   try {

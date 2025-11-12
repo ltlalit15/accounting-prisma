@@ -954,3 +954,535 @@ export const getVendorLedger = async (req, res) => {
     res.status(500).json({ message: "Internal server error", error });
   }
 };
+
+
+// export const getCustomerLedger = async (req, res) => {
+//   try {
+//     // Match the route param names
+//     const { customer_id, company_id } = req.params;
+
+//     const customerIdNum = Number(customer_id);
+//     const companyIdNum = Number(company_id);
+
+//     if (isNaN(customerIdNum) || isNaN(companyIdNum)) {
+//       return res.status(400).json({ message: "Invalid customer or company ID" });
+//     }
+
+//     // --- Fetch Customer Info ---
+//     const customer = await prisma.vendorscustomer.findUnique({
+//       where: { id: customerIdNum },
+//       include: {
+//         company: {
+//           select: {
+//             name: true,
+//             email: true,
+//             phone: true,
+//           },
+//         },
+//       },
+//     });
+
+//     if (!customer) {
+//       return res.status(404).json({ message: "Customer not found" });
+//     }
+
+//     // --- Fetch All Transactions ---
+//     const [sales, salesReturns, receipts] = await Promise.all([
+//       prisma.salesorder.findMany({
+//         where: {
+//           company_id: companyIdNum,
+//           bill_to_customer_name: customer.name_english,
+//         },
+//         include: { salesorderitems: true },
+//       }),
+
+//       prisma.sales_return.findMany({
+//         where: {
+//           company_id: companyIdNum,
+//           customer_id: customerIdNum,
+//         },
+//         include: { sales_return_items: true },
+//       }),
+
+//       prisma.receipts.findMany({
+//         where: {
+//           company_id: companyIdNum,
+//           receipt_items: { some: { customer_id: customerIdNum } },
+//         },
+//         include: { receipt_items: true },
+//       }),
+//     ]);
+
+//     // --- Prepare Transactions ---
+//     const transactions = [];
+//     let openingBalance = 0;
+
+//     if (customer.account_balance && customer.account_balance !== 0) {
+//       const type = customer.balance_type || "Cr";
+//       openingBalance = type === "Dr" ? customer.account_balance : -customer.account_balance;
+
+//       transactions.push({
+//         date: customer.creation_date || customer.created_at || new Date(),
+//         particulars: "Opening Balance",
+//         vch_type: "Opening",
+//         vch_no: "--",
+//         debit: type === "Dr" ? customer.account_balance : 0,
+//         credit: type === "Cr" ? customer.account_balance : 0,
+//         balance: openingBalance,
+//         items: [],
+//       });
+//     }
+
+//     let runningBalance = openingBalance;
+
+//     // 🧾 Sales (Credit)
+//     sales.forEach((s) => {
+//       const total = s.total.toNumber();
+//       runningBalance -= total;
+//       transactions.push({
+//         date: s.created_at,
+//         particulars: `Sales Invoice ${s.SO_no || ""}`,
+//         vch_type: "Sales",
+//         vch_no: s.SO_no,
+//         debit: 0,
+//         credit: total,
+//         balance: runningBalance,
+//         items: s.salesorderitems.map((i) => ({
+//           item_name: i.item_name,
+//           quantity: i.qty.toNumber(),
+//           rate: i.rate.toNumber(),
+//           value: i.amount.toNumber(),
+//         })),
+//       });
+//     });
+
+//     // 🔁 Sales Returns (Debit)
+//     salesReturns.forEach((r) => {
+//       const total = r.grand_total.toNumber();
+//       runningBalance += total;
+//       transactions.push({
+//         date: r.return_date,
+//         particulars: `Sales Return ${r.return_no}`,
+//         vch_type: "Sales Return",
+//         vch_no: r.return_no,
+//         debit: total,
+//         credit: 0,
+//         balance: runningBalance,
+//         items: r.sales_return_items.map((i) => ({
+//           item_name: i.item_name,
+//           quantity: i.quantity.toNumber(),
+//           rate: i.rate.toNumber(),
+//           value: i.amount.toNumber(),
+//         })),
+//       });
+//     });
+
+//     // 💵 Receipts (Debit)
+//     receipts.forEach((r) => {
+//       const total = r.total_amount?.toNumber() || 0;
+//       runningBalance += total;
+//       transactions.push({
+//         date: r.receipt_date,
+//         particulars: `Receipt ${r.auto_receipt_no}`,
+//         vch_type: "Receipt",
+//         vch_no: r.auto_receipt_no,
+//         debit: total,
+//         credit: 0,
+//         balance: runningBalance,
+//         items: [],
+//       });
+//     });
+
+//     // --- Sort by Date ---
+//     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+//     // --- Transaction Summary ---
+//     const transactionSummary = {
+//       opening_balance: customer.account_balance ? 1 : 0,
+//       sales: sales.length,
+//       receipt: receipts.length,
+//       sales_return: salesReturns.length,
+//       purchase_return: 0,
+//       banking: 0,
+//       journal: 0,
+//     };
+
+//     const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
+
+//     // --- Ledger Summary ---
+//     const totalSales = sales.reduce((a, b) => a + b.total.toNumber(), 0);
+//     const totalReceipt = receipts.reduce((a, b) => a + (b.total_amount?.toNumber() || 0), 0);
+//     const totalReturn = salesReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+
+//     const closingBalance = openingBalance - totalSales + (totalReturn + totalReceipt);
+
+//     const ledgerSummary = {
+//       opening_balance: Math.abs(customer.account_balance || 0),
+//       opening_balance_type: customer.balance_type || "Cr",
+//       total_sales: totalSales,
+//       total_returns: totalReturn,
+//       total_receipts: totalReceipt,
+//       balance: Math.abs(closingBalance),
+//       balance_type: closingBalance > 0 ? "Dr" : "Cr",
+//     };
+
+//     // --- Response ---
+//     return res.status(200).json({
+//       customer,
+//       transactions,
+//       ledger_summary: ledgerSummary,
+//       transaction_summary: {
+//         ...transactionSummary,
+//         total_transactions: totalTransactions,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error fetching customer ledger:", error);
+//     res.status(500).json({ message: "Internal server error", error });
+//   }
+// };
+
+
+// export const getCustomerLedger = async (req, res) => {
+//   try {
+//     // Match the route param names
+//     const { customer_id, company_id } = req.params;
+
+//     const customerIdNum = Number(customer_id);
+//     const companyIdNum = Number(company_id);
+
+//     if (isNaN(customerIdNum) || isNaN(companyIdNum)) {
+//       return res.status(400).json({ message: "Invalid customer or company ID" });
+//     }
+
+//     // --- Fetch Customer Info ---
+//     const customer = await prisma.vendorscustomer.findUnique({
+//       where: { id: customerIdNum },
+//       include: {
+//         company: {
+//           select: {
+//             name: true,
+//             email: true,
+//             phone: true,
+//           },
+//         },
+//       },
+//     });
+
+//     if (!customer) {
+//       return res.status(404).json({ message: "Customer not found" });
+//     }
+
+//     // --- Fetch All Transactions ---
+//     const [sales, salesReturns] = await Promise.all([
+//       prisma.salesorder.findMany({
+//         where: {
+//           company_id: companyIdNum,
+//           bill_to_customer_name: customer.name_english,
+//         },
+//         include: { salesorderitems: true },
+//       }),
+
+//       prisma.sales_return.findMany({
+//         where: {
+//           company_id: companyIdNum,
+//           customer_id: customerIdNum,
+//         },
+//         include: { sales_return_items: true },
+//       }),
+//     ]);
+
+//     // --- Prepare Transactions ---
+//     const transactions = [];
+//     let openingBalance = 0;
+
+//     if (customer.account_balance && customer.account_balance !== 0) {
+//       const type = customer.balance_type || "Cr";
+//       openingBalance = type === "Dr" ? customer.account_balance : -customer.account_balance;
+
+//       transactions.push({
+//         date: customer.creation_date || customer.created_at || new Date(),
+//         particulars: "Opening Balance",
+//         vch_type: "Opening",
+//         vch_no: "--",
+//         debit: type === "Dr" ? customer.account_balance : 0,
+//         credit: type === "Cr" ? customer.account_balance : 0,
+//         balance: openingBalance,
+//         items: [],
+//       });
+//     }
+
+//     let runningBalance = openingBalance;
+
+//     // 🧾 Sales (Credit)
+//     sales.forEach((s) => {
+//       const total = s.total.toNumber();
+//       runningBalance -= total;
+//       transactions.push({
+//         date: s.created_at,
+//         particulars: `Sales Invoice ${s.SO_no || ""}`,
+//         vch_type: "Sales",
+//         vch_no: s.SO_no,
+//         debit: 0,
+//         credit: total,
+//         balance: runningBalance,
+//         items: s.salesorderitems.map((i) => ({
+//           item_name: i.item_name,
+//           quantity: i.qty.toNumber(),
+//           rate: i.rate.toNumber(),
+//           value: i.amount.toNumber(),
+//         })),
+//       });
+//     });
+
+//     // 🔁 Sales Returns (Debit)
+//     salesReturns.forEach((r) => {
+//       const total = r.grand_total.toNumber();
+//       runningBalance += total;
+//       transactions.push({
+//         date: r.return_date,
+//         particulars: `Sales Return ${r.return_no}`,
+//         vch_type: "Sales Return",
+//         vch_no: r.return_no,
+//         debit: total,
+//         credit: 0,
+//         balance: runningBalance,
+//         items: r.sales_return_items.map((i) => ({
+//           item_name: i.item_name,
+//           quantity: i.quantity.toNumber(),
+//           rate: i.rate.toNumber(),
+//           value: i.amount.toNumber(),
+//         })),
+//       });
+//     });
+
+//     // --- Sort by Date ---
+//     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+//     // --- Transaction Summary ---
+//     const transactionSummary = {
+//       opening_balance: customer.account_balance ? 1 : 0,
+//       sales: sales.length,
+//       sales_return: salesReturns.length,
+//       purchase_return: 0,
+//       banking: 0,
+//       journal: 0,
+//     };
+
+//     const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
+
+//     // --- Ledger Summary ---
+//     const totalSales = sales.reduce((a, b) => a + b.total.toNumber(), 0);
+//     const totalReturn = salesReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+
+//     const closingBalance = openingBalance - totalSales + totalReturn;
+
+//     const ledgerSummary = {
+//       opening_balance: Math.abs(customer.account_balance || 0),
+//       opening_balance_type: customer.balance_type || "Cr",
+//       total_sales: totalSales,
+//       total_returns: totalReturn,
+//       total_receipts: 0, // Since receipts are removed, set to 0
+//       balance: Math.abs(closingBalance),
+//       balance_type: closingBalance > 0 ? "Dr" : "Cr",
+//     };
+
+//     // --- Response ---
+//     return res.status(200).json({
+//       customer,
+//       transactions,
+//       ledger_summary: ledgerSummary,
+//       transaction_summary: {
+//         ...transactionSummary,
+//         total_transactions: totalTransactions,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error fetching customer ledger:", error);
+//     res.status(500).json({ message: "Internal server error", error });
+//   }
+// };
+
+export const getCustomerLedger = async (req, res) => {
+  try {
+    const { customer_id, company_id } = req.params;
+    const customerIdNum = Number(customer_id);
+    const companyIdNum = Number(company_id);
+
+    if (isNaN(customerIdNum) || isNaN(companyIdNum)) {
+      return res.status(400).json({ message: "Invalid customer or company ID" });
+    }
+
+    // --- Fetch Customer Info ---
+    const customer = await prisma.vendorscustomer.findUnique({
+      where: { id: customerIdNum },
+      include: {
+        company: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // --- Fetch All Transactions ---
+    const [sales, salesReturns, payments] = await Promise.all([
+      prisma.salesorder.findMany({
+        where: {
+          company_id: companyIdNum,
+          bill_to_customer_name: customer.name_english,
+        },
+        include: { salesorderitems: true },
+      }),
+
+      prisma.sales_return.findMany({
+        where: {
+          company_id: companyIdNum,
+          customer_id: customerIdNum,
+        },
+        include: { sales_return_items: true },
+      }),
+
+      // ADD: Fetch payments
+      prisma.income_vouchers.findMany({
+        where: {
+          company_id: companyIdNum,
+          received_from: customerIdNum,
+        },
+      }),
+    ]);
+
+    // --- Prepare Transactions ---
+    const transactions = [];
+    let openingBalance = 0;
+
+    if (customer.account_balance && customer.account_balance !== 0) {
+      const type = customer.balance_type || "Cr";
+      openingBalance = type === "Dr" ? customer.account_balance : -customer.account_balance;
+
+      transactions.push({
+        date: customer.creation_date || customer.created_at || new Date(),
+        particulars: "Opening Balance",
+        vch_type: "Opening",
+        vch_no: "--",
+        debit: type === "Dr" ? customer.account_balance : 0,
+        credit: type === "Cr" ? customer.account_balance : 0,
+        balance: openingBalance,
+        items: [],
+      });
+    }
+
+    let runningBalance = openingBalance;
+
+    // 🧾 Sales (Debit: increases balance)
+    sales.forEach((s) => {
+      const total = s.total.toNumber();
+      runningBalance += total; // CHANGED: += for debit
+      transactions.push({
+        date: s.created_at,
+        particulars: `Sales Invoice ${s.SO_no || ""}`,
+        vch_type: "Sales",
+        vch_no: s.SO_no,
+        debit: total, // CHANGED: debit
+        credit: 0,
+        balance: runningBalance,
+        items: s.salesorderitems.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.qty.toNumber(),
+          rate: i.rate.toNumber(),
+          value: i.amount.toNumber(),
+        })),
+      });
+    });
+
+    // 🔁 Sales Returns (Credit: decreases balance)
+    salesReturns.forEach((r) => {
+      const total = r.grand_total.toNumber();
+      runningBalance -= total; // CHANGED: -= for credit
+      transactions.push({
+        date: r.return_date,
+        particulars: `Sales Return ${r.return_no}`,
+        vch_type: "Sales Return",
+        vch_no: r.return_no,
+        debit: 0,
+        credit: total, // CHANGED: credit
+        balance: runningBalance,
+        items: r.sales_return_items.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.quantity.toNumber(),
+          rate: i.rate.toNumber(),
+          value: i.amount.toNumber(),
+        })),
+      });
+    });
+
+    // 💳 Payments (Credit: decreases balance)
+    payments.forEach((p) => {
+      const total = p.total_amount.toNumber();
+      runningBalance -= total;
+      transactions.push({
+        date: p.voucher_date,
+        particulars: `Payment Received ${p.auto_receipt_no || ""}`,
+        vch_type: "Receipt",
+        vch_no: p.auto_receipt_no,
+        debit: 0,
+        credit: total,
+        balance: runningBalance,
+        items: [],
+      });
+    });
+
+    // --- Sort by Date ---
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // --- Transaction Summary ---
+    const transactionSummary = {
+      opening_balance: customer.account_balance ? 1 : 0,
+      sales: sales.length,
+      sales_return: salesReturns.length,
+      receipts: payments.length, // ADD
+      purchase_return: 0,
+      banking: 0,
+      journal: 0,
+    };
+
+    const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
+
+    // --- Ledger Summary ---
+    const totalSales = sales.reduce((a, b) => a + b.total.toNumber(), 0);
+    const totalReturn = salesReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+    const totalReceipts = payments.reduce((a, b) => a + b.total_amount.toNumber(), 0); // ADD
+
+    const closingBalance = openingBalance + totalSales - totalReturn - totalReceipts;
+
+    const ledgerSummary = {
+      opening_balance: Math.abs(customer.account_balance || 0),
+      opening_balance_type: customer.balance_type || "Cr",
+      total_sales: totalSales,
+      total_returns: totalReturn,
+      total_receipts: totalReceipts, // ADD
+      balance: Math.abs(closingBalance),
+      balance_type: closingBalance >= 0 ? "Dr" : "Cr", // CHANGED condition
+    };
+
+    // --- Response ---
+    return res.status(200).json({
+      customer,
+      transactions,
+      ledger_summary: ledgerSummary,
+      transaction_summary: {
+        ...transactionSummary,
+        total_transactions: totalTransactions,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching customer ledger:", error);
+    res.status(500).json({ message: "Internal server error", error });
+  }
+};

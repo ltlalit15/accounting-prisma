@@ -117,6 +117,14 @@ model users {
   favicon_url           String? @db.VarChar(500)
   company_logo_url      String? @db.VarChar(500)
   company_dark_logo_url String? @db.VarChar(500)
+
+   bank_name            String? @db.VarChar(150)
+  account_number       String? @db.VarChar(50)
+  account_holder       String? @db.VarChar(150)
+  ifsc_code            String? @db.VarChar(50)
+  notes                String? @db.VarChar(1000)
+  terms_and_conditions String? @db.VarChar(1000)
+
 }
 
 enum Role {
@@ -620,23 +628,6 @@ model tax_classes {
   updated_at DateTime @updatedAt
   invoices   pos_invoices[]
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 model pos_invoice_products {
   id         Int     @id @default(autoincrement())
