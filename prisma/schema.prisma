@@ -379,10 +379,10 @@ model uoms {
 model unit_details {
   id              Int      @id @default(autoincrement())
   company_id      Int?
-  uom_id          Int?
+  uom_name        String?   @db.VarChar(100) 
+  category        String
   weight_per_unit Float? // ✅ No @db.VarChar — let Prisma choose REAL/DOUBLE
   created_at      DateTime @default(now()) @db.Timestamp(0)
-
   products        products[]
 }
 

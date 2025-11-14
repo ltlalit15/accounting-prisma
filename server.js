@@ -2,22 +2,32 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import mainAppRouters from "./app.js";
+import mainAppRouters from "./app.js"; // Your routes
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
+
+// Load environment variables
+dotenv.config();
+
+// Load Swagger JSON
 const swaggerFile = JSON.parse(
   fs.readFileSync(new URL('./swagger-output.json', import.meta.url), 'utf8')
 );
 
-dotenv.config();
 const app = express();
-
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
 app.use(express.json());
 
+// Enable CORS for React frontend
+app.use(cors({
+  origin: 'http://localhost:5173', // React dev server
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true // if you need cookies/auth
+}));
+
+// Logger
 app.use(morgan('dev'));
 
 // Root route
@@ -25,9 +35,12 @@ app.get("/", (req, res) => {
   res.send("🚀 Server is running successfully!");
 });
 
+// Swagger API docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
+
+// Main API routes
 app.use("/api/v1", mainAppRouters);
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));

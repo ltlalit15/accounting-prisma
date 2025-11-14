@@ -51,7 +51,7 @@ router.use("/taxclasses", taxClassRoutes);
 router.use("/posinvoice", posinvoiceRoutes);
 router.use("/", purchase);
 router.use("/sales-return", salesreturn);
-router.use("/", salesorder);
+router.use("/sales-order", salesorder);
 router.use("/sales-reports", salesReport);
 router.use("/purchase-reports", purchaseReport);
 router.use("/companies", company);

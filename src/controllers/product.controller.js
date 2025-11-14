@@ -290,6 +290,117 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
+// export const getProductsByCompany = async (req, res) => {
+//   try {
+//     const { company_id } = req.params;
+
+//     // ✅ Validate company_id
+//     const companyId = Number(company_id);
+//     if (!companyId || isNaN(companyId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid or missing company_id parameter",
+//       });
+//     }
+
+//     // ✅ Fetch products with related data
+//     const products = await prisma.products.findMany({
+//       where: { company_id: companyId },
+//       include: {
+//         product_warehouses: {
+//           include: {
+//             warehouse: {
+//               select: {
+//                 id: true,
+//                 warehouse_name: true,
+//                 location: true,
+//               },
+//             },
+//           },
+//         },
+//         item_category: {
+//           select: {
+//             id: true,
+//             item_category_name: true,
+//           },
+//         },
+//         unit_detail: {
+//           select: {
+//             id: true,
+//             company_id: true,
+//             uom_id: true,
+//             weight_per_unit: true,
+//             created_at: true,
+//           },
+//         },
+//       },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     // ✅ Format and flatten warehouses
+//     const formattedProducts = products.map((product) => {
+//       const warehouses = product.product_warehouses.map((pw) => ({
+//         warehouse_id: pw.warehouse?.id,
+//         warehouse_name: pw.warehouse?.warehouse_name,
+//         location: pw.warehouse?.location,
+//         stock_qty: pw.stock_qty ?? 0,
+//       }));
+
+//       const totalStock =
+//         product.total_stock ??
+//         warehouses.reduce((sum, w) => sum + (w.stock_qty || 0), 0);
+
+//       return {
+//         id: product.id,
+//         company_id: product.company_id,
+//         item_category: product.item_category,
+//         unit_detail: product.unit_detail,
+//         item_name: product.item_name,
+//         hsn: product.hsn,
+//         barcode: product.barcode,
+//         sku: product.sku,
+//         description: product.description,
+//         initial_qty: product.initial_qty,
+//         min_order_qty: product.min_order_qty,
+//         as_of_date: product.as_of_date,
+//         initial_cost: product.initial_cost,
+//         sale_price: product.sale_price,
+//         purchase_price: product.purchase_price,
+//         discount: product.discount,
+//         tax_account: product.tax_account,
+//         remarks: product.remarks,
+//         total_stock: totalStock,
+//         image: product.image,
+//         warehouses,
+//         created_at: product.created_at,
+//         updated_at: product.updated_at,
+//       };
+//     });
+
+//     if (formattedProducts.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `No products found for company_id ${companyId}`,
+//       });
+//     }
+
+//     // ✅ Final success response
+//     return res.status(200).json({
+//       success: true,
+//       message: `✅ Products fetched successfully for company_id ${companyId}`,
+//       total_products: formattedProducts.length,
+//       data: formattedProducts,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get products by company error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };;
+
 export const getProductsByCompany = async (req, res) => {
   try {
     const { company_id } = req.params;
@@ -328,7 +439,8 @@ export const getProductsByCompany = async (req, res) => {
           select: {
             id: true,
             company_id: true,
-            uom_id: true,
+            uom_name: true,     // Using uom_name instead of uom_id
+            category: true,      // Include category field
             weight_per_unit: true,
             created_at: true,
           },
@@ -399,8 +511,7 @@ export const getProductsByCompany = async (req, res) => {
       error: error.message,
     });
   }
-};;
-
+};
 export const getProductsByCompanyAndWarehouse = async (req, res) => {
   try {
     const { company_id, warehouse_id } = req.params;
