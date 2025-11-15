@@ -31,7 +31,8 @@ app.use(express.json());
 app.use(cors({
   origin: [
     'http://localhost:5173',          // React local dev
-    'https://zirak-book.netlify.app'  // Deployed frontend
+    'https://zirak-book.netlify.app', // Deployed frontend
+    'https://erp-accounting-new.netlify.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
