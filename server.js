@@ -21,11 +21,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Enable CORS for React frontend
+// app.use(cors({
+//   origin: 'http://localhost:5173', // React dev server
+//   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+//   credentials: true // if you need cookies/auth
+// }));
+
+
 app.use(cors({
-  origin: 'http://localhost:5173', // React dev server
+  origin: [
+    'http://localhost:5173',          // React local dev
+    'https://zirak-book.netlify.app'  // Deployed frontend
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true // if you need cookies/auth
+  credentials: true
 }));
+
 
 // Logger
 app.use(morgan('dev'));
