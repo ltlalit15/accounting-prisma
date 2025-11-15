@@ -5,6 +5,7 @@ import {
   createProduct,
   deleteProduct,
   getAllProducts,
+  getInventoryItemDetails,
   getProductById,
   getProductsByCompany,
   getProductsByCompanyAndWarehouse,
@@ -21,6 +22,9 @@ router.get("/", getAllProducts);
 
 // 🟢 Get by company_id
 router.get("/company/:company_id", getProductsByCompany);
+
+
+router.get("/item-details/:product_id/:company_id", getInventoryItemDetails);
 
 // 🟢 Get by company_id + warehouse_id
 router.get(

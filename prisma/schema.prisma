@@ -668,6 +668,9 @@ model salesorder {
   Challan_no                        String?                    @db.VarChar(100)
   Manual_challan_no                 String?                    @db.VarChar(100)
   Manual_DC_no                      String?                    @db.VarChar(100)
+  status                        String?   @default("pending")
+  invoice_date      DateTime?   @db.Date
+  payment_date                       DateTime?   @db.Date
   SO_no                             String?                    @db.VarChar(100)
   customer_ref                      String?                    @db.VarChar(100)
   quotation_no                      String?                    @db.VarChar(100)

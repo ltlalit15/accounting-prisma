@@ -416,3 +416,697 @@ export const deleteTransaction = async (req, res) => {
     });
   }
 };
+
+
+// export const getLedger = async (req, res) => {
+
+
+//   try {
+//     const { 
+//       company_id, 
+//       account_type, 
+//       from_type, 
+//       from_id,
+//       from_date, 
+//       to_date, 
+//       page = 1, 
+//       limit = 50 
+//     } = req.query;
+    
+//     const skip = (page - 1) * limit;
+//     const limitNum = parseInt(limit);
+    
+//     // Build filters
+//     const where = {};
+    
+//     if (company_id) where.company_id = parseInt(company_id);
+//     if (account_type) where.account_type = account_type;
+//     if (from_type) where.from_type = from_type;
+//     if (from_id) where.from_id = parseInt(from_id);
+    
+//     // Build date filter - handle as string since schema defines it as String
+//     if (from_date || to_date) {
+//       where.date = {};
+//       if (from_date) where.date.gte = from_date;
+//       if (to_date) where.date.lte = to_date;
+//     }
+    
+//     // Get transactions with pagination
+//     const [transactions, total] = await Promise.all([
+//       prisma.transactions.findMany({
+//         where,
+//         orderBy: [
+//           { date: 'asc' },
+//           { created_at: 'asc' }
+//         ],
+//         skip,
+//         take: limitNum,
+//         include: {
+//           company: {
+//             select: { id: true, name: true }
+//           }
+//         }
+//       }),
+//       prisma.transactions.count({ where })
+//     ]);
+    
+//     if (!transactions.length) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No transactions found",
+//         data: {
+//           transactions: [],
+//           opening_balance: 0,
+//           closing_balance: 0,
+//           total_debits: 0,
+//           total_credits: 0
+//         }
+//       });
+//     }
+    
+//     // Get all vendor/customer IDs from transactions
+//     const vendorCustomerIds = [
+//       ...new Set(
+//         transactions
+//           .filter(t => ["vender", "vendor", "customer"].includes(String(t.from_type).toLowerCase()))
+//           .map(t => t.from_id)
+//       )
+//     ];
+    
+//     // Fetch vendor/customer details
+//     const vendorCustomers = await prisma.vendorscustomer.findMany({
+//       where: { id: { in: vendorCustomerIds } },
+//       select: {
+//         id: true,
+//         type: true,
+//         name_english: true,
+//         name_arabic: true,
+//         company_name: true,
+//       },
+//     });
+    
+//     // Create lookup map
+//     const vendorMap = {};
+//     vendorCustomers.forEach(vc => {
+//       vendorMap[vc.id] = vc;
+//     });
+    
+//     // Calculate opening balance (transactions before from_date)
+//     let openingBalance = 0;
+//     if (from_date) {
+//       const openingTransactions = await prisma.transactions.findMany({
+//         where: {
+//           ...where,
+//           date: { lt: from_date }
+//         },
+//         select: {
+//           balance_type: true,
+//           amount: true
+//         }
+//       });
+      
+//       openingTransactions.forEach(tx => {
+//         const amount = parseFloat(tx.amount || 0);
+//         // Fixed: Check actual balance_type field, not voucher_type
+//         if (tx.balance_type === 'Debit') {
+//           openingBalance -= amount;
+//         } else {
+//           openingBalance += amount;
+//         }
+//       });
+//     }
+    
+//     // Enrich transactions with vendor/customer data and calculate running balance
+//     let balance = openingBalance;
+//     const ledgerWithBalance = transactions.map(tx => {
+//       const amount = parseFloat(tx.amount || 0);
+      
+//       // Fixed: Use balance_type field for calculation
+//       if (tx.balance_type === 'Debit') {
+//         balance -= amount;
+//       } else {
+//         balance += amount;
+//       }
+      
+//       return {
+//         ...tx,
+//         amount,
+//         running_balance: balance,
+//         from_entity: vendorMap[tx.from_id] && 
+//           ["vender", "vendor", "customer"].includes(String(tx.from_type).toLowerCase())
+//           ? vendorMap[tx.from_id]
+//           : null,
+//       };
+//     });
+    
+//     // Calculate totals
+//     let totalDebits = 0;
+//     let totalCredits = 0;
+    
+//     ledgerWithBalance.forEach(tx => {
+//       if (tx.balance_type === 'Debit') {
+//         totalDebits += tx.amount;
+//       } else {
+//         totalCredits += tx.amount;
+//       }
+//     });
+    
+//     // Get closing balance
+//     const closingBalance = ledgerWithBalance.length > 0 
+//       ? ledgerWithBalance[ledgerWithBalance.length - 1].running_balance 
+//       : openingBalance;
+    
+//     // Return flat array of transactions (not grouped by account_type)
+//     res.status(200).json({
+//       success: true,
+//       message: "Ledger fetched successfully",
+//       data: {
+//         transactions: ledgerWithBalance,
+//         opening_balance: openingBalance,
+//         closing_balance: closingBalance,
+//         total_debits: totalDebits,
+//         total_credits: totalCredits
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error fetching ledger:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch ledger",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+// ✅ Get Ledger
+// ✅ Get Ledger
+// export const getLedger = async (req, res) => {
+//   try {
+//     const { 
+//       company_id, 
+//       account_type, 
+//       from_type, 
+//       from_id,
+//       from_date, 
+//       to_date, 
+//       page = 1, 
+//       limit = 50 
+//     } = req.query;
+    
+//     const skip = (page - 1) * limit;
+//     const limitNum = parseInt(limit);
+    
+//     // Build filters
+//     const where = {};
+    
+//     if (company_id) where.company_id = parseInt(company_id);
+//     if (account_type) where.account_type = account_type;
+//     if (from_type) where.from_type = from_type;
+//     if (from_id) where.from_id = parseInt(from_id);
+    
+//     // Build date filter - handle as string since schema defines it as String
+//     if (from_date || to_date) {
+//       where.date = {};
+//       if (from_date) where.date.gte = from_date;
+//       if (to_date) where.date.lte = to_date;
+//     }
+    
+//     // Get transactions with pagination
+//     const [transactions, total] = await Promise.all([
+//       prisma.transactions.findMany({
+//         where,
+//         orderBy: [
+//           { date: 'asc' },
+//           { created_at: 'asc' }
+//         ],
+//         skip,
+//         take: limitNum,
+//         include: {
+//           company: {
+//             select: { id: true, name: true }
+//           }
+//         }
+//       }),
+//       prisma.transactions.count({ where })
+//     ]);
+    
+//     if (!transactions.length) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No transactions found",
+//         data: {
+//           transactions: [],
+//           opening_balance: 0,
+//           closing_balance: 0,
+//           total_debits: 0,
+//           total_credits: 0
+//         }
+//       });
+//     }
+    
+//     // Get all vendor/customer IDs from transactions
+//     const vendorCustomerIds = [
+//       ...new Set(
+//         transactions
+//           .filter(t => ["vender", "vendor", "customer"].includes(String(t.from_type).toLowerCase()))
+//           .map(t => t.from_id)
+//       )
+//     ];
+    
+//     // Fetch vendor/customer details
+//     const vendorCustomers = await prisma.vendorscustomer.findMany({
+//       where: { id: { in: vendorCustomerIds } },
+//       select: {
+//         id: true,
+//         type: true,
+//         name_english: true,
+//         name_arabic: true,
+//         company_name: true,
+//       },
+//     });
+    
+//     // Create lookup map
+//     const vendorMap = {};
+//     vendorCustomers.forEach(vc => {
+//       vendorMap[vc.id] = vc;
+//     });
+    
+//     // Calculate opening balance (transactions before from_date)
+//     let openingBalance = 0;
+//     if (from_date) {
+//       const openingTransactions = await prisma.transactions.findMany({
+//         where: {
+//           ...where,
+//           date: { lt: from_date }
+//         },
+//         select: {
+//           balance_type: true,
+//           amount: true
+//         }
+//       });
+      
+//       openingTransactions.forEach(tx => {
+//         const amount = parseFloat(tx.amount || 0);
+//         // Treat "Make Payment" as debit (money going out)
+//         if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//           openingBalance -= amount;
+//         } else {
+//           openingBalance += amount;
+//         }
+//       });
+//     }
+    
+//     // Enrich transactions with vendor/customer data and calculate running balance
+//     let balance = openingBalance;
+//     const ledgerWithBalance = transactions.map(tx => {
+//       const amount = parseFloat(tx.amount || 0);
+      
+//       // Update running balance - treat "Make Payment" as debit
+//       if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//         balance -= amount;
+//       } else {
+//         balance += amount;
+//       }
+      
+//       return {
+//         ...tx,
+//         amount,
+//         running_balance: balance,
+//         from_entity: vendorMap[tx.from_id] && 
+//           ["vender", "vendor", "customer"].includes(String(tx.from_type).toLowerCase())
+//           ? vendorMap[tx.from_id]
+//           : null,
+//       };
+//     });
+    
+//     // Calculate totals
+//     let totalDebits = 0;
+//     let totalCredits = 0;
+    
+//     ledgerWithBalance.forEach(tx => {
+//       // Treat "Make Payment" as debit
+//       if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//         totalDebits += tx.amount;
+//       } else {
+//         totalCredits += tx.amount;
+//       }
+//     });
+    
+//     // Get closing balance
+//     const closingBalance = ledgerWithBalance.length > 0 
+//       ? ledgerWithBalance[ledgerWithBalance.length - 1].running_balance 
+//       : openingBalance;
+    
+//     res.status(200).json({
+//       success: true,
+//       message: "Ledger fetched successfully",
+//       data: {
+//         transactions: ledgerWithBalance,
+//         opening_balance: openingBalance,
+//         closing_balance: closingBalance,
+//         total_debits: totalDebits,
+//         total_credits: totalCredits
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error fetching ledger:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch ledger",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// export const getLedger = async (req, res) => {
+//   try {
+//     const { 
+//       company_id, 
+//       account_type, 
+//       from_type, 
+//       from_id,
+//       from_date, 
+//       to_date, 
+//       page = 1, 
+//       limit = 50 
+//     } = req.query;
+    
+//     const skip = (page - 1) * limit;
+//     const limitNum = parseInt(limit);
+    
+//     // Build filters
+//     const where = {};
+    
+//     if (company_id) where.company_id = parseInt(company_id);
+//     if (account_type) where.account_type = account_type;
+//     if (from_type) where.from_type = from_type;
+//     if (from_id) where.from_id = parseInt(from_id);
+    
+//     // Build date filter - handle as string since schema defines it as String
+//     if (from_date || to_date) {
+//       where.date = {};
+//       if (from_date) where.date.gte = from_date;
+//       if (to_date) where.date.lte = to_date;
+//     }
+    
+//     // Get transactions with pagination
+//     const [transactions, total] = await Promise.all([
+//       prisma.transactions.findMany({
+//         where,
+//         orderBy: [
+//           { date: 'asc' },
+//           { created_at: 'asc' }
+//         ],
+//         skip,
+//         take: limitNum,
+//         include: {
+//           company: {
+//             select: { id: true, name: true }
+//           }
+//         }
+//       }),
+//       prisma.transactions.count({ where })
+//     ]);
+    
+//     if (!transactions.length) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No transactions found",
+//         data: {
+//           transactions: [],
+//           opening_balance: 0,
+//           closing_balance: 0,
+//           total_debits: 0,
+//           total_credits: 0
+//         }
+//       });
+//     }
+    
+//     // Get all vendor/customer IDs from transactions
+//     const vendorCustomerIds = [
+//       ...new Set(
+//         transactions
+//           .filter(t => ["vender", "vendor", "customer"].includes(String(t.from_type).toLowerCase()))
+//           .map(t => t.from_id)
+//       )
+//     ];
+    
+//     // Fetch vendor/customer details
+//     const vendorCustomers = await prisma.vendorscustomer.findMany({
+//       where: { id: { in: vendorCustomerIds } },
+//       select: {
+//         id: true,
+//         type: true,
+//         name_english: true,
+//         name_arabic: true,
+//         company_name: true,
+//       },
+//     });
+    
+//     // Create lookup map
+//     const vendorMap = {};
+//     vendorCustomers.forEach(vc => {
+//       vendorMap[vc.id] = vc;
+//     });
+    
+//     // Calculate opening balance (transactions before from_date)
+//     let openingBalance = 0;
+//     if (from_date) {
+//       const openingTransactions = await prisma.transactions.findMany({
+//         where: {
+//           ...where,
+//           date: { lt: from_date }
+//         },
+//         select: {
+//           balance_type: true,
+//           amount: true
+//         }
+//       });
+      
+//       openingTransactions.forEach(tx => {
+//         const amount = parseFloat(tx.amount || 0);
+//         // Treat "Make Payment" as debit (money going out)
+//         if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//           openingBalance -= amount;
+//         } else {
+//           openingBalance += amount;
+//         }
+//       });
+//     }
+    
+//     // Enrich transactions with vendor/customer data and calculate running balance
+//     let balance = openingBalance;
+//     const ledgerWithBalance = transactions.map(tx => {
+//       const amount = parseFloat(tx.amount || 0);
+      
+//       // Update running balance - treat "Make Payment" as debit
+//       if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//         balance -= amount;
+//       } else {
+//         balance += amount;
+//       }
+      
+//       return {
+//         ...tx,
+//         amount,
+//         running_balance: balance,
+//         from_entity: vendorMap[tx.from_id] && 
+//           ["vender", "vendor", "customer"].includes(String(tx.from_type).toLowerCase())
+//           ? vendorMap[tx.from_id]
+//           : null,
+//       };
+//     });
+    
+//     // Calculate totals
+//     let totalDebits = 0;
+//     let totalCredits = 0;
+    
+//     ledgerWithBalance.forEach(tx => {
+//       // Treat "Make Payment" as debit
+//       if (tx.balance_type === 'Debit' || tx.balance_type === 'Make Payment') {
+//         totalDebits += tx.amount;
+//       } else {
+//         totalCredits += tx.amount;
+//       }
+//     });
+    
+//     // Get closing balance
+//     const closingBalance = ledgerWithBalance.length > 0 
+//       ? ledgerWithBalance[ledgerWithBalance.length - 1].running_balance 
+//       : openingBalance;
+    
+//     res.status(200).json({
+//       success: true,
+//       message: "Ledger fetched successfully",
+//       data: {
+//         transactions: ledgerWithBalance,
+//         opening_balance: openingBalance,
+//         closing_balance: closingBalance,
+//         total_debits: totalDebits,
+//         total_credits: totalCredits
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error fetching ledger:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch ledger",
+//       error: error.message,
+//     });
+//   }
+// };
+export const getLedger = async (req, res) => {
+  try {
+    const { 
+      company_id, 
+      account_type, 
+      from_type, 
+      from_id,
+      from_date, 
+      to_date
+    } = req.query;
+
+    const where = {};
+
+    if (company_id) where.company_id = parseInt(company_id);
+    if (account_type) where.account_type = account_type;
+    if (from_type) where.from_type = from_type;
+    if (from_id) where.from_id = parseInt(from_id);
+
+    if (from_date || to_date) {
+      where.date = {};
+      if (from_date) where.date.gte = from_date;
+      if (to_date) where.date.lte = to_date;
+    }
+
+    const transactions = await prisma.transactions.findMany({
+      where,
+      orderBy: [
+        { date: "asc" },
+        { created_at: "asc" }
+      ],
+      include: {
+        company: { select: { id: true, name: true } }
+      }
+    });
+
+    if (!transactions.length) {
+      return res.status(200).json({
+        success: true,
+        message: "No transactions found",
+        data: {
+          transactions: [],
+          opening_balance: 0,
+          closing_balance: 0,
+          total_debits: 0,
+          total_credits: 0
+        }
+      });
+    }
+
+    // Get vendor/customer list
+    const vendorCustomerIds = [
+      ...new Set(
+        transactions
+          .filter(t => ["vender", "vendor", "customer"].includes(String(t.from_type).toLowerCase()))
+          .map(t => t.from_id)
+      )
+    ];
+
+    const vendorCustomers = await prisma.vendorscustomer.findMany({
+      where: { id: { in: vendorCustomerIds } },
+      select: {
+        id: true,
+        type: true,
+        name_english: true,
+        company_name: true
+      }
+    });
+
+    const vendorMap = {};
+    vendorCustomers.forEach(v => vendorMap[v.id] = v);
+
+    // Opening balance
+    let openingBalance = 0;
+
+    if (from_date) {
+      const openingTx = await prisma.transactions.findMany({
+        where: { ...where, date: { lt: from_date } },
+        select: { balance_type: true, amount: true }
+      });
+
+      openingTx.forEach(tx => {
+        const amt = parseFloat(tx.amount || 0);
+        if (tx.balance_type === "Make Payment" || tx.balance_type === "Debit") {
+          openingBalance -= amt;
+        } else {
+          openingBalance += amt;
+        }
+      });
+    }
+
+    // Build Ledger View
+    let balance = openingBalance;
+    let totalDebits = 0;
+    let totalCredits = 0;
+
+    const ledger = transactions.map(tx => {
+      const amount = parseFloat(tx.amount || 0);
+
+      let debit = 0;
+      let credit = 0;
+
+      if (tx.balance_type === "Make Payment" || tx.balance_type === "Debit") {
+        debit = amount;
+        balance -= amount;
+        totalDebits += amount;
+      } else {
+        credit = amount;
+        balance += amount;
+        totalCredits += amount;
+      }
+
+      const entity = vendorMap[tx.from_id];
+      const from_to = entity
+        ? (entity.company_name || entity.name_english)
+        : "";
+
+      const balanceType = balance >= 0 ? "Cr" : "Dr";
+      const formattedBalance = Math.abs(balance) + " " + balanceType;
+
+      return {
+        id: tx.id,
+        date: tx.date,
+        voucher_type: tx.voucher_type,
+        voucher_no: tx.voucher_no,
+        from_to,
+        debit,
+        credit,
+        balance: formattedBalance
+      };
+    });
+
+    const closingBalance = balance;
+
+    res.status(200).json({
+      success: true,
+      message: "Ledger fetched successfully",
+      data: {
+        transactions: ledger,
+        opening_balance: openingBalance,
+        closing_balance: closingBalance,
+        total_debits: totalDebits,
+        total_credits: totalCredits
+      }
+    });
+
+  } catch (error) {
+    console.error("Error fetching ledger:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch ledger",
+      error: error.message
+    });
+  }
+};

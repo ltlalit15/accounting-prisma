@@ -7,6 +7,7 @@ import {
   getTransactionsByCompany,
   getAllTransactions,
   getTransactionById,
+  getLedger,
 } from "../controllers/transactionController.js";
 
 const router = Router();
@@ -18,12 +19,13 @@ router.post("/", createTransaction);
 
 // ✅ Get all transactions (with company/customer/vendor/account details)
 router.get("/", getAllTransactions);
-
+router.get("/ledger", getLedger);
 // ✅ Get a single transaction by ID
 router.get("/:id",getTransactionById );
 
 // ✅ Get all transactions for a specific company
 router.get("/company/:company_id", getTransactionsByCompany); // Better URL clarity
+
 
 // ✅ Update a transaction by ID
 router.put("/:id", updateTransaction); // Using PUT for full/partial update (consistent with planController)

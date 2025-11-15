@@ -930,3 +930,157 @@ export const deleteProduct = async (req, res) => {
     });
   }
 };
+
+export const getInventoryItemDetails = async (req, res) => {
+  try {
+    const { product_id, company_id } = req.params;
+
+    const productId = Number(product_id);
+    const companyId = Number(company_id);
+
+    // =============================
+    // 1️⃣ PRODUCT DETAILS
+    // =============================
+    const product = await prisma.products.findUnique({
+      where: { id: productId },
+      include: {
+        item_category: true,
+        unit_detail: true,
+        product_warehouses: { include: { warehouse: true } },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // Primary warehouse (first one)
+    const primaryWarehouse =
+      product.product_warehouses.length > 0
+        ? product.product_warehouses[0].warehouse?.warehouse_name
+        : "-";
+
+    // =============================
+    // 2️⃣ ALL TRANSFER ITEMS
+    // =============================
+    const transferItems = await prisma.transfer_items.findMany({
+      where: { product_id: productId },
+      include: {
+        transfers: true,
+        warehouses: true,
+      },
+      orderBy: { id: "asc" }, // chronological order for closing stock
+    });
+
+    // =============================
+    // 3️⃣ MAP EACH ROW → EXACT UI FORMAT
+    // =============================
+    let closingQty = 0;
+
+    const mapTransaction = async (item) => {
+      const t = item.transfers;
+
+      // Fetch vendor/customer
+      const vendor = await prisma.vendorscustomer.findFirst({
+        where: { id: Number(t.company_id) },
+      });
+
+      // IN / OUT logic
+      let inwardQty = 0;
+      let outwardQty = 0;
+
+      if (t.vch_type === "Purchase") {
+        inwardQty = Number(item.qty);
+      } else if (t.vch_type === "Purchase Return") {
+        outwardQty = Number(item.qty);
+      } else if (
+        t.vch_type === "Sales Invoice" ||
+        t.vch_type === "Delivery Challan"
+      ) {
+        outwardQty = Number(item.qty);
+      } else if (t.vch_type === "Sales Return") {
+        inwardQty = Number(item.qty);
+      }
+
+      // Update closing qty
+      closingQty = closingQty + inwardQty - outwardQty;
+
+      return {
+        date: t.transfer_date,
+        vch_type: t.vch_type,
+        particulars: vendor?.name_english || "-",
+        vch_no: t.manual_voucher_no || "-",
+        voucher_no: t.voucher_no,
+        warehouse: item.warehouses?.warehouse_name || "-",
+        rate: Number(item.rate),
+        inward_qty: inwardQty,
+        inward_value: inwardQty * Number(item.rate),
+        outward_qty: outwardQty,
+        outward_value: outwardQty * Number(item.rate),
+        closing_qty: closingQty,
+        description: product.unit_detail?.unit_name || "",
+        narration: item.narration || "",
+      };
+    };
+
+    const allTransactions = await Promise.all(
+      transferItems.map((t) => mapTransaction(t))
+    );
+
+    // =============================
+    // 4️⃣ FILTER SPECIFIC SECTIONS
+    // =============================
+    const purchaseHistory = allTransactions.filter(
+      (t) => t.vch_type === "Purchase"
+    );
+
+    const salesHistory = allTransactions.filter((t) =>
+      ["Sales Invoice", "Delivery Challan"].includes(t.vch_type)
+    );
+
+    const returnHistory = allTransactions.filter((t) =>
+      ["Sales Return", "Purchase Return"].includes(t.vch_type)
+    );
+
+    // =============================
+    // 5️⃣ PRODUCT STATUS
+    // =============================
+    const status = closingQty > 0 ? "In Stock" : "Out of Stock";
+
+    // =============================
+    // 6️⃣ FINAL RESPONSE
+    // =============================
+    res.status(200).json({
+      success: true,
+      message: "Item details fetched successfully",
+
+      product: {
+        id: product.id,
+        name: product.item_name,
+        barcode: product.barcode,
+        hsn: product.hsn,
+        category: product.item_category?.category_name,
+        unit: product.unit_detail?.unit_name,
+        image: product.image,
+        current_stock: closingQty,
+        warehouse_name: primaryWarehouse, // ⭐ added
+        status: status, // ⭐ added
+      },
+
+      allTransactions,
+      purchaseHistory,
+      salesHistory,
+      returnHistory,
+    });
+  } catch (error) {
+    console.error("Inventory Error: ", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch inventory details",
+      error: error.message,
+    });
+  }
+};

@@ -492,193 +492,601 @@ export const saveOrUpdateSalesOrder = async (req, res) => {
 };
 
 // ✅ Create Sales Order (dedicated POST endpoint)
+// export const createSalesOrder = async (req, res) => {
+//   try {
+//     const data = { ...req.body };
+//     delete data.id;
+
+//     const fileFields = [
+//       "logo_url",
+//       "signature_url",
+//       "photo_url",
+//       "attach_file_url"
+//     ];
+
+//     for (const field of fileFields) {
+//       if (data[field] && data[field].startsWith("data:")) {
+//         const uploadedUrl = await uploadToCloudinary(data[field]);
+//         const dbField = field === "attach_file_url" ? "attachment_url" : field;
+//         data[dbField] = uploadedUrl || "";
+//       }
+//     }
+
+//     delete data.attach_file_url;
+
+//     // Process items data
+//     let items = [];
+//     if (data.items) {
+//       if (typeof data.items === 'string') {
+//         try {
+//           items = JSON.parse(data.items);
+//         } catch (e) {
+//           console.error("Error parsing items JSON:", e);
+//           items = [];
+//         }
+//       } else if (Array.isArray(data.items)) {
+//         items = data.items;
+//       }
+//     }
+
+//     const mappedData = {
+//       company_id: toNumber(data.company_id),
+//       company_name: data.company_name || "",
+//       company_address: data.company_address || "",
+//       company_email: data.company_email || "",
+//       company_phone: data.company_phone || "",
+//       logo_url: data.logo_url || "",
+
+//       qoutation_to_customer_name: data.qoutation_to_customer_name || data.customer_name || "",
+//       qoutation_to_customer_address: data.qoutation_to_customer_address || data.customer_address || "",
+//       qoutation_to_customer_email: data.qoutation_to_customer_email || data.customer_email || "",
+//       qoutation_to_customer_phone: data.qoutation_to_customer_phone || data.customer_phone || "",
+
+//       ref_no: data.ref_no || data.quotation_no || "",
+//       Manual_ref_ro: data.Manual_ref_ro || data.manual_ref_no || "",
+//       quotation_no: data.quotation_no || "",
+//       manual_quo_no: data.manual_quo_no || "",
+//       quotation_date: data.quotation_date ? new Date(data.quotation_date) : new Date(),
+//       valid_till: data.valid_till ? new Date(data.valid_till) : null,
+
+//       subtotal: toNumber(data.subtotal || data.sub_total || 0),
+//       tax: toNumber(data.tax || data.tax_total || 0),
+//       discount: toNumber(data.discount || data.discount_total || 0),
+//       total: toNumber(data.total || data.grand_total || 0),
+
+//       bank_name: data.bank_name || data.bank_details?.bank_name || "",
+//       account_no: data.account_no || data.bank_details?.account_no || "",
+//       account_holder: data.account_holder || data.bank_details?.account_holder || "",
+//       ifsc_code: data.ifsc_code || data.bank_details?.ifsc_code || "",
+
+//       notes: data.notes || "",
+//       terms: data.terms || data.terms_conditions || "",
+
+//       signature_url: data.signature_url || "",
+//       photo_url: data.photo_url || "",
+//       attachment_url: data.attachment_url || "",
+
+//       bill_to_attention_name: data.bill_to_attention_name || "",
+//       bill_to_company_name: data.bill_to_company_name || data.bill_to_comp_name || "",
+//       bill_to_company_address: data.bill_to_company_address || data.bill_to_comp_address || "",
+//       bill_to_company_phone: data.bill_to_company_phone || data.bill_to_comp_phone || "",
+//       bill_to_company_email: data.bill_to_company_email || data.bill_to_comp_email || "",
+
+//       bill_to_customer_name: data.bill_to_customer_name || data.bill_to_cust_name || "",
+//       bill_to_customer_address: data.bill_to_customer_address || data.bill_to_cust_addr || "",
+//       bill_to_customer_email: data.bill_to_customer_email || data.bill_to_cust_email || "",
+//       bill_to_customer_phone: data.bill_to_customer_phone || data.bill_to_cust_phone || "",
+
+//       ship_to_attention_name: data.ship_to_attention_name || "",
+//       ship_to_company_name: data.ship_to_company_name || data.ship_to_comp_name || "",
+//       ship_to_company_address: data.ship_to_company_address || data.ship_to_comp_address || "",
+//       ship_to_company_phone: data.ship_to_company_phone || data.ship_to_comp_phone || "",
+//       ship_to_company_email: data.ship_to_company_email || data.ship_to_comp_email || "",
+
+//       ship_to_customer_name: data.ship_to_customer_name || data.ship_to_cust_name || "",
+//       ship_to_customer_address: data.ship_to_customer_address || data.ship_to_cust_addr || "",
+//       ship_to_customer_email: data.ship_to_customer_email || data.ship_to_cust_email || "",
+//       ship_to_customer_phone: data.ship_to_customer_phone || data.ship_to_cust_phone || "",
+
+//       payment_received_customer_name: data.payment_received_customer_name || data.received_cust_name || "",
+//       payment_received_customer_address: data.payment_received_customer_address || data.received_addr || "",
+//       payment_received_customer_email: data.payment_received_customer_email || data.received_email || "",
+//       payment_received_customer_phone: data.payment_received_customer_phone || data.received_phone || "",
+
+//       driver_name: data.driver_name || data.driver_details?.driver_name || "",
+//       driver_phone: data.driver_phone || data.driver_details?.driver_phone || "",
+
+//       amount_received: toNumber(data.amount_received || 0),
+//       total_amount: toNumber(data.total_amount || 0),
+//       payment_status: data.payment_status || "Pending",
+//       total_invoice: toNumber(data.total_invoice || 0),
+//       balance: toNumber(data.balance || 0),
+//       payment_note: data.payment_note || data.payment_notes || "",
+
+//       quotation_status: data.quotation_status || "Pending",
+//       sales_order_status: data.sales_order_status || data.sales_status || "Pending",
+//       delivery_challan_status: data.delivery_challan_status || "Pending",
+//       invoice_status: data.invoice_status || "Pending",
+//       draft_status: data.draft_status || "Draft",
+
+//       SO_no: data.SO_no || data.so_no || "",
+//       Manual_SO_ref: data.Manual_SO_ref || data.manual_so || "",
+//       Challan_no: data.Challan_no || data.challan_no || "",
+//       Manual_challan_no: data.Manual_challan_no || data.manual_dc_no || "",
+//       Manual_DC_no: data.Manual_DC_no || data.manual_dc_no || "",
+//       invoice_no: data.invoice_no || "",
+//       Manual_invoice_no: data.Manual_invoice_no || data.manual_invoice_no || "",
+//       Payment_no: data.Payment_no || data.payment_no || "",
+//       Manual_payment_no: data.Manual_payment_no || data.manual_payment_no || data.manual_pym_no || "",
+//       customer_ref: data.customer_ref || "",
+
+//       created_at: new Date(),
+//       updated_at: new Date(),
+//     };
+
+//     const createData = {
+//       ...mappedData,
+//       salesorderitems: items.length > 0 ? {
+//         create: items.map(item => ({
+//           item_name: item.item_name || item.name || "",
+//           qty: toNumber(item.qty || item.quantity || 0),
+//           rate: toNumber(item.rate || 0),
+//           tax_percent: toNumber(item.tax_percent || item.tax || 0),
+//           discount: toNumber(item.discount || 0),
+//           amount: toNumber(item.amount) || (toNumber(item.qty || item.quantity) * toNumber(item.rate))
+//         }))
+//       } : undefined
+//     };
+
+//     const newOrder = await prisma.salesorder.create({
+//       data: createData,
+//       include: {
+//         salesorderitems: true
+//       }
+//     });
+
+//     // Structure the response by steps
+//     const structuredResponse = structureSalesOrderBySteps(newOrder);
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Sales order created successfully",
+//       data: structuredResponse
+//     });
+//   } catch (error) {
+//     console.error("Error creating sales order:", error);
+    
+//     if (error.code === 'P1001' || error.message.includes('Server has closed the connection')) {
+//       return res.status(503).json({
+//         success: false,
+//         message: "Database connection error. Please check your database connection.",
+//         error: "The database server is not reachable or the connection was closed."
+//       });
+//     }
+    
+//     if (error.code === 'P2021' || error.message.includes("doesn't exist")) {
+//       return res.status(500).json({
+//         success: false,
+//         message: "Database table not found. Please run: npx prisma db push",
+//         error: "The salesorder table does not exist in the database."
+//       });
+//     }
+    
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
+
+
+// export const createSalesOrder = async (req, res) => {
+//   try {
+//     const body = { ...req.body };
+
+//     const orderId = body.id ? Number(body.id) : null;
+
+//     // ============ VALIDATION ============
+//     if (!body.company_info) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_info is mandatory"
+//       });
+//     }
+
+//     if (!Array.isArray(body.items) || body.items.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "items must be provided and not empty"
+//       });
+//     }
+
+//     if (!body.steps) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "steps object is mandatory"
+//       });
+//     }
+
+//     const requiredSteps = ["quotation", "sales_order", "delivery_challan", "invoice", "payment"];
+//     for (const step of requiredSteps) {
+//       if (!body.steps[step]) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `${step} step data is mandatory`
+//         });
+//       }
+//     }
+
+//     // ============ FILE UPLOAD HANDLER ============
+//     const fileFields = ["logo_url", "signature_url", "photo_url", "attachment_url"];
+//     for (const field of fileFields) {
+//       if (body.company_info[field] && body.company_info[field].startsWith("data:")) {
+//         const uploaded = await uploadToCloudinary(body.company_info[field]);
+//         body.company_info[field] = uploaded ?? "";
+//       }
+//     }
+
+//     // ============ AUTO STATUS COMPLETE ============
+//     const stepCompleted = (data, fields) =>
+//       fields.every(field => data[field] !== "" && data[field] !== null && data[field] !== undefined);
+
+//     const stepRules = {
+//       quotation: ["ref_no", "quotation_no", "quotation_date", "subtotal", "total"],
+//       sales_order: ["SO_no", "sales_order_status"],
+//       delivery_challan: ["Challan_no", "driver_name"],
+//       invoice: ["invoice_no"],
+//       payment: ["Payment_no", "amount_received"]
+//     };
+
+//     for (const step of requiredSteps) {
+//       const isCompleted = stepCompleted(body.steps[step], stepRules[step]);
+//       body.steps[step].status = isCompleted ? "completed" : "pending";
+//     }
+
+//     // ============ MAP COMPANY INFO ============
+//     const companyData = {
+//       company_id: Number(body.company_info.company_id),
+//       company_name: body.company_info.company_name,
+//       company_address: body.company_info.company_address,
+//       company_email: body.company_info.company_email,
+//       company_phone: body.company_info.company_phone,
+//       logo_url: body.company_info.logo_url ?? "",
+//       bank_name: body.company_info.bank_name ?? "",
+//       account_no: body.company_info.account_no ?? "",
+//       account_holder: body.company_info.account_holder ?? "",
+//       ifsc_code: body.company_info.ifsc_code ?? ""
+//     };
+
+//     // ============ MAP ITEMS ============
+//     const itemsData = body.items.map(item => ({
+//       item_name: item.item_name,
+//       qty: Number(item.qty),
+//       rate: Number(item.rate),
+//       tax_percent: Number(item.tax_percent),
+//       discount: Number(item.discount),
+//       amount: Number(item.amount)
+//     }));
+
+//     // ============ PREPARE FINAL DATABASE OBJECT ============
+//     const dbData = {
+//       ...companyData,
+//       ...body.steps.quotation,
+//       ...body.steps.sales_order,
+//       ...body.steps.delivery_challan,
+//       ...body.steps.invoice,
+//       ...body.steps.payment,
+
+//       customer_ref: body.additional_info?.customer_ref ?? "",
+//       signature_url: body.additional_info?.signature_url ?? "",
+//       photo_url: body.additional_info?.photo_url ?? "",
+//       attachment_url: body.additional_info?.attachment_url ?? "",
+
+//       updated_at: new Date()
+//     };
+
+//     // ============ CREATE OR UPDATE ============
+
+//     let savedOrder;
+
+//     if (orderId) {
+//       // UPDATE
+//       await prisma.salesorderitems.deleteMany({
+//         where: { sales_order_id: orderId }
+//       });
+
+//       savedOrder = await prisma.salesorder.update({
+//         where: { id: orderId },
+//         data: {
+//           ...dbData,
+//           salesorderitems: {
+//             create: itemsData
+//           }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     } else {
+//       // CREATE
+//       savedOrder = await prisma.salesorder.create({
+//         data: {
+//           ...dbData,
+//           created_at: new Date(),
+//           salesorderitems: {
+//             create: itemsData
+//           }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     }
+
+//     // ============ FORMAT RESPONSE (same as your structure) ============
+
+//     const response = {
+//       company_info: {
+//         ...companyData,
+//         id: savedOrder.id,
+//         created_at: savedOrder.created_at,
+//         updated_at: savedOrder.updated_at
+//       },
+//       items: savedOrder.salesorderitems,
+//       steps: [
+//         {
+//           step: "quotation",
+//           status: body.steps.quotation.status,
+//           data: body.steps.quotation
+//         },
+//         {
+//           step: "sales_order",
+//           status: body.steps.sales_order.status,
+//           data: body.steps.sales_order
+//         },
+//         {
+//           step: "delivery_challan",
+//           status: body.steps.delivery_challan.status,
+//           data: body.steps.delivery_challan
+//         },
+//         {
+//           step: "invoice",
+//           status: body.steps.invoice.status,
+//           data: body.steps.invoice
+//         },
+//         {
+//           step: "payment",
+//           status: body.steps.payment.status,
+//           data: body.steps.payment
+//         }
+//       ],
+//       additional_info: body.additional_info ?? {}
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: orderId ? "Sales order updated" : "Sales order created",
+//       data: response
+//     });
+//   } catch (err) {
+//     console.error("Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: err.message
+//     });
+//   }
+// };
+
+
 export const createSalesOrder = async (req, res) => {
   try {
-    const data = { ...req.body };
-    delete data.id;
+    const body = { ...req.body };
 
-    const fileFields = [
-      "logo_url",
-      "signature_url",
-      "photo_url",
-      "attach_file_url"
-    ];
+    const orderId = body.id ? Number(body.id) : null;
 
+    // ============ VALIDATION ============
+    if (!body.company_info) {
+      return res.status(400).json({
+        success: false,
+        message: "company_info is mandatory"
+      });
+    }
+
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "items must be provided and not empty"
+      });
+    }
+
+    if (!body.steps) {
+      return res.status(400).json({
+        success: false,
+        message: "steps object is mandatory"
+      });
+    }
+
+    const requiredSteps = ["quotation", "sales_order", "delivery_challan", "invoice", "payment"];
+    for (const step of requiredSteps) {
+      if (!body.steps[step]) {
+        return res.status(400).json({
+          success: false,
+          message: `${step} step data is mandatory`
+        });
+      }
+    }
+
+    // ============ FILE UPLOAD HANDLER ============
+    const fileFields = ["logo_url", "signature_url", "photo_url", "attachment_url"];
     for (const field of fileFields) {
-      if (data[field] && data[field].startsWith("data:")) {
-        const uploadedUrl = await uploadToCloudinary(data[field]);
-        const dbField = field === "attach_file_url" ? "attachment_url" : field;
-        data[dbField] = uploadedUrl || "";
+      if (body.company_info[field] && body.company_info[field].startsWith("data:")) {
+        const uploaded = await uploadToCloudinary(body.company_info[field]);
+        body.company_info[field] = uploaded ?? "";
       }
     }
 
-    delete data.attach_file_url;
+    // ============ AUTO STATUS COMPLETE ============
+    const stepCompleted = (data, fields) =>
+      fields.every(field => data[field] !== "" && data[field] !== null && data[field] !== undefined);
 
-    // Process items data
-    let items = [];
-    if (data.items) {
-      if (typeof data.items === 'string') {
-        try {
-          items = JSON.parse(data.items);
-        } catch (e) {
-          console.error("Error parsing items JSON:", e);
-          items = [];
+    const stepRules = {
+      quotation: ["ref_no", "quotation_no", "quotation_date", "subtotal", "total"],
+      sales_order: ["SO_no", "sales_order_status"],
+      delivery_challan: ["Challan_no", "driver_name"],
+      invoice: ["invoice_no"],
+      payment: ["Payment_no", "amount_received"]
+    };
+
+    for (const step of requiredSteps) {
+      const isCompleted = stepCompleted(body.steps[step], stepRules[step]);
+      body.steps[step].status = isCompleted ? "completed" : "pending";
+    }
+
+    // ============ MAP COMPANY INFO ============
+    const companyData = {
+      company_id: Number(body.company_info.company_id),
+      company_name: body.company_info.company_name,
+      company_address: body.company_info.company_address,
+      company_email: body.company_info.company_email,
+      company_phone: body.company_info.company_phone,
+      logo_url: body.company_info.logo_url ?? "",
+      bank_name: body.company_info.bank_name ?? "",
+      account_no: body.company_info.account_no ?? "",
+      account_holder: body.company_info.account_holder ?? "",
+      ifsc_code: body.company_info.ifsc_code ?? ""
+    };
+
+    // ============ MAP ITEMS ============
+    const itemsData = body.items.map(item => ({
+      item_name: item.item_name,
+      qty: Number(item.qty),
+      rate: Number(item.rate),
+      tax_percent: Number(item.tax_percent),
+      discount: Number(item.discount),
+      amount: Number(item.amount)
+    }));
+
+    // ============ PREPARE FINAL DATABASE OBJECT ============
+    const dbData = {
+      ...companyData,
+      ...body.steps.quotation,
+      ...body.steps.sales_order,
+      ...body.steps.delivery_challan,
+      ...body.steps.invoice,
+      ...body.steps.payment,
+
+      customer_ref: body.additional_info?.customer_ref ?? "",
+      signature_url: body.additional_info?.signature_url ?? "",
+      photo_url: body.additional_info?.photo_url ?? "",
+      attachment_url: body.additional_info?.attachment_url ?? "",
+
+      updated_at: new Date()
+    };
+
+    // ============ FIX DATE FIELDS FOR PRISMA ============
+    const fixDate = (d) => (d ? new Date(d) : null);
+
+    dbData.quotation_date = fixDate(dbData.quotation_date);
+    dbData.valid_till = fixDate(dbData.valid_till);
+    dbData.due_date = fixDate(dbData.due_date);
+    dbData.invoice_date = fixDate(dbData.invoice_date);
+    dbData.payment_date = fixDate(dbData.payment_date);
+
+    // ============ CREATE OR UPDATE ============
+    let savedOrder;
+
+    if (orderId) {
+      // UPDATE
+      await prisma.salesorderitems.deleteMany({
+        where: { sales_order_id: orderId }
+      });
+
+      savedOrder = await prisma.salesorder.update({
+        where: { id: orderId },
+        data: {
+          ...dbData,
+          salesorderitems: {
+            create: itemsData
+          }
+        },
+        include: { salesorderitems: true }
+      });
+    } else {
+      // CREATE
+      savedOrder = await prisma.salesorder.create({
+        data: {
+          ...dbData,
+          created_at: new Date(),
+          salesorderitems: {
+            create: itemsData
+          }
+        },
+        include: { salesorderitems: true }
+      });
+    }
+
+    // ============ FORMAT RESPONSE ============
+    const response = {
+      company_info: {
+        ...companyData,
+        id: savedOrder.id,
+        created_at: savedOrder.created_at,
+        updated_at: savedOrder.updated_at
+      },
+      items: savedOrder.salesorderitems,
+      steps: [
+        {
+          step: "quotation",
+          status: body.steps.quotation.status,
+          data: body.steps.quotation
+        },
+        {
+          step: "sales_order",
+          status: body.steps.sales_order.status,
+          data: body.steps.sales_order
+        },
+        {
+          step: "delivery_challan",
+          status: body.steps.delivery_challan.status,
+          data: body.steps.delivery_challan
+        },
+        {
+          step: "invoice",
+          status: body.steps.invoice.status,
+          data: body.steps.invoice
+        },
+        {
+          step: "payment",
+          status: body.steps.payment.status,
+          data: body.steps.payment
         }
-      } else if (Array.isArray(data.items)) {
-        items = data.items;
-      }
-    }
-
-    const mappedData = {
-      company_id: toNumber(data.company_id),
-      company_name: data.company_name || "",
-      company_address: data.company_address || "",
-      company_email: data.company_email || "",
-      company_phone: data.company_phone || "",
-      logo_url: data.logo_url || "",
-
-      qoutation_to_customer_name: data.qoutation_to_customer_name || data.customer_name || "",
-      qoutation_to_customer_address: data.qoutation_to_customer_address || data.customer_address || "",
-      qoutation_to_customer_email: data.qoutation_to_customer_email || data.customer_email || "",
-      qoutation_to_customer_phone: data.qoutation_to_customer_phone || data.customer_phone || "",
-
-      ref_no: data.ref_no || data.quotation_no || "",
-      Manual_ref_ro: data.Manual_ref_ro || data.manual_ref_no || "",
-      quotation_no: data.quotation_no || "",
-      manual_quo_no: data.manual_quo_no || "",
-      quotation_date: data.quotation_date ? new Date(data.quotation_date) : new Date(),
-      valid_till: data.valid_till ? new Date(data.valid_till) : null,
-
-      subtotal: toNumber(data.subtotal || data.sub_total || 0),
-      tax: toNumber(data.tax || data.tax_total || 0),
-      discount: toNumber(data.discount || data.discount_total || 0),
-      total: toNumber(data.total || data.grand_total || 0),
-
-      bank_name: data.bank_name || data.bank_details?.bank_name || "",
-      account_no: data.account_no || data.bank_details?.account_no || "",
-      account_holder: data.account_holder || data.bank_details?.account_holder || "",
-      ifsc_code: data.ifsc_code || data.bank_details?.ifsc_code || "",
-
-      notes: data.notes || "",
-      terms: data.terms || data.terms_conditions || "",
-
-      signature_url: data.signature_url || "",
-      photo_url: data.photo_url || "",
-      attachment_url: data.attachment_url || "",
-
-      bill_to_attention_name: data.bill_to_attention_name || "",
-      bill_to_company_name: data.bill_to_company_name || data.bill_to_comp_name || "",
-      bill_to_company_address: data.bill_to_company_address || data.bill_to_comp_address || "",
-      bill_to_company_phone: data.bill_to_company_phone || data.bill_to_comp_phone || "",
-      bill_to_company_email: data.bill_to_company_email || data.bill_to_comp_email || "",
-
-      bill_to_customer_name: data.bill_to_customer_name || data.bill_to_cust_name || "",
-      bill_to_customer_address: data.bill_to_customer_address || data.bill_to_cust_addr || "",
-      bill_to_customer_email: data.bill_to_customer_email || data.bill_to_cust_email || "",
-      bill_to_customer_phone: data.bill_to_customer_phone || data.bill_to_cust_phone || "",
-
-      ship_to_attention_name: data.ship_to_attention_name || "",
-      ship_to_company_name: data.ship_to_company_name || data.ship_to_comp_name || "",
-      ship_to_company_address: data.ship_to_company_address || data.ship_to_comp_address || "",
-      ship_to_company_phone: data.ship_to_company_phone || data.ship_to_comp_phone || "",
-      ship_to_company_email: data.ship_to_company_email || data.ship_to_comp_email || "",
-
-      ship_to_customer_name: data.ship_to_customer_name || data.ship_to_cust_name || "",
-      ship_to_customer_address: data.ship_to_customer_address || data.ship_to_cust_addr || "",
-      ship_to_customer_email: data.ship_to_customer_email || data.ship_to_cust_email || "",
-      ship_to_customer_phone: data.ship_to_customer_phone || data.ship_to_cust_phone || "",
-
-      payment_received_customer_name: data.payment_received_customer_name || data.received_cust_name || "",
-      payment_received_customer_address: data.payment_received_customer_address || data.received_addr || "",
-      payment_received_customer_email: data.payment_received_customer_email || data.received_email || "",
-      payment_received_customer_phone: data.payment_received_customer_phone || data.received_phone || "",
-
-      driver_name: data.driver_name || data.driver_details?.driver_name || "",
-      driver_phone: data.driver_phone || data.driver_details?.driver_phone || "",
-
-      amount_received: toNumber(data.amount_received || 0),
-      total_amount: toNumber(data.total_amount || 0),
-      payment_status: data.payment_status || "Pending",
-      total_invoice: toNumber(data.total_invoice || 0),
-      balance: toNumber(data.balance || 0),
-      payment_note: data.payment_note || data.payment_notes || "",
-
-      quotation_status: data.quotation_status || "Pending",
-      sales_order_status: data.sales_order_status || data.sales_status || "Pending",
-      delivery_challan_status: data.delivery_challan_status || "Pending",
-      invoice_status: data.invoice_status || "Pending",
-      draft_status: data.draft_status || "Draft",
-
-      SO_no: data.SO_no || data.so_no || "",
-      Manual_SO_ref: data.Manual_SO_ref || data.manual_so || "",
-      Challan_no: data.Challan_no || data.challan_no || "",
-      Manual_challan_no: data.Manual_challan_no || data.manual_dc_no || "",
-      Manual_DC_no: data.Manual_DC_no || data.manual_dc_no || "",
-      invoice_no: data.invoice_no || "",
-      Manual_invoice_no: data.Manual_invoice_no || data.manual_invoice_no || "",
-      Payment_no: data.Payment_no || data.payment_no || "",
-      Manual_payment_no: data.Manual_payment_no || data.manual_payment_no || data.manual_pym_no || "",
-      customer_ref: data.customer_ref || "",
-
-      created_at: new Date(),
-      updated_at: new Date(),
+      ],
+      additional_info: body.additional_info ?? {}
     };
 
-    const createData = {
-      ...mappedData,
-      salesorderitems: items.length > 0 ? {
-        create: items.map(item => ({
-          item_name: item.item_name || item.name || "",
-          qty: toNumber(item.qty || item.quantity || 0),
-          rate: toNumber(item.rate || 0),
-          tax_percent: toNumber(item.tax_percent || item.tax || 0),
-          discount: toNumber(item.discount || 0),
-          amount: toNumber(item.amount) || (toNumber(item.qty || item.quantity) * toNumber(item.rate))
-        }))
-      } : undefined
-    };
-
-    const newOrder = await prisma.salesorder.create({
-      data: createData,
-      include: {
-        salesorderitems: true
-      }
-    });
-
-    // Structure the response by steps
-    const structuredResponse = structureSalesOrderBySteps(newOrder);
-
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: "Sales order created successfully",
-      data: structuredResponse
+      message: orderId ? "Sales order updated" : "Sales order created",
+      data: response
     });
-  } catch (error) {
-    console.error("Error creating sales order:", error);
-    
-    if (error.code === 'P1001' || error.message.includes('Server has closed the connection')) {
-      return res.status(503).json({
-        success: false,
-        message: "Database connection error. Please check your database connection.",
-        error: "The database server is not reachable or the connection was closed."
-      });
-    }
-    
-    if (error.code === 'P2021' || error.message.includes("doesn't exist")) {
-      return res.status(500).json({
-        success: false,
-        message: "Database table not found. Please run: npx prisma db push",
-        error: "The salesorder table does not exist in the database."
-      });
-    }
-    
+  } catch (err) {
+    console.error("Error:", err);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
-      error: error.message
+      error: err.message
     });
   }
 };
+
+
+
+
+
+
+
+
 
 export const getAllSalesOrders = async (req, res) => {
   try {
