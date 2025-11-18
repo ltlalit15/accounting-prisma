@@ -32,7 +32,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173',          // React local dev
     'https://zirak-book.netlify.app', // Deployed frontend
-    'https://erp-accounting-new.netlify.app'
+    'https://erp-accounting-new.netlify.app',
+    'https://invoice360-software.netlify.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
