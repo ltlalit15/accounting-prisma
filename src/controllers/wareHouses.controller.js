@@ -979,6 +979,84 @@ export const getWarehouseInventory = async (req, res) => {
 // };
 
 // ✅ Update Warehouse
+// export const updateWarehouse = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const {
+//       warehouse_name,
+//       location,
+//       address_line1,
+//       address_line2,
+//       city,
+//       state,
+//       pincode,
+//       country,
+//     } = req.body;
+
+//     if (!id) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Warehouse ID is required" });
+//     }
+
+//     const warehouseId = parseInt(id);
+
+//     // Check if warehouse exists
+//     const existingWarehouse = await prisma.warehouses.findUnique({
+//       where: { id: warehouseId },
+//     });
+
+//     if (!existingWarehouse) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Warehouse not found" });
+//     }
+
+//     // Build update data object (only include fields that are provided)
+//     const updateData = {};
+//     if (warehouse_name !== undefined)
+//       updateData.warehouse_name = warehouse_name;
+//     if (location !== undefined) updateData.location = location;
+//     if (address_line1 !== undefined) updateData.address_line1 = address_line1;
+//     if (address_line2 !== undefined) updateData.address_line2 = address_line2;
+//     if (city !== undefined) updateData.city = city;
+//     if (state !== undefined) updateData.state = state;
+//     if (pincode !== undefined) updateData.pincode = pincode;
+//     if (country !== undefined) updateData.country = country;
+
+//     const updatedWarehouse = await prisma.warehouses.update({
+//       where: { id: warehouseId },
+//       data: updateData,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Warehouse updated successfully",
+//       data: {
+//         id: toNumber(updatedWarehouse.id),
+//         company_id: updatedWarehouse.company_id
+//           ? toNumber(updatedWarehouse.company_id)
+//           : null,
+//         warehouse_name: updatedWarehouse.warehouse_name,
+//         location: updatedWarehouse.location,
+//         address_line1: updatedWarehouse.address_line1,
+//         address_line2: updatedWarehouse.address_line2,
+//         city: updatedWarehouse.city,
+//         state: updatedWarehouse.state,
+//         pincode: updatedWarehouse.pincode,
+//         country: updatedWarehouse.country,
+//         created_at: updatedWarehouse.created_at,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error updating warehouse:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update warehouse",
+//       error: error.message,
+//     });
+//   }
+// };
 export const updateWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
@@ -991,6 +1069,7 @@ export const updateWarehouse = async (req, res) => {
       state,
       pincode,
       country,
+      company_id,   // 🔥 added
     } = req.body;
 
     if (!id) {
@@ -1001,7 +1080,6 @@ export const updateWarehouse = async (req, res) => {
 
     const warehouseId = parseInt(id);
 
-    // Check if warehouse exists
     const existingWarehouse = await prisma.warehouses.findUnique({
       where: { id: warehouseId },
     });
@@ -1012,10 +1090,10 @@ export const updateWarehouse = async (req, res) => {
         .json({ success: false, message: "Warehouse not found" });
     }
 
-    // Build update data object (only include fields that are provided)
+    // Build update object
     const updateData = {};
-    if (warehouse_name !== undefined)
-      updateData.warehouse_name = warehouse_name;
+
+    if (warehouse_name !== undefined) updateData.warehouse_name = warehouse_name;
     if (location !== undefined) updateData.location = location;
     if (address_line1 !== undefined) updateData.address_line1 = address_line1;
     if (address_line2 !== undefined) updateData.address_line2 = address_line2;
@@ -1023,6 +1101,11 @@ export const updateWarehouse = async (req, res) => {
     if (state !== undefined) updateData.state = state;
     if (pincode !== undefined) updateData.pincode = pincode;
     if (country !== undefined) updateData.country = country;
+
+    // 🔥 NEW — accept company_id safely
+    if (company_id !== undefined) {
+      updateData.company_id = Number(company_id);
+    }
 
     const updatedWarehouse = await prisma.warehouses.update({
       where: { id: warehouseId },
@@ -1032,22 +1115,9 @@ export const updateWarehouse = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Warehouse updated successfully",
-      data: {
-        id: toNumber(updatedWarehouse.id),
-        company_id: updatedWarehouse.company_id
-          ? toNumber(updatedWarehouse.company_id)
-          : null,
-        warehouse_name: updatedWarehouse.warehouse_name,
-        location: updatedWarehouse.location,
-        address_line1: updatedWarehouse.address_line1,
-        address_line2: updatedWarehouse.address_line2,
-        city: updatedWarehouse.city,
-        state: updatedWarehouse.state,
-        pincode: updatedWarehouse.pincode,
-        country: updatedWarehouse.country,
-        created_at: updatedWarehouse.created_at,
-      },
+      data: updatedWarehouse,
     });
+
   } catch (error) {
     console.error("Error updating warehouse:", error);
     return res.status(500).json({
@@ -1058,28 +1128,91 @@ export const updateWarehouse = async (req, res) => {
   }
 };
 
+
 // ✅ Delete Warehouse
+// export const deleteWarehouse = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     if (!id) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Warehouse ID is required" });
+//     }
+
+//     const warehouseId = parseInt(id);
+
+//     // Check if warehouse exists
+//     const existingWarehouse = await prisma.warehouses.findUnique({
+//       where: { id: warehouseId },
+//     });
+
+//     if (!existingWarehouse) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Warehouse not found" });
+//     }
+
+//     await prisma.warehouses.delete({
+//       where: { id: warehouseId },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Warehouse deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error deleting warehouse:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete warehouse",
+//       error: error.message,
+//     });
+//   }
+// };
 export const deleteWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
+
     if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Warehouse ID is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Warehouse ID is required"
+      });
     }
 
     const warehouseId = parseInt(id);
 
-    // Check if warehouse exists
+    // Check if exists
     const existingWarehouse = await prisma.warehouses.findUnique({
       where: { id: warehouseId },
     });
 
     if (!existingWarehouse) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Warehouse not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Warehouse not found"
+      });
     }
+
+    // ================================
+    // DELETE DEPENDENT CHILD RECORDS
+    // ================================
+
+    await prisma.product_warehouses.deleteMany({
+      where: { warehouse_id: warehouseId },
+    });
+
+    await prisma.transfer_items.deleteMany({
+      where: { source_warehouse_id: warehouseId },
+    });
+
+    await prisma.pos_invoice_products.deleteMany({
+      where: { warehouse_id: warehouseId },
+    });
+
+    // ================================
+    // NOW DELETE THE PARENT
+    // ================================
 
     await prisma.warehouses.delete({
       where: { id: warehouseId },
@@ -1089,6 +1222,7 @@ export const deleteWarehouse = async (req, res) => {
       success: true,
       message: "Warehouse deleted successfully",
     });
+
   } catch (error) {
     console.error("Error deleting warehouse:", error);
     return res.status(500).json({
@@ -1098,6 +1232,7 @@ export const deleteWarehouse = async (req, res) => {
     });
   }
 };
+
 
 // ✅ Add Stock to Warehouse
 export const addStockToWarehouse = async (req, res) => {

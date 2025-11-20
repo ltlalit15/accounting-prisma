@@ -65,6 +65,153 @@ const toNumber = (val) => (val == null ? null : Number(val));
 //   }
 // };
 
+// export const createProduct = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       item_category_id,
+//       unit_detail_id,
+//       item_name,
+//       hsn,
+//       barcode,
+//       sku,
+//       description,
+//       initial_qty,
+//       min_order_qty,
+//       as_of_date,
+//       initial_cost,
+//       sale_price,
+//       purchase_price,
+//       discount,
+//       tax_account,
+//       remarks,
+//       warehouses, // [{ warehouse_id, stock_qty }]
+//     } = req.body;
+
+//     // ✅ Upload image if provided
+//     let imageUrl = null;
+//     if (req.file) {
+//       imageUrl = await uploadToCloudinary(req.file.buffer, "products");
+//     }
+
+//     // ✅ Parse warehouses safely
+//     let parsedWarehouses = [];
+//     if (typeof warehouses === "string") {
+//       try {
+//         parsedWarehouses = JSON.parse(warehouses);
+//       } catch (err) {
+//         console.warn("⚠️ Invalid warehouses JSON, skipping");
+//         parsedWarehouses = [];
+//       }
+//     } else if (Array.isArray(warehouses)) {
+//       parsedWarehouses = warehouses;
+//     }
+
+//     // ✅ Calculate total stock
+//     const totalStock = parsedWarehouses.reduce(
+//       (sum, w) => sum + (Number(w.stock_qty) || 0),
+//       0
+//     );
+
+//     // ✅ Create product with warehouse relations
+//     const product = await prisma.products.create({
+//       data: {
+//         company_id: Number(company_id),
+//         item_category_id: Number(item_category_id),
+//         unit_detail_id: Number(unit_detail_id),
+//         item_name,
+//         hsn,
+//         barcode,
+//         sku,
+//         description,
+//         initial_qty: Number(initial_qty),
+//         min_order_qty: Number(min_order_qty),
+//         as_of_date,
+//         initial_cost: Number(initial_cost),
+//         sale_price: Number(sale_price),
+//         purchase_price: Number(purchase_price),
+//         discount: Number(discount),
+//         tax_account,
+//         remarks,
+//         image: imageUrl,
+//         total_stock: totalStock,
+//         product_warehouses: {
+//           create: parsedWarehouses.map((w) => ({
+//             warehouse_id: Number(w.warehouse_id),
+//             stock_qty: Number(w.stock_qty) || 0,
+//           })),
+//         },
+//       },
+//       include: {
+//         product_warehouses: {
+//           include: {
+//             warehouse: {
+//               select: {
+//                 id: true,
+//                 warehouse_name: true,
+//                 location: true,
+//               },
+//             },
+//           },
+//         },
+//         item_category: { select: { id: true, item_category_name: true } },
+//         unit_detail: {
+//           select: {
+//             id: true,
+//     company_id: true,
+//     uom_name: true,       // ✔ Correct field
+//     category: true,       // ✔ Also part of your schema
+//     weight_per_unit: true,
+//     created_at: true,
+//           },
+//         },
+//       },
+//     });
+
+//     // ✅ Simplify warehouse structure
+//     const simplifiedWarehouses = product.product_warehouses.map((pw) => ({
+//       warehouse_id: pw.warehouse.id,
+//       warehouse_name: pw.warehouse.warehouse_name,
+//       location: pw.warehouse.location,
+//       stock_qty: pw.stock_qty,
+//     }));
+
+//     // ✅ Final unified product response
+//     return res.status(201).json({
+//       success: true,
+//       message: "✅ Product created successfully with warehouse mapping",
+//       data: {
+//         id: product.id,
+//         company_id: product.company_id,
+//         item_category: product.item_category,
+//         unit_detail: product.unit_detail,
+//         item_name: product.item_name,
+//         hsn: product.hsn,
+//         barcode: product.barcode,
+//         sku: product.sku,
+//         description: product.description,
+//         initial_qty: product.initial_qty,
+//         min_order_qty: product.min_order_qty,
+//         as_of_date: product.as_of_date,
+//         initial_cost: product.initial_cost,
+//         sale_price: product.sale_price,
+//         purchase_price: product.purchase_price,
+//         discount: product.discount,
+//         tax_account: product.tax_account,
+//         remarks: product.remarks,
+//         total_stock: product.total_stock,
+//         image: product.image,
+//         warehouses: simplifiedWarehouses,
+//         created_at: product.created_at,
+//         updated_at: product.updated_at,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ Create product error:", error);
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -85,35 +232,48 @@ export const createProduct = async (req, res) => {
       discount,
       tax_account,
       remarks,
-      warehouses, // [{ warehouse_id, stock_qty }]
+      warehouses, // UI array: [{ warehouse_id, quantity, min_order_qty, initial_qty }]
     } = req.body;
 
-    // ✅ Upload image if provided
+    // ---------------------------
+    // 📌 Upload Image if Available
+    // ---------------------------
     let imageUrl = null;
     if (req.file) {
       imageUrl = await uploadToCloudinary(req.file.buffer, "products");
     }
 
-    // ✅ Parse warehouses safely
+    // ---------------------------
+    // 📌 Parse Warehouses
+    // ---------------------------
     let parsedWarehouses = [];
     if (typeof warehouses === "string") {
       try {
         parsedWarehouses = JSON.parse(warehouses);
-      } catch (err) {
-        console.warn("⚠️ Invalid warehouses JSON, skipping");
+      } catch {
         parsedWarehouses = [];
       }
     } else if (Array.isArray(warehouses)) {
       parsedWarehouses = warehouses;
     }
 
-    // ✅ Calculate total stock
-    const totalStock = parsedWarehouses.reduce(
-      (sum, w) => sum + (Number(w.stock_qty) || 0),
-      0
-    );
+    // ---------------------------
+    // 📌 Calculate Total Stock
+    // Supports: stock_qty, quantity, initial_qty
+    // ---------------------------
+    const totalStock = parsedWarehouses.reduce((sum, w) => {
+      const qty = Number(
+        w.stock_qty ??
+        w.quantity ??
+        w.initial_qty ??
+        0
+      );
+      return sum + qty;
+    }, 0);
 
-    // ✅ Create product with warehouse relations
+    // ---------------------------
+    // 📌 Create Product
+    // ---------------------------
     const product = await prisma.products.create({
       data: {
         company_id: Number(company_id),
@@ -135,13 +295,22 @@ export const createProduct = async (req, res) => {
         remarks,
         image: imageUrl,
         total_stock: totalStock,
+
+        // Create Warehouse Stock Rows
         product_warehouses: {
           create: parsedWarehouses.map((w) => ({
             warehouse_id: Number(w.warehouse_id),
-            stock_qty: Number(w.stock_qty) || 0,
+            stock_qty: Number(
+              w.stock_qty ??
+              w.quantity ??
+              w.initial_qty ??
+              0
+            ),
           })),
         },
       },
+
+      // Include related data
       include: {
         product_warehouses: {
           include: {
@@ -159,7 +328,8 @@ export const createProduct = async (req, res) => {
           select: {
             id: true,
             company_id: true,
-            uom_id: true,
+            uom_name: true,
+            category: true,
             weight_per_unit: true,
             created_at: true,
           },
@@ -167,7 +337,9 @@ export const createProduct = async (req, res) => {
       },
     });
 
-    // ✅ Simplify warehouse structure
+    // ---------------------------
+    // 📌 Prepare Warehouse View
+    // ---------------------------
     const simplifiedWarehouses = product.product_warehouses.map((pw) => ({
       warehouse_id: pw.warehouse.id,
       warehouse_name: pw.warehouse.warehouse_name,
@@ -175,10 +347,12 @@ export const createProduct = async (req, res) => {
       stock_qty: pw.stock_qty,
     }));
 
-    // ✅ Final unified product response
+    // ---------------------------
+    // 📌 Response
+    // ---------------------------
     return res.status(201).json({
       success: true,
-      message: "✅ Product created successfully with warehouse mapping",
+      message: "Product created successfully with warehouse mapping",
       data: {
         id: product.id,
         company_id: product.company_id,
@@ -205,11 +379,14 @@ export const createProduct = async (req, res) => {
         updated_at: product.updated_at,
       },
     });
+
   } catch (error) {
-    console.error("❌ Create product error:", error);
+    console.error("Create product error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
 
 // export const getAllProducts = async (req, res) => {
 //   try {
@@ -228,11 +405,71 @@ export const createProduct = async (req, res) => {
 //   }
 // };
 
+// export const getAllProducts = async (req, res) => {
+//   try {
+//     const products = await prisma.products.findMany({
+//       include: {
+//         // ✅ Include all linked warehouses with stock details
+//         product_warehouses: {
+//           include: {
+//             warehouse: {
+//               select: {
+//                 id: true,
+//                 warehouse_name: true,
+//                 location: true,
+//                 city: true,
+//                 state: true,
+//               },
+//             },
+//           },
+//         },
+
+//         // ✅ Include category info
+//         item_category: {
+//           select: { id: true, item_category_name: true },
+//         },
+
+//         // ✅ Include unit details
+//         unit_detail: {
+//           select: {
+//             id: true,
+//             company_id: true,
+//             uom_id: true,
+//             weight_per_unit: true,
+//             created_at: true,
+//           },
+//         },
+//       },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     // ✅ Optionally, compute total stock dynamically if not stored (safe fallback)
+//     const formattedProducts = products.map((p) => ({
+//       ...p,
+//       total_stock:
+//         p.total_stock ??
+//         p.product_warehouses.reduce((sum, pw) => sum + (pw.stock_qty || 0), 0),
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       message: "✅ Products fetched successfully",
+//       total: formattedProducts.length,
+//       data: formattedProducts,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get all products error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch products",
+//       error: error.message,
+//     });
+//   }
+// };
 export const getAllProducts = async (req, res) => {
   try {
     const products = await prisma.products.findMany({
       include: {
-        // ✅ Include all linked warehouses with stock details
         product_warehouses: {
           include: {
             warehouse: {
@@ -247,17 +484,16 @@ export const getAllProducts = async (req, res) => {
           },
         },
 
-        // ✅ Include category info
         item_category: {
           select: { id: true, item_category_name: true },
         },
 
-        // ✅ Include unit details
         unit_detail: {
           select: {
             id: true,
             company_id: true,
-            uom_id: true,
+            uom_name: true,
+            category: true,
             weight_per_unit: true,
             created_at: true,
           },
@@ -266,7 +502,6 @@ export const getAllProducts = async (req, res) => {
       orderBy: { created_at: "desc" },
     });
 
-    // ✅ Optionally, compute total stock dynamically if not stored (safe fallback)
     const formattedProducts = products.map((p) => ({
       ...p,
       total_stock:
@@ -289,6 +524,7 @@ export const getAllProducts = async (req, res) => {
     });
   }
 };
+
 
 // export const getProductsByCompany = async (req, res) => {
 //   try {
@@ -573,11 +809,12 @@ export const getProductsByCompanyAndWarehouse = async (req, res) => {
         // ✅ Include unit details
         unit_detail: {
           select: {
-            id: true,
-            company_id: true,
-            uom_id: true,
-            weight_per_unit: true,
-            created_at: true,
+           id: true,
+    company_id: true,
+    uom_name: true,
+    category: true,
+    weight_per_unit: true,
+    created_at: true,
           },
         },
       },
@@ -670,10 +907,11 @@ export const getProductById = async (req, res) => {
         unit_detail: {
           select: {
             id: true,
-            company_id: true,
-            uom_id: true,
-            weight_per_unit: true,
-            created_at: true,
+    company_id: true,
+    uom_name: true,
+    category: true,
+    weight_per_unit: true,
+    created_at: true,
           },
         },
       },
@@ -718,6 +956,175 @@ export const getProductById = async (req, res) => {
  * 🟠 UPDATE PRODUCT
  */
 
+// export const updateProduct = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const {
+//       company_id,
+//       item_category_id,
+//       unit_detail_id,
+//       item_name,
+//       hsn,
+//       barcode,
+//       sku,
+//       description,
+//       initial_qty,
+//       min_order_qty,
+//       as_of_date,
+//       initial_cost,
+//       sale_price,
+//       purchase_price,
+//       discount,
+//       tax_account,
+//       remarks,
+//       warehouses, // ✅ Expected: [{ warehouse_id, stock_qty }]
+//     } = req.body;
+
+//     const productId = Number(id);
+//     if (!productId || isNaN(productId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid or missing product ID",
+//       });
+//     }
+
+//     // ✅ Check if product exists
+//     const existingProduct = await prisma.products.findUnique({
+//       where: { id: productId },
+//       include: { product_warehouses: true },
+//     });
+
+//     if (!existingProduct) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     // ✅ Handle new image upload (optional)
+//     let imageUrl = existingProduct.image;
+//     if (req.file) {
+//       imageUrl = await uploadToCloudinary(req.file.buffer, "products");
+//     }
+
+//     // ✅ Parse warehouses input (can come as JSON string in form-data)
+//     let parsedWarehouses = [];
+//     if (typeof warehouses === "string") {
+//       try {
+//         parsedWarehouses = JSON.parse(warehouses);
+//       } catch {
+//         parsedWarehouses = [];
+//       }
+//     } else if (Array.isArray(warehouses)) {
+//       parsedWarehouses = warehouses;
+//     }
+
+//     // ✅ Calculate total stock
+//     let totalStock = parsedWarehouses.length
+//       ? parsedWarehouses.reduce((sum, w) => sum + (Number(w.stock_qty) || 0), 0)
+//       : existingProduct.total_stock;
+
+//     // ✅ Update product_warehouses mapping (replace all for simplicity)
+//     if (parsedWarehouses.length > 0) {
+//       await prisma.product_warehouses.deleteMany({
+//         where: { product_id: productId },
+//       });
+
+//       await prisma.product_warehouses.createMany({
+//         data: parsedWarehouses.map((w) => ({
+//           product_id: productId,
+//           warehouse_id: Number(w.warehouse_id),
+//           stock_qty: Number(w.stock_qty) || 0,
+//         })),
+//       });
+//     }
+
+//     // ✅ Prepare update data
+//     const updateData = {
+//       company_id: company_id ? Number(company_id) : existingProduct.company_id,
+//       item_name: item_name ?? existingProduct.item_name,
+//       hsn: hsn ?? existingProduct.hsn,
+//       barcode: barcode ?? existingProduct.barcode,
+//       sku: sku ?? existingProduct.sku,
+//       description: description ?? existingProduct.description,
+//       initial_qty: initial_qty
+//         ? Number(initial_qty)
+//         : existingProduct.initial_qty,
+//       min_order_qty: min_order_qty
+//         ? Number(min_order_qty)
+//         : existingProduct.min_order_qty,
+//       as_of_date: as_of_date ?? existingProduct.as_of_date,
+//       initial_cost: initial_cost
+//         ? Number(initial_cost)
+//         : existingProduct.initial_cost,
+//       sale_price: sale_price ? Number(sale_price) : existingProduct.sale_price,
+//       purchase_price: purchase_price
+//         ? Number(purchase_price)
+//         : existingProduct.purchase_price,
+//       discount: discount ? Number(discount) : existingProduct.discount,
+//       tax_account: tax_account ?? existingProduct.tax_account,
+//       remarks: remarks ?? existingProduct.remarks,
+//       image: imageUrl,
+//       total_stock: totalStock,
+//       updated_at: new Date(),
+//     };
+
+//     // ✅ Handle relational updates properly
+//     if (item_category_id) {
+//       updateData.item_category = { connect: { id: Number(item_category_id) } };
+//     }
+//     if (unit_detail_id) {
+//       updateData.unit_detail = { connect: { id: Number(unit_detail_id) } };
+//     }
+
+//     // ✅ Update product
+//     const updatedProduct = await prisma.products.update({
+//       where: { id: productId },
+//       data: updateData,
+//       include: {
+//         product_warehouses: {
+//           include: {
+//             warehouse: {
+//               select: {
+//                 id: true,
+//                 warehouse_name: true,
+//                 location: true,
+//                 city: true,
+//                 state: true,
+//                 country: true,
+//               },
+//             },
+//           },
+//         },
+//         item_category: { select: { id: true, item_category_name: true } },
+//         unit_detail: {
+//           select: {
+//             id: true,
+//     company_id: true,
+//     uom_name: true,
+//     category: true,
+//     weight_per_unit: true,
+//     created_at: true,
+//           },
+//         },
+//       },
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "✅ Product updated successfully",
+//       data: updatedProduct,
+//     });
+//   } catch (error) {
+//     console.error("❌ Update product error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -739,7 +1146,7 @@ export const updateProduct = async (req, res) => {
       discount,
       tax_account,
       remarks,
-      warehouses, // ✅ Expected: [{ warehouse_id, stock_qty }]
+      warehouses,
     } = req.body;
 
     const productId = Number(id);
@@ -750,7 +1157,7 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // ✅ Check if product exists
+    // Check if product exists
     const existingProduct = await prisma.products.findUnique({
       where: { id: productId },
       include: { product_warehouses: true },
@@ -763,13 +1170,13 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // ✅ Handle new image upload (optional)
+    // Handle image upload
     let imageUrl = existingProduct.image;
     if (req.file) {
       imageUrl = await uploadToCloudinary(req.file.buffer, "products");
     }
 
-    // ✅ Parse warehouses input (can come as JSON string in form-data)
+    // Parse warehouses
     let parsedWarehouses = [];
     if (typeof warehouses === "string") {
       try {
@@ -781,12 +1188,42 @@ export const updateProduct = async (req, res) => {
       parsedWarehouses = warehouses;
     }
 
-    // ✅ Calculate total stock
+    // ----------------------------------------------------------
+    // ✅ VALIDATE: Make sure warehouse_id exists in DB
+    // ----------------------------------------------------------
+    if (parsedWarehouses.length > 0) {
+      const warehouseIds = parsedWarehouses.map(w => Number(w.warehouse_id));
+
+      const existing = await prisma.warehouses.findMany({
+        where: { id: { in: warehouseIds } },
+        select: { id: true },
+      });
+
+      const existingIds = existing.map(w => w.id);
+
+      const invalidIds = warehouseIds.filter(id => !existingIds.includes(id));
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid warehouse_id found",
+          invalid_ids: invalidIds,
+        });
+      }
+    }
+
+    // ----------------------------------------------------------
+    // ✅ FIX: Correct stock_qty logic for frontend payload
+    // ----------------------------------------------------------
+    const deriveStockQty = (w) =>
+      Number(w.stock_qty ?? w.quantity ?? w.initial_qty ?? 0);
+
+    // Calculate total stock
     let totalStock = parsedWarehouses.length
-      ? parsedWarehouses.reduce((sum, w) => sum + (Number(w.stock_qty) || 0), 0)
+      ? parsedWarehouses.reduce((sum, w) => sum + deriveStockQty(w), 0)
       : existingProduct.total_stock;
 
-    // ✅ Update product_warehouses mapping (replace all for simplicity)
+    // Update product_warehouses (replace all)
     if (parsedWarehouses.length > 0) {
       await prisma.product_warehouses.deleteMany({
         where: { product_id: productId },
@@ -796,12 +1233,12 @@ export const updateProduct = async (req, res) => {
         data: parsedWarehouses.map((w) => ({
           product_id: productId,
           warehouse_id: Number(w.warehouse_id),
-          stock_qty: Number(w.stock_qty) || 0,
+          stock_qty: deriveStockQty(w),
         })),
       });
     }
 
-    // ✅ Prepare update data
+    // Prepare update data
     const updateData = {
       company_id: company_id ? Number(company_id) : existingProduct.company_id,
       item_name: item_name ?? existingProduct.item_name,
@@ -809,20 +1246,12 @@ export const updateProduct = async (req, res) => {
       barcode: barcode ?? existingProduct.barcode,
       sku: sku ?? existingProduct.sku,
       description: description ?? existingProduct.description,
-      initial_qty: initial_qty
-        ? Number(initial_qty)
-        : existingProduct.initial_qty,
-      min_order_qty: min_order_qty
-        ? Number(min_order_qty)
-        : existingProduct.min_order_qty,
+      initial_qty: initial_qty ? Number(initial_qty) : existingProduct.initial_qty,
+      min_order_qty: min_order_qty ? Number(min_order_qty) : existingProduct.min_order_qty,
       as_of_date: as_of_date ?? existingProduct.as_of_date,
-      initial_cost: initial_cost
-        ? Number(initial_cost)
-        : existingProduct.initial_cost,
+      initial_cost: initial_cost ? Number(initial_cost) : existingProduct.initial_cost,
       sale_price: sale_price ? Number(sale_price) : existingProduct.sale_price,
-      purchase_price: purchase_price
-        ? Number(purchase_price)
-        : existingProduct.purchase_price,
+      purchase_price: purchase_price ? Number(purchase_price) : existingProduct.purchase_price,
       discount: discount ? Number(discount) : existingProduct.discount,
       tax_account: tax_account ?? existingProduct.tax_account,
       remarks: remarks ?? existingProduct.remarks,
@@ -831,7 +1260,6 @@ export const updateProduct = async (req, res) => {
       updated_at: new Date(),
     };
 
-    // ✅ Handle relational updates properly
     if (item_category_id) {
       updateData.item_category = { connect: { id: Number(item_category_id) } };
     }
@@ -839,7 +1267,7 @@ export const updateProduct = async (req, res) => {
       updateData.unit_detail = { connect: { id: Number(unit_detail_id) } };
     }
 
-    // ✅ Update product
+    // Update product
     const updatedProduct = await prisma.products.update({
       where: { id: productId },
       data: updateData,
@@ -863,7 +1291,8 @@ export const updateProduct = async (req, res) => {
           select: {
             id: true,
             company_id: true,
-            uom_id: true,
+            uom_name: true,
+            category: true,
             weight_per_unit: true,
             created_at: true,
           },
@@ -876,6 +1305,7 @@ export const updateProduct = async (req, res) => {
       message: "✅ Product updated successfully",
       data: updatedProduct,
     });
+
   } catch (error) {
     console.error("❌ Update product error:", error);
     res.status(500).json({
@@ -885,6 +1315,7 @@ export const updateProduct = async (req, res) => {
     });
   }
 };
+
 
 /**
  * 🔴 DELETE PRODUCT

@@ -167,83 +167,302 @@ export const getVendorById = async (req, res) => {
   }
 };
 
+// export const updateVendor = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const data = req.body;
+
+//     const vendor = await prisma.vendorscustomer.findUnique({
+//       where: { id: parseInt(id) },
+//     });
+
+//     if (!vendor) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Vendor not found" });
+//     }
+
+//     let idCardImageUrl = vendor.id_card_image;
+//     let anyFileUrl = vendor.any_file;
+
+//     // ✅ If new ID card image uploaded → delete old from Cloudinary
+//     if (req.files?.id_card_image?.[0]) {
+//       if (vendor.id_card_image) {
+//         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       const uploaded = await uploadToCloudinary(
+//         req.files.id_card_image[0].buffer,
+//         "vendorsCustomer/id_cards"
+//       );
+//       idCardImageUrl = uploaded;
+//     }
+
+//     // ✅ If new file uploaded → delete old from Cloudinary
+//     if (req.files?.any_file?.[0]) {
+//       if (vendor.any_file) {
+//         const publicId = vendor.any_file.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       const uploaded = await uploadToCloudinary(
+//         req.files.any_file[0].buffer,
+//         "vendorsCustomer/files"
+//       );
+//       anyFileUrl = uploaded;
+//     }
+
+//     // ✅ Convert numeric fields safely
+//     const numericData = {
+//       company_id: data.company_id ? parseInt(data.company_id) : null,
+//       account_balance: data.account_balance
+//         ? parseFloat(data.account_balance)
+//         : null,
+//       credit_period_days: data.credit_period_days
+//         ? parseInt(data.credit_period_days)
+//         : null,
+//       enable_gst: data.enable_gst === "1" || data.enable_gst === true, // handle boolean-like fields
+//     };
+
+//     // ✅ Merge and update vendor
+//     const updatedVendor = await prisma.vendorscustomer.update({
+//       where: { id: parseInt(id) },
+//       data: {
+//         ...data,
+//         ...numericData,
+//         id_card_image: idCardImageUrl,
+//         any_file: anyFileUrl,
+//       },
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Vendor updated successfully",
+//       data: updatedVendor,
+//     });
+//   } catch (error) {
+//     console.error("Error updating vendor:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+// export const updateVendor = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const data = req.body;
+
+//     const vendor = await prisma.vendorscustomer.findUnique({
+//       where: { id: parseInt(id) },
+//     });
+
+//     if (!vendor) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Vendor not found" });
+//     }
+
+//     let idCardImageUrl = vendor.id_card_image;
+//     let anyFileUrl = vendor.any_file;
+
+//     // =====================================================
+//     //  SAFE DATE PARSER TO PREVENT PRISMA DATE ERRORS
+//     // =====================================================
+//     const safeDate = (val) => {
+//       if (!val) return null;            // null allowed
+//       const d = new Date(val);
+//       return isNaN(d.getTime()) ? null : d;
+//     };
+
+//     // Convert the date fields before using them
+//     data.creation_date = safeDate(data.creation_date);
+
+//     // =====================================================
+//     //  FILE UPLOAD HANDLING
+//     // =====================================================
+
+//     if (req.files?.id_card_image?.[0]) {
+//       if (vendor.id_card_image) {
+//         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       const uploaded = await uploadToCloudinary(
+//         req.files.id_card_image[0].buffer,
+//         "vendorsCustomer/id_cards"
+//       );
+//       idCardImageUrl = uploaded;
+//     }
+
+//     if (req.files?.any_file?.[0]) {
+//       if (vendor.any_file) {
+//         const publicId = vendor.any_file.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       const uploaded = await uploadToCloudinary(
+//         req.files.any_file[0].buffer,
+//         "vendorsCustomer/files"
+//       );
+//       anyFileUrl = uploaded;
+//     }
+
+//     // =====================================================
+//     // NUMERIC FIELD SANITIZATION
+//     // =====================================================
+//     const numericData = {
+//       company_id: data.company_id ? parseInt(data.company_id) : null,
+//       account_balance: data.account_balance
+//         ? parseFloat(data.account_balance)
+//         : null,
+//       credit_period_days: data.credit_period_days
+//         ? parseInt(data.credit_period_days)
+//         : null,
+//       enable_gst: data.enable_gst === "1" || data.enable_gst === true,
+//     };
+
+//     // =====================================================
+//     // MERGE & UPDATE
+//     // =====================================================
+//     const updatedVendor = await prisma.vendorscustomer.update({
+//       where: { id: parseInt(id) },
+//       data: {
+//         ...data,
+//         ...numericData,
+//         id_card_image: idCardImageUrl,
+//         any_file: anyFileUrl,
+//       },
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Vendor updated successfully",
+//       data: updatedVendor,
+//     });
+//   } catch (error) {
+//     console.error("Error updating vendor:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 export const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const data = req.body;
+    let data = req.body;
 
     const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: parseInt(id) },
     });
 
     if (!vendor) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Vendor not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
     }
 
     let idCardImageUrl = vendor.id_card_image;
     let anyFileUrl = vendor.any_file;
 
-    // ✅ If new ID card image uploaded → delete old from Cloudinary
+    // ==========================================
+    // SAFE DATE PARSER
+    // ==========================================
+    const safeDate = (val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    data.creation_date = safeDate(data.creation_date);
+
+    // ==========================================
+    // FIX FRONTEND WRONG FIELD NAMES
+    // ==========================================
+
+    // ❌ frontend sent account_balance_type
+    // ✔ prisma needs balance_type
+    if (data.account_balance_type) {
+      data.balance_type = data.account_balance_type;
+      delete data.account_balance_type;
+    }
+
+    // ==========================================
+    // IMAGE HANDLING
+    // ==========================================
+
     if (req.files?.id_card_image?.[0]) {
       if (vendor.id_card_image) {
         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
         await deleteFromCloudinary(publicId);
       }
 
-      const uploaded = await uploadToCloudinary(
+      idCardImageUrl = await uploadToCloudinary(
         req.files.id_card_image[0].buffer,
         "vendorsCustomer/id_cards"
       );
-      idCardImageUrl = uploaded;
     }
 
-    // ✅ If new file uploaded → delete old from Cloudinary
     if (req.files?.any_file?.[0]) {
       if (vendor.any_file) {
         const publicId = vendor.any_file.split("/").pop().split(".")[0];
         await deleteFromCloudinary(publicId);
       }
 
-      const uploaded = await uploadToCloudinary(
+      anyFileUrl = await uploadToCloudinary(
         req.files.any_file[0].buffer,
         "vendorsCustomer/files"
       );
-      anyFileUrl = uploaded;
     }
 
-    // ✅ Convert numeric fields safely
+    // ==========================================
+    // NUMERIC & BOOLEAN SANITIZATION
+    // ==========================================
     const numericData = {
-      company_id: data.company_id ? parseInt(data.company_id) : null,
+      company_id: data.company_id ? Number(data.company_id) : vendor.company_id,
       account_balance: data.account_balance
-        ? parseFloat(data.account_balance)
-        : null,
+        ? Number(data.account_balance)
+        : vendor.account_balance,
       credit_period_days: data.credit_period_days
-        ? parseInt(data.credit_period_days)
-        : null,
-      enable_gst: data.enable_gst === "1" || data.enable_gst === true, // handle boolean-like fields
+        ? Number(data.credit_period_days)
+        : vendor.credit_period_days,
+
+      enable_gst:
+        data.enable_gst === "1" ||
+        data.enable_gst === 1 ||
+        data.enable_gst === true,
+
+      // ENUM field must be "customer" or "vender"
+      type:
+        data.type === "customer" || data.type === "vender"
+          ? data.type
+          : vendor.type,
     };
 
-    // ✅ Merge and update vendor
+    // ==========================================
+    // FINAL UPDATE OBJECT
+    // ==========================================
+    const updatePayload = {
+      ...data,
+      ...numericData,
+      id_card_image: idCardImageUrl,
+      any_file: anyFileUrl,
+    };
+
     const updatedVendor = await prisma.vendorscustomer.update({
       where: { id: parseInt(id) },
-      data: {
-        ...data,
-        ...numericData,
-        id_card_image: idCardImageUrl,
-        any_file: anyFileUrl,
-      },
+      data: updatePayload,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Vendor updated successfully",
       data: updatedVendor,
     });
   } catch (error) {
     console.error("Error updating vendor:", error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

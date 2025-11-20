@@ -312,18 +312,56 @@ export const updateAccount = async (req, res) => {
 };
 
 
+// export const deleteAccount = async (req, res) => {
+
+
+//   try {
+//     const { id } = req.params;
+
+//     await prisma.accounts.delete({
+//       where: { id: parseInt(id) },
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Account deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error("❌ Error deleting account:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
 export const deleteAccount = async (req, res) => {
   try {
     const { id } = req.params;
+    const accountId = parseInt(id);
 
+    // 1️⃣ Delete vouchers where this account is FROM
+    await prisma.contra_vouchers.deleteMany({
+      where: { account_from_id: accountId },
+    });
+
+    // 2️⃣ Delete vouchers where this account is TO
+    await prisma.contra_vouchers.deleteMany({
+      where: { account_to_id: accountId },
+    });
+
+    // 3️⃣ Now delete the account
     await prisma.accounts.delete({
-      where: { id: parseInt(id) },
+      where: { id: accountId },
     });
 
     res.status(200).json({
       success: true,
       message: "Account deleted successfully",
     });
+
   } catch (error) {
     console.error("❌ Error deleting account:", error);
     res.status(500).json({
