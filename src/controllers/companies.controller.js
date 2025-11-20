@@ -83,43 +83,94 @@ export const createCompany = async (req, res) => {
 };
 
 // ✅ Get All Companies (with plan name — NO schema change needed)
+// export const getCompanies = async (req, res) => {
+//   try {
+//     // Step 1: Fetch companies with plan_id (scalar field only)
+//     const companies = await prisma.companies.findMany({
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         start_date: true,
+//         expire_date: true,
+//         status: true,
+//         logo_url: true,
+//         plan_type: true,
+//         plan_id: true, // ✅ Only scalar field — safe
+//         // ❌ DO NOT include 'plan' here
+//       },
+//       orderBy: { id: 'desc' },
+//     });
+
+//     if (companies.length === 0) {
+//       return res.status(404).json({ message: "No companies found" });
+//     }
+
+//     // Step 2: Fetch all referenced plans in one query
+//     const planIds = [...new Set(companies.map(c => c.plan_id))];
+//     const plans = await prisma.plans.findMany({
+//       where: { id: { in: planIds } },
+//       select: { id: true, name: true }
+//     });
+
+//     // Step 3: Create a map for quick lookup
+//     const planMap = new Map(plans.map(p => [p.id, p.name]));
+
+//     // Step 4: Attach plan name to each company
+//     const data = companies.map(company => ({
+//       ...company,
+//       plan_name: planMap.get(company.plan_id) || 'Unknown Plan'
+//     }));
+
+//     return res.status(200).json({
+//       message: "Companies fetched successfully",
+//       data
+//     });
+//   } catch (error) {
+//     console.error("Fetch companies error:", error);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 export const getCompanies = async (req, res) => {
   try {
-    // Step 1: Fetch companies with plan_id (scalar field only)
-    const companies = await prisma.companies.findMany({
+    // Step 1: Fetch all company users
+    const companies = await prisma.users.findMany({
+      where: { role: "COMPANY" },
       select: {
         id: true,
         name: true,
         email: true,
-        start_date: true,
-        expire_date: true,
-        status: true,
-        logo_url: true,
-        plan_type: true,
-        plan_id: true, // ✅ Only scalar field — safe
-        // ❌ DO NOT include 'plan' here
+        startDate: true,
+        expireDate: true,
+        company_logo_url: true,
+        user_plans: {
+          select: {
+            plan_id: true
+          }
+        }
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: 'desc' }
     });
 
     if (companies.length === 0) {
       return res.status(404).json({ message: "No companies found" });
     }
 
-    // Step 2: Fetch all referenced plans in one query
-    const planIds = [...new Set(companies.map(c => c.plan_id))];
+    // extract plan IDs
+    const planIds = companies
+      .map(c => c.user_plans[0]?.plan_id)
+      .filter(Boolean);
+
     const plans = await prisma.plans.findMany({
       where: { id: { in: planIds } },
-      select: { id: true, name: true }
+      select: { id: true, plan_name: true }
     });
 
-    // Step 3: Create a map for quick lookup
-    const planMap = new Map(plans.map(p => [p.id, p.name]));
+    const planMap = new Map(plans.map(p => [p.id, p.plan_name]));
 
-    // Step 4: Attach plan name to each company
-    const data = companies.map(company => ({
-      ...company,
-      plan_name: planMap.get(company.plan_id) || 'Unknown Plan'
+    const data = companies.map(c => ({
+      ...c,
+      plan_name: planMap.get(c.user_plans[0]?.plan_id) || "Unknown Plan"
     }));
 
     return res.status(200).json({

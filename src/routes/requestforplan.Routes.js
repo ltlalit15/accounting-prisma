@@ -4,7 +4,8 @@ import {
   requestPlan,
   getRequestedPlans,
   updatePlanRequestStatus,
-  deletePlanRequest
+  deletePlanRequest,
+  getRequestedPlanById
 } from "../controllers/requestforplan.controller.js"; // 👈 Updated import path
 
 const router = express.Router();
@@ -14,6 +15,9 @@ router.post("/", requestPlan);
 
 // GET /api/plan-requests → Admin fetches all requests
 router.get("/", getRequestedPlans);
+
+// GET /api/plan-requests/:id
+router.get("/:id", getRequestedPlanById);
 
 // PUT /api/plan-requests/:id → Approve or Reject request
 router.put("/:id", updatePlanRequestStatus);

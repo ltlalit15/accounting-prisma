@@ -1278,16 +1278,116 @@ export const getCompanyById = async (req, res) => {
 // };
 
 
+// export const getAllCompanies = async (req, res) => {
+//   try {
+//     // 🔹 Fetch all companies (role = COMPANY)
+//     const companies = await prisma.users.findMany({
+//       where: { role: "COMPANY" },
+//       include: {
+//         user_plans: {
+//           include: {
+//             plan: true, // ✅ Include related plan info
+//           },
+//         },
+//         created_users: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//             role: true,
+//             created_at: true,
+//           },
+//         },
+//       },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     if (!companies || companies.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No companies found",
+//       });
+//     }
+
+//     // 🔹 Format each company into a clean UI-ready structure
+//     const formattedCompanies = companies.map((company) => ({
+//       id: company.id,
+//       name: company.name,
+//       email: company.email,
+//       phone: company.phone,
+//       role: company.role,
+//       user_role: company.user_role,
+//       address: company.address,
+//       country: company.country,
+//       state: company.state,
+//       city: company.city,
+//       postal_code: company.postal_code,
+//       currency: company.currency,
+//       startDate: company.startDate,
+//       expireDate: company.expireDate,
+//       UserStatus: company.UserStatus,
+//       created_at: company.created_at,
+
+//       // Include bank details, notes, and terms & conditions
+//       bank_details: {
+//         bank_name: company.bank_name,
+//         account_number: company.account_number,
+//         account_holder: company.account_holder,
+//         ifsc_code: company.ifsc_code,
+//       },
+//       notes: company.notes,
+//       terms_and_conditions: company.terms_and_conditions,
+
+//       branding: {
+//         company_logo_url: company.company_logo_url,
+//         company_dark_logo_url: company.company_dark_logo_url,
+//         company_icon_url: company.company_icon_url,
+//         favicon_url: company.favicon_url,
+//       },
+
+//       // User plan details
+//       user_plans: company.user_plans.map((planData) => ({
+//         id: planData.id,
+//         status: planData.status,
+//         start_date: planData.start_date,
+//         end_date: planData.end_date,
+//         plan: planData.plan
+//           ? {
+//               id: planData.plan.id,
+//               plan_name: planData.plan.plan_name,
+//               duration: planData.plan.duration,
+//               amount: planData.plan.amount,
+//             }
+//           : null,
+//       })),
+      
+//       // Team members associated with the company
+//       team_members: company.created_users,
+//     }));
+
+//     // ✅ Send formatted response
+//     return res.status(200).json({
+//       success: true,
+//       message: "Companies fetched successfully",
+//       count: formattedCompanies.length,
+//       data: formattedCompanies,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get all companies error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
 export const getAllCompanies = async (req, res) => {
   try {
-    // 🔹 Fetch all companies (role = COMPANY)
     const companies = await prisma.users.findMany({
       where: { role: "COMPANY" },
       include: {
         user_plans: {
-          include: {
-            plan: true, // ✅ Include related plan info
-          },
+          include: { plan: true },
         },
         created_users: {
           select: {
@@ -1309,63 +1409,65 @@ export const getAllCompanies = async (req, res) => {
       });
     }
 
-    // 🔹 Format each company into a clean UI-ready structure
-    const formattedCompanies = companies.map((company) => ({
-      id: company.id,
-      name: company.name,
-      email: company.email,
-      phone: company.phone,
-      role: company.role,
-      user_role: company.user_role,
-      address: company.address,
-      country: company.country,
-      state: company.state,
-      city: company.city,
-      postal_code: company.postal_code,
-      currency: company.currency,
-      startDate: company.startDate,
-      expireDate: company.expireDate,
-      UserStatus: company.UserStatus,
-      created_at: company.created_at,
+    const format = (value) => value ?? ""; // Replace null with empty string
 
-      // Include bank details, notes, and terms & conditions
+    const formattedCompanies = companies.map((c) => ({
+      id: c.id,
+      name: format(c.name),
+      email: format(c.email),
+      phone: format(c.phone),
+      role: c.role,
+      user_role: format(c.user_role),
+      address: format(c.address),
+      country: format(c.country),
+      state: format(c.state),
+      city: format(c.city),
+      postal_code: format(c.postal_code),
+      currency: format(c.currency),
+      startDate: c.startDate,
+      expireDate: c.expireDate,
+      UserStatus: format(c.UserStatus),
+      created_at: c.created_at,
+
+      // 🏦 Bank details (null-proof)
       bank_details: {
-        bank_name: company.bank_name,
-        account_number: company.account_number,
-        account_holder: company.account_holder,
-        ifsc_code: company.ifsc_code,
+        bank_name: format(c.bank_name),
+        account_number: format(c.account_number),
+        account_holder: format(c.account_holder),
+        ifsc_code: format(c.ifsc_code),
       },
-      notes: company.notes,
-      terms_and_conditions: company.terms_and_conditions,
 
+      notes: format(c.notes),
+      terms_and_conditions: format(c.terms_and_conditions),
+
+      // 🖼 Branding (null-safe)
       branding: {
-        company_logo_url: company.company_logo_url,
-        company_dark_logo_url: company.company_dark_logo_url,
-        company_icon_url: company.company_icon_url,
-        favicon_url: company.favicon_url,
+        company_logo_url: format(c.company_logo_url),
+        company_dark_logo_url: format(c.company_dark_logo_url),
+        company_icon_url: format(c.company_icon_url),
+        favicon_url: format(c.favicon_url),
       },
 
-      // User plan details
-      user_plans: company.user_plans.map((planData) => ({
-        id: planData.id,
-        status: planData.status,
-        start_date: planData.start_date,
-        end_date: planData.end_date,
-        plan: planData.plan
+      // 📅 User plan info
+      user_plans: c.user_plans.map((p) => ({
+        id: p.id,
+        status: p.status,
+        start_date: p.start_date,
+        end_date: p.end_date,
+        plan: p.plan
           ? {
-              id: planData.plan.id,
-              plan_name: planData.plan.plan_name,
-              duration: planData.plan.duration,
-              amount: planData.plan.amount,
+              id: p.plan.id,
+              plan_name: format(p.plan.plan_name),
+              duration: p.plan.duration,
+              amount: p.plan.amount,
             }
           : null,
       })),
-      
-      // Team members associated with the company
-      team_members: company.created_users,
+
+      // 👥 Team members
+      team_members: c.created_users || [],
     }));
 
-    // ✅ Send formatted response
     return res.status(200).json({
       success: true,
       message: "Companies fetched successfully",

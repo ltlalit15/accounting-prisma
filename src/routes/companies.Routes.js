@@ -13,7 +13,7 @@ const router = Router();
 
 // Super admin routes
 router.post("/", createCompany);                 // Create new company
-router.get("/", getCompanies);     
+router.get("/", getCompanies);  
               
 router.get("/:id/modules", getCompanyModules);   // Get modules for a company (admin view)
 router.put("/:id/plan", updateCompanyPlan);      // Update company (including plan)

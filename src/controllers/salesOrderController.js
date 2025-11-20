@@ -879,189 +879,503 @@ export const saveOrUpdateSalesOrder = async (req, res) => {
 // };
 
 
+// export const createSalesOrder = async (req, res) => {
+//   try {
+//     const body = { ...req.body };
+
+//     const orderId = body.id ? Number(body.id) : null;
+
+//     // ============ VALIDATION ============
+//     if (!body.company_info) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_info is mandatory"
+//       });
+//     }
+
+//     if (!Array.isArray(body.items) || body.items.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "items must be provided and not empty"
+//       });
+//     }
+
+//     if (!body.steps) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "steps object is mandatory"
+//       });
+//     }
+
+//     const requiredSteps = ["quotation", "sales_order", "delivery_challan", "invoice", "payment"];
+//     for (const step of requiredSteps) {
+//       if (!body.steps[step]) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `${step} step data is mandatory`
+//         });
+//       }
+//     }
+
+//     // ============ FILE UPLOAD HANDLER ============
+//     const fileFields = ["logo_url", "signature_url", "photo_url", "attachment_url"];
+//     for (const field of fileFields) {
+//       if (body.company_info[field] && body.company_info[field].startsWith("data:")) {
+//         const uploaded = await uploadToCloudinary(body.company_info[field]);
+//         body.company_info[field] = uploaded ?? "";
+//       }
+//     }
+
+//     // ============ AUTO STATUS COMPLETE ============
+//     const stepCompleted = (data, fields) =>
+//       fields.every(field => data[field] !== "" && data[field] !== null && data[field] !== undefined);
+
+//     const stepRules = {
+//       quotation: ["ref_no", "quotation_no", "quotation_date", "subtotal", "total"],
+//       sales_order: ["SO_no", "sales_order_status"],
+//       delivery_challan: ["Challan_no", "driver_name"],
+//       invoice: ["invoice_no"],
+//       payment: ["Payment_no", "amount_received"]
+//     };
+
+//     for (const step of requiredSteps) {
+//       const isCompleted = stepCompleted(body.steps[step], stepRules[step]);
+//       body.steps[step].status = isCompleted ? "completed" : "pending";
+//     }
+
+//     // ============ MAP COMPANY INFO ============
+//     const companyData = {
+//       company_id: Number(body.company_info.company_id),
+//       company_name: body.company_info.company_name,
+//       company_address: body.company_info.company_address,
+//       company_email: body.company_info.company_email,
+//       company_phone: body.company_info.company_phone,
+//       logo_url: body.company_info.logo_url ?? "",
+//       bank_name: body.company_info.bank_name ?? "",
+//       account_no: body.company_info.account_no ?? "",
+//       account_holder: body.company_info.account_holder ?? "",
+//       ifsc_code: body.company_info.ifsc_code ?? ""
+//     };
+
+//     // ============ MAP ITEMS ============
+//     const itemsData = body.items.map(item => ({
+//       item_name: item.item_name,
+//       qty: Number(item.qty),
+//       rate: Number(item.rate),
+//       tax_percent: Number(item.tax_percent),
+//       discount: Number(item.discount),
+//       amount: Number(item.amount)
+//     }));
+
+//     // ============ PREPARE FINAL DATABASE OBJECT ============
+//     const dbData = {
+//       ...companyData,
+//       ...body.steps.quotation,
+//       ...body.steps.sales_order,
+//       ...body.steps.delivery_challan,
+//       ...body.steps.invoice,
+//       ...body.steps.payment,
+
+//       customer_ref: body.additional_info?.customer_ref ?? "",
+//       signature_url: body.additional_info?.signature_url ?? "",
+//       photo_url: body.additional_info?.photo_url ?? "",
+//       attachment_url: body.additional_info?.attachment_url ?? "",
+
+//       updated_at: new Date()
+//     };
+
+//     // ============ FIX DATE FIELDS FOR PRISMA ============
+//     const fixDate = (d) => (d ? new Date(d) : null);
+
+//     dbData.quotation_date = fixDate(dbData.quotation_date);
+//     dbData.valid_till = fixDate(dbData.valid_till);
+//     dbData.due_date = fixDate(dbData.due_date);
+//     dbData.invoice_date = fixDate(dbData.invoice_date);
+//     dbData.payment_date = fixDate(dbData.payment_date);
+
+//     // ============ CREATE OR UPDATE ============
+//     let savedOrder;
+
+//     if (orderId) {
+//       // UPDATE
+//       await prisma.salesorderitems.deleteMany({
+//         where: { sales_order_id: orderId }
+//       });
+
+//       savedOrder = await prisma.salesorder.update({
+//         where: { id: orderId },
+//         data: {
+//           ...dbData,
+//           salesorderitems: {
+//             create: itemsData
+//           }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     } else {
+//       // CREATE
+//       savedOrder = await prisma.salesorder.create({
+//         data: {
+//           ...dbData,
+//           created_at: new Date(),
+//           salesorderitems: {
+//             create: itemsData
+//           }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     }
+
+//     // ============ FORMAT RESPONSE ============
+//     const response = {
+//       company_info: {
+//         ...companyData,
+//         id: savedOrder.id,
+//         created_at: savedOrder.created_at,
+//         updated_at: savedOrder.updated_at
+//       },
+//       items: savedOrder.salesorderitems,
+//       steps: [
+//         {
+//           step: "quotation",
+//           status: body.steps.quotation.status,
+//           data: body.steps.quotation
+//         },
+//         {
+//           step: "sales_order",
+//           status: body.steps.sales_order.status,
+//           data: body.steps.sales_order
+//         },
+//         {
+//           step: "delivery_challan",
+//           status: body.steps.delivery_challan.status,
+//           data: body.steps.delivery_challan
+//         },
+//         {
+//           step: "invoice",
+//           status: body.steps.invoice.status,
+//           data: body.steps.invoice
+//         },
+//         {
+//           step: "payment",
+//           status: body.steps.payment.status,
+//           data: body.steps.payment
+//         }
+//       ],
+//       additional_info: body.additional_info ?? {}
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: orderId ? "Sales order updated" : "Sales order created",
+//       data: response
+//     });
+//   } catch (err) {
+//     console.error("Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: err.message
+//     });
+//   }
+// };
+
+
+// export const createSalesOrder = async (req, res) => {
+//   try {
+//     const body = { ...req.body };
+
+//     const orderId = body.id ? Number(body.id) : null;
+
+//     // ============ VALIDATION ============
+//     if (!body.company_info) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_info is mandatory"
+//       });
+//     }
+
+//     if (!Array.isArray(body.items) || body.items.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "items must be provided and not empty"
+//       });
+//     }
+
+//     // ❗ STEPS OPTIONAL NOW
+//     const steps = body.steps || {};
+//     const requiredSteps = ["quotation", "sales_order", "delivery_challan", "invoice", "payment"];
+
+//     // ============ FILE UPLOAD HANDLER ============
+//     const fileFields = ["logo_url", "signature_url", "photo_url", "attachment_url"];
+//     for (const field of fileFields) {
+//       if (body.company_info[field] && body.company_info[field].startsWith("data:")) {
+//         const uploaded = await uploadToCloudinary(body.company_info[field]);
+//         body.company_info[field] = uploaded ?? "";
+//       }
+//     }
+
+//     // ============ AUTO STATUS COMPLETE ============
+//     const stepCompleted = (data, fields) =>
+//       fields.every(field => data[field] !== "" && data[field] !== null && data[field] !== undefined);
+
+//     const stepRules = {
+//       quotation: ["ref_no", "quotation_no", "quotation_date", "subtotal", "total"],
+//       sales_order: ["SO_no", "sales_order_status"],
+//       delivery_challan: ["Challan_no", "driver_name"],
+//       invoice: ["invoice_no"],
+//       payment: ["Payment_no", "amount_received"]
+//     };
+
+//     // ❗ Only check status for steps that user actually sent
+//     requiredSteps.forEach(step => {
+//       if (steps[step]) {
+//         const isCompleted = stepCompleted(steps[step], stepRules[step]);
+//         steps[step].status = isCompleted ? "completed" : "pending";
+//       }
+//     });
+
+//     // ============ MAP COMPANY INFO ============
+//     const companyData = {
+//       company_id: Number(body.company_info.company_id),
+//       company_name: body.company_info.company_name,
+//       company_address: body.company_info.company_address,
+//       company_email: body.company_info.company_email,
+//       company_phone: body.company_info.company_phone,
+//       logo_url: body.company_info.logo_url ?? "",
+//       bank_name: body.company_info.bank_name ?? "",
+//       account_no: body.company_info.account_no ?? "",
+//       account_holder: body.company_info.account_holder ?? "",
+//       ifsc_code: body.company_info.ifsc_code ?? ""
+//     };
+
+//     // ============ MAP ITEMS ============
+//     const itemsData = body.items.map(item => ({
+//       item_name: item.item_name,
+//       qty: Number(item.qty),
+//       rate: Number(item.rate),
+//       tax_percent: Number(item.tax_percent),
+//       discount: Number(item.discount),
+//       amount: Number(item.amount)
+//     }));
+
+//     // ============ PREPARE FINAL DATABASE OBJECT ============
+//     const dbData = {
+//       ...companyData,
+//       ...(steps.quotation || {}),
+//       ...(steps.sales_order || {}),
+//       ...(steps.delivery_challan || {}),
+//       ...(steps.invoice || {}),
+//       ...(steps.payment || {}),
+
+//       customer_ref: body.additional_info?.customer_ref ?? "",
+//       signature_url: body.additional_info?.signature_url ?? "",
+//       photo_url: body.additional_info?.photo_url ?? "",
+//       attachment_url: body.additional_info?.attachment_url ?? "",
+
+//       updated_at: new Date()
+//     };
+
+//     // ============ FIX DATE FIELDS ============
+//     const fixDate = d => (d ? new Date(d) : null);
+
+//     if (dbData.quotation_date) dbData.quotation_date = fixDate(dbData.quotation_date);
+//     if (dbData.valid_till) dbData.valid_till = fixDate(dbData.valid_till);
+//     if (dbData.due_date) dbData.due_date = fixDate(dbData.due_date);
+//     if (dbData.invoice_date) dbData.invoice_date = fixDate(dbData.invoice_date);
+//     if (dbData.payment_date) dbData.payment_date = fixDate(dbData.payment_date);
+
+//     // ============ CREATE OR UPDATE ============
+//     let savedOrder;
+
+//     if (orderId) {
+//       await prisma.salesorderitems.deleteMany({
+//         where: { sales_order_id: orderId }
+//       });
+
+//       savedOrder = await prisma.salesorder.update({
+//         where: { id: orderId },
+//         data: {
+//           ...dbData,
+//           salesorderitems: { create: itemsData }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     } else {
+//       savedOrder = await prisma.salesorder.create({
+//         data: {
+//           ...dbData,
+//           created_at: new Date(),
+//           salesorderitems: { create: itemsData }
+//         },
+//         include: { salesorderitems: true }
+//       });
+//     }
+
+//     // ============ FORMAT RESPONSE ============
+//     const response = {
+//       company_info: {
+//         ...companyData,
+//         id: savedOrder.id,
+//         created_at: savedOrder.created_at,
+//         updated_at: savedOrder.updated_at
+//       },
+//       items: savedOrder.salesorderitems,
+//       steps: requiredSteps.map(step => ({
+//         step,
+//         status: steps[step]?.status ?? "pending",
+//         data: steps[step] ?? {}
+//       })),
+//       additional_info: body.additional_info ?? {}
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: orderId ? "Sales order updated" : "Sales order created",
+//       data: response
+//     });
+
+//   } catch (err) {
+//     console.error("Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: err.message
+//     });
+//   }
+// };
+
 export const createSalesOrder = async (req, res) => {
   try {
     const body = { ...req.body };
-
     const orderId = body.id ? Number(body.id) : null;
 
-    // ============ VALIDATION ============
-    if (!body.company_info) {
-      return res.status(400).json({
-        success: false,
-        message: "company_info is mandatory"
-      });
-    }
-
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "items must be provided and not empty"
-      });
-    }
-
-    if (!body.steps) {
-      return res.status(400).json({
-        success: false,
-        message: "steps object is mandatory"
-      });
-    }
-
+    const steps = body.steps || {};
     const requiredSteps = ["quotation", "sales_order", "delivery_challan", "invoice", "payment"];
-    for (const step of requiredSteps) {
-      if (!body.steps[step]) {
-        return res.status(400).json({
-          success: false,
-          message: `${step} step data is mandatory`
-        });
-      }
-    }
 
     // ============ FILE UPLOAD HANDLER ============
     const fileFields = ["logo_url", "signature_url", "photo_url", "attachment_url"];
     for (const field of fileFields) {
-      if (body.company_info[field] && body.company_info[field].startsWith("data:")) {
+      if (body.company_info?.[field] && body.company_info[field].startsWith("data:")) {
         const uploaded = await uploadToCloudinary(body.company_info[field]);
         body.company_info[field] = uploaded ?? "";
       }
     }
 
-    // ============ AUTO STATUS COMPLETE ============
-    const stepCompleted = (data, fields) =>
-      fields.every(field => data[field] !== "" && data[field] !== null && data[field] !== undefined);
-
-    const stepRules = {
-      quotation: ["ref_no", "quotation_no", "quotation_date", "subtotal", "total"],
-      sales_order: ["SO_no", "sales_order_status"],
-      delivery_challan: ["Challan_no", "driver_name"],
-      invoice: ["invoice_no"],
-      payment: ["Payment_no", "amount_received"]
-    };
-
-    for (const step of requiredSteps) {
-      const isCompleted = stepCompleted(body.steps[step], stepRules[step]);
-      body.steps[step].status = isCompleted ? "completed" : "pending";
-    }
-
     // ============ MAP COMPANY INFO ============
     const companyData = {
-      company_id: Number(body.company_info.company_id),
-      company_name: body.company_info.company_name,
-      company_address: body.company_info.company_address,
-      company_email: body.company_info.company_email,
-      company_phone: body.company_info.company_phone,
-      logo_url: body.company_info.logo_url ?? "",
-      bank_name: body.company_info.bank_name ?? "",
-      account_no: body.company_info.account_no ?? "",
-      account_holder: body.company_info.account_holder ?? "",
-      ifsc_code: body.company_info.ifsc_code ?? ""
+      company_id: Number(body.company_info?.company_id || 0),
+      company_name: body.company_info?.company_name || "",
+      company_address: body.company_info?.company_address || "",
+      company_email: body.company_info?.company_email || "",
+      company_phone: body.company_info?.company_phone || "",
+      logo_url: body.company_info?.logo_url ?? "",
+      bank_name: body.company_info?.bank_name ?? "",
+      account_no: body.company_info?.account_no ?? "",
+      account_holder: body.company_info?.account_holder ?? "",
+      ifsc_code: body.company_info?.ifsc_code ?? ""
     };
 
     // ============ MAP ITEMS ============
-    const itemsData = body.items.map(item => ({
-      item_name: item.item_name,
-      qty: Number(item.qty),
-      rate: Number(item.rate),
-      tax_percent: Number(item.tax_percent),
-      discount: Number(item.discount),
-      amount: Number(item.amount)
+    const itemsData = (Array.isArray(body.items) ? body.items : []).map(item => ({
+      item_name: item.item_name || "",
+      qty: Number(item.qty || 0),
+      rate: Number(item.rate || 0),
+      tax_percent: Number(item.tax_percent || 0),
+      discount: Number(item.discount || 0),
+      amount: Number(item.amount || 0)
     }));
 
-    // ============ PREPARE FINAL DATABASE OBJECT ============
+    // ============ PREPARE DATABASE OBJECT ============
     const dbData = {
       ...companyData,
-      ...body.steps.quotation,
-      ...body.steps.sales_order,
-      ...body.steps.delivery_challan,
-      ...body.steps.invoice,
-      ...body.steps.payment,
-
+      ...(steps.quotation || {}),
+      ...(steps.sales_order || {}),
+      ...(steps.delivery_challan || {}),
+      ...(steps.invoice || {}),
+      ...(steps.payment || {}),
       customer_ref: body.additional_info?.customer_ref ?? "",
       signature_url: body.additional_info?.signature_url ?? "",
       photo_url: body.additional_info?.photo_url ?? "",
       attachment_url: body.additional_info?.attachment_url ?? "",
-
       updated_at: new Date()
     };
 
-    // ============ FIX DATE FIELDS FOR PRISMA ============
-    const fixDate = (d) => (d ? new Date(d) : null);
-
-    dbData.quotation_date = fixDate(dbData.quotation_date);
-    dbData.valid_till = fixDate(dbData.valid_till);
-    dbData.due_date = fixDate(dbData.due_date);
-    dbData.invoice_date = fixDate(dbData.invoice_date);
-    dbData.payment_date = fixDate(dbData.payment_date);
+    const fixDate = d => (d ? new Date(d) : null);
+    ["quotation_date", "valid_till", "due_date", "invoice_date", "payment_date"].forEach(field => {
+      if (dbData[field]) dbData[field] = fixDate(dbData[field]);
+    });
 
     // ============ CREATE OR UPDATE ============
     let savedOrder;
-
     if (orderId) {
-      // UPDATE
-      await prisma.salesorderitems.deleteMany({
-        where: { sales_order_id: orderId }
-      });
-
+      await prisma.salesorderitems.deleteMany({ where: { sales_order_id: orderId } });
       savedOrder = await prisma.salesorder.update({
         where: { id: orderId },
-        data: {
-          ...dbData,
-          salesorderitems: {
-            create: itemsData
-          }
-        },
+        data: { ...dbData, salesorderitems: { create: itemsData } },
         include: { salesorderitems: true }
       });
     } else {
-      // CREATE
       savedOrder = await prisma.salesorder.create({
-        data: {
-          ...dbData,
-          created_at: new Date(),
-          salesorderitems: {
-            create: itemsData
-          }
-        },
+        data: { ...dbData, created_at: new Date(), salesorderitems: { create: itemsData } },
         include: { salesorderitems: true }
       });
     }
 
-    // ============ FORMAT RESPONSE ============
+    // ============ FORMAT RESPONSE (with DB fallback) ============
     const response = {
-      company_info: {
-        ...companyData,
-        id: savedOrder.id,
-        created_at: savedOrder.created_at,
-        updated_at: savedOrder.updated_at
-      },
+      company_info: { ...companyData, id: savedOrder.id, created_at: savedOrder.created_at, updated_at: savedOrder.updated_at },
       items: savedOrder.salesorderitems,
-      steps: [
-        {
-          step: "quotation",
-          status: body.steps.quotation.status,
-          data: body.steps.quotation
-        },
-        {
-          step: "sales_order",
-          status: body.steps.sales_order.status,
-          data: body.steps.sales_order
-        },
-        {
-          step: "delivery_challan",
-          status: body.steps.delivery_challan.status,
-          data: body.steps.delivery_challan
-        },
-        {
-          step: "invoice",
-          status: body.steps.invoice.status,
-          data: body.steps.invoice
-        },
-        {
-          step: "payment",
-          status: body.steps.payment.status,
-          data: body.steps.payment
+      steps: requiredSteps.map(step => ({
+        step,
+        status: steps[step]?.status ?? "pending",
+        data: {
+          ...(steps[step] || {}),
+          ...(step === "quotation" ? {
+            ref_no: savedOrder.ref_no,
+            quotation_no: savedOrder.quotation_no,
+            quotation_date: savedOrder.quotation_date,
+            valid_till: savedOrder.valid_till,
+            subtotal: savedOrder.subtotal,
+            total: savedOrder.total,
+            draft_status: savedOrder.draft_status,
+            notes: savedOrder.notes,
+            ship_to: savedOrder.ship_to,
+            bill_to: savedOrder.bill_to
+          } : {}),
+          ...(step === "sales_order" ? {
+            SO_no: savedOrder.SO_no,
+            Manual_SO_ref: savedOrder.Manual_SO_ref,
+            sales_order_status: savedOrder.sales_order_status
+          } : {}),
+          ...(step === "delivery_challan" ? {
+            Challan_no: savedOrder.Challan_no,
+            Manual_challan_no: savedOrder.Manual_challan_no,
+            Manual_DC_no: savedOrder.Manual_DC_no,
+            driver_name: savedOrder.driver_name,
+            driver_phone: savedOrder.driver_phone,
+            delivery_challan_status: savedOrder.delivery_challan_status
+          } : {}),
+          ...(step === "invoice" ? {
+            invoice_no: savedOrder.invoice_no,
+            Manual_invoice_no: savedOrder.Manual_invoice_no,
+            total_invoice: savedOrder.total_invoice,
+            invoice_status: savedOrder.invoice_status
+          } : {}),
+          ...(step === "payment" ? {
+            Payment_no: savedOrder.Payment_no,
+            Manual_payment_no: savedOrder.Manual_payment_no,
+            payment_details: {
+              amount_received: savedOrder.amount_received,
+              total_amount: savedOrder.total_amount,
+              payment_status: savedOrder.payment_status,
+              balance: savedOrder.balance,
+              payment_note: savedOrder.payment_note,
+              received_from: savedOrder.received_from
+            }
+          } : {})
         }
-      ],
+      })),
       additional_info: body.additional_info ?? {}
     };
 
@@ -1070,6 +1384,7 @@ export const createSalesOrder = async (req, res) => {
       message: orderId ? "Sales order updated" : "Sales order created",
       data: response
     });
+
   } catch (err) {
     console.error("Error:", err);
     return res.status(500).json({
@@ -1079,14 +1394,6 @@ export const createSalesOrder = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
-
 
 export const getAllSalesOrders = async (req, res) => {
   try {

@@ -24,6 +24,8 @@ model plans {
   // 🔗 Relation
   plan_modules plan_modules[]
   user_plans   user_plans[]
+  plan_requests plan_requests[]
+
 }
 
 model plan_modules {
@@ -46,6 +48,24 @@ enum PlanStatus {
   Inactive
   Expired
 }
+
+//------------- planRequest ---------------//
+
+model plan_requests {
+  id            Int      @id @default(autoincrement())
+ company_name  String   @db.VarChar(255)   
+  company_email String   @db.VarChar(255)   
+  plan_id       Int
+  billing_cycle PlansBillingCycle @default(Monthly)
+  request_date  DateTime @default(now())
+  status        String   @default("Pending")
+
+  // Relations
+  plan    plans @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+
+  @@index([plan_id])
+}
+
 
 // ------------ userroles permissions ----------- //
 model userRoles {
@@ -124,6 +144,8 @@ model users {
   ifsc_code            String? @db.VarChar(50)
   notes                String? @db.VarChar(1000)
   terms_and_conditions String? @db.VarChar(1000)
+ 
+
 
 }
 
