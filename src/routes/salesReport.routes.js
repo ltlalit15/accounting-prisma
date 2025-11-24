@@ -2,7 +2,8 @@ import { Router } from "express";
 import {
   getSalesReportSummary,
   getSalesReport,
-  getSalesReportOptimized
+  getSalesReportOptimized,
+  getSalesReportTable
 } from "../controllers/salesReport.controller.js";
 
 const router = Router();
@@ -15,6 +16,8 @@ router.get("/detailed", getSalesReport);
 
 // Get Optimized Sales Report (Recommended - Better Performance)
 router.get("/", getSalesReportOptimized);
+
+router.get("/salesummary", getSalesReportTable);
 
 export default router;
 

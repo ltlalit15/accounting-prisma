@@ -128,144 +128,143 @@ export const createTransfer = async (req, res) => {
   try {
     const {
       company_id,
-      voucher_no,
-      manual_voucher_no,
-      transfer_date,
-      destination_warehouse_id,
-      notes,
-      items,
-    } = req.body;
+    voucher_no,
+    manual_voucher_no,
+    transfer_date,
+    destination_warehouse_id,
+    notes,
+    items,
+  } = req.body;
 
-    if (!company_id || !destination_warehouse_id) {
+  if (!company_id || !destination_warehouse_id) {
+    return res.status(400).json({
+      success: false,
+      message: "company_id and destination_warehouse_id are required",
+    });
+  }
+
+  const parsedDate = transfer_date ? new Date(transfer_date) : new Date();
+  if (isNaN(parsedDate.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid transfer date",
+    });
+  }
+
+  let parsedItems = [];
+  if (items) parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+
+  // ========================================================================
+  // 🚨 1. STOCK VALIDATION BEFORE TRANSACTION
+  // ========================================================================
+  for (const item of parsedItems) {
+    const productId = Number(item.product_id);
+    const sourceWh = Number(item.source_warehouse_id);
+    const qty = Number(item.qty);
+
+    const sourceStock = await prisma.product_warehouses.findUnique({
+      where: {
+        product_id_warehouse_id: { product_id: productId, warehouse_id: sourceWh },
+      },
+    });
+
+    if (!sourceStock) {
       return res.status(400).json({
         success: false,
-        message: "company_id and destination_warehouse_id are required",
+        message: `No stock found for product_id ${productId} in warehouse ${sourceWh}`,
       });
     }
 
-    const parsedDate = transfer_date ? new Date(transfer_date) : new Date();
-    if (isNaN(parsedDate.getTime())) {
-      return res.status(400).json({ success: false, message: "Invalid transfer date" });
+    if (sourceStock.stock_qty < qty) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient stock for product_id ${productId} in warehouse ${sourceWh}. Available: ${sourceStock.stock_qty}, Required: ${qty}`,
+      });
     }
+  }
 
-    let parsedItems = [];
-    if (items) parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+  // ========================================================================
+  // 🧮 2. TRANSACTION — Create transfer, items, and update stock
+  // ========================================================================
+  const transfer = await prisma.$transaction(async (tx) => {
+    const createdTransfer = await tx.transfers.create({
+      data: {
+        company_id: Number(company_id),
+        voucher_no: voucher_no || null,
+        manual_voucher_no: manual_voucher_no || null,
+        transfer_date: parsedDate,
+        destination_warehouse_id: Number(destination_warehouse_id),
+        notes: notes || null,
+      },
+    });
 
-    // ========================================================================
-    // 🚨 STOCK VALIDATION BEFORE TRANSACTION
-    // ========================================================================
     for (const item of parsedItems) {
       const productId = Number(item.product_id);
       const sourceWh = Number(item.source_warehouse_id);
+      const destWh = Number(destination_warehouse_id);
       const qty = Number(item.qty);
 
-      const sourceStock = await prisma.product_warehouses.findUnique({
-        where: {
-          product_id_warehouse_id: { product_id: productId, warehouse_id: sourceWh },
+      // 2.1️⃣ Save transfer item
+      await tx.transfer_items.create({
+        data: {
+          transfer_id: createdTransfer.id,
+          product_id: productId,
+          source_warehouse_id: sourceWh,
+          qty,
+          rate: item.rate || 0,
+          narration: item.narration || null,
         },
       });
 
-      // ❌ if no record found
-      if (!sourceStock) {
-        return res.status(400).json({
-          success: false,
-          message: `No stock found for product_id ${productId} in warehouse ${sourceWh}`,
-        });
-      }
+      // 2.2️⃣ Reduce stock from source warehouse (must exist)
+      await tx.product_warehouses.update({
+        where: {
+          product_id_warehouse_id: {
+            product_id: productId,
+            warehouse_id: sourceWh,
+          },
+        },
+        data: { stock_qty: { decrement: qty } },
+      });
 
-      // ❌ if stock insufficient
-      if (sourceStock.stock_qty < qty) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for product_id ${productId} in warehouse ${sourceWh}. Available: ${sourceStock.stock_qty}, Required: ${qty}`,
-        });
-      }
+      // 2.3️⃣ Increase stock in destination warehouse (UPSERT BEST PRACTICE)
+      await tx.product_warehouses.upsert({
+        where: {
+          product_id_warehouse_id: {
+            product_id: productId,
+            warehouse_id: destWh,
+          },
+        },
+        update: {
+          stock_qty: { increment: qty },
+        },
+        create: {
+          product_id: productId,
+          warehouse_id: destWh,
+          stock_qty: qty,
+        },
+      });
     }
 
-    // ========================================================================
-    // 🧮 TRANSACTION — Create transfer, items, and update stock
-    // ========================================================================
-    const transfer = await prisma.$transaction(async (tx) => {
-      const createdTransfer = await tx.transfers.create({
-        data: {
-          company_id: Number(company_id),
-          voucher_no: voucher_no || null,
-          manual_voucher_no: manual_voucher_no || null,
-          transfer_date: parsedDate,
-          destination_warehouse_id: Number(destination_warehouse_id),
-          notes: notes || null,
-        },
-      });
+    return createdTransfer;
+  });
 
-      for (const item of parsedItems) {
-        const productId = Number(item.product_id);
-        const sourceWh = Number(item.source_warehouse_id);
-        const destWh = Number(destination_warehouse_id);
-        const qty = Number(item.qty);
+  return res.status(201).json({
+    success: true,
+    message: "Transfer created successfully",
+    data: transfer,
+  });
 
-        await tx.transfer_items.create({
-          data: {
-            transfer_id: createdTransfer.id,
-            product_id: productId,
-            source_warehouse_id: sourceWh,
-            qty,
-            rate: item.rate || 0,
-            narration: item.narration || null,
-          },
-        });
-
-        // 1️⃣ Reduce stock from source warehouse
-        await tx.product_warehouses.update({
-          where: {
-            product_id_warehouse_id: { product_id: productId, warehouse_id: sourceWh },
-          },
-          data: {
-            stock_qty: { decrement: qty },
-          },
-        });
-
-        // 2️⃣ Increase stock in destination warehouse
-        const destStock = await tx.product_warehouses.findUnique({
-          where: {
-            product_id_warehouse_id: { product_id: productId, warehouse_id: destWh },
-          },
-        });
-
-        if (destStock) {
-          await tx.product_warehouses.update({
-            where: {
-              product_id_warehouse_id: { product_id: productId, warehouse_id: destWh },
-            },
-            data: { stock_qty: { increment: qty } },
-          });
-        } else {
-          await tx.product_warehouses.create({
-            data: {
-              product_id: productId,
-              warehouse_id: destWh,
-              stock_qty: qty,
-            },
-          });
-        }
-      }
-
-      return createdTransfer;
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Transfer created successfully",
-      data: transfer,
-    });
-  } catch (error) {
-    console.error("❌ Error creating transfer:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create transfer",
-      error: error.message,
-    });
-  }
+} catch (error) {
+  console.error("❌ Error creating transfer:", error);
+  return res.status(500).json({
+    success: false,
+    message: "Failed to create transfer",
+    error: error.message,
+  });
+}
 };
+
 
 
 
@@ -372,7 +371,8 @@ export const createTransfer = async (req, res) => {
 
 export const updateTransfer = async (req, res) => {
   try {
-    const { id } = req.params; // transfer ID
+    const { id } = req.params;
+
     const {
       company_id,
       voucher_no,
@@ -380,7 +380,7 @@ export const updateTransfer = async (req, res) => {
       transfer_date,
       destination_warehouse_id,
       notes,
-      items, // updated array
+      items,
     } = req.body;
 
     if (!id) {
@@ -405,43 +405,90 @@ export const updateTransfer = async (req, res) => {
 
     // Parse items
     let parsedItems = [];
-    if (items) {
-      parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+    if (items) parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+
+    const parsedDate = transfer_date
+      ? new Date(transfer_date)
+      : oldTransfer.transfer_date;
+
+    const newDestinationWh = Number(
+      destination_warehouse_id || oldTransfer.destination_warehouse_id
+    );
+
+    // ============================================================
+    // 🚨 VALIDATE DESTINATION WAREHOUSE EXISTS
+    // ============================================================
+    const checkDest = await prisma.warehouses.findUnique({
+      where: { id: newDestinationWh },
+    });
+
+    if (!checkDest) {
+      return res.status(400).json({
+        success: false,
+        message: `Destination warehouse ID ${newDestinationWh} does not exist`,
+      });
     }
 
-    const parsedDate = transfer_date ? new Date(transfer_date) : oldTransfer.transfer_date;
-
-    // =========================
+    // ============================================================
     // 🔥 MAIN TRANSACTION
-    // =========================
+    // ============================================================
     const updatedTransfer = await prisma.$transaction(async (tx) => {
-      
-      // 1️⃣ REVERSE OLD STOCK MOVEMENTS
+
+      // 1️⃣ REVERSE OLD STOCK
       for (const oldItem of oldTransfer.transfer_items) {
-        // Increase old source stock
-        await tx.product_warehouses.updateMany({
+        const qty = Number(oldItem.qty);
+
+        // Return stock to OLD SOURCE warehouse
+        await tx.product_warehouses.update({
           where: {
-            product_id: oldItem.product_id,
-            warehouse_id: oldItem.source_warehouse_id,
+            product_id_warehouse_id: {
+              product_id: oldItem.product_id,
+              warehouse_id: oldItem.source_warehouse_id,
+            },
           },
           data: {
-            stock_qty: { increment: Number(oldItem.qty) },
+            stock_qty: { increment: qty },
           },
         });
 
-        // Reduce old destination stock (if exists)
-        await tx.product_warehouses.updateMany({
+        // Remove stock from OLD DESTINATION warehouse
+        await tx.product_warehouses.update({
           where: {
-            product_id: oldItem.product_id,
-            warehouse_id: oldTransfer.destination_warehouse_id,
+            product_id_warehouse_id: {
+              product_id: oldItem.product_id,
+              warehouse_id: oldTransfer.destination_warehouse_id,
+            },
           },
           data: {
-            stock_qty: { decrement: Number(oldItem.qty) },
+            stock_qty: { decrement: qty },
           },
         });
       }
 
-      // 2️⃣ UPDATE TRANSFER MAIN RECORD
+      // 2️⃣ STOCK VALIDATION AFTER REVERSING OLD STOCK
+      for (const item of parsedItems) {
+        const productId = Number(item.product_id);
+        const sourceWh = Number(item.source_warehouse_id);
+        const qty = Number(item.qty);
+
+        const stock = await tx.product_warehouses.findUnique({
+          where: {
+            product_id_warehouse_id: {
+              product_id: productId,
+              warehouse_id: sourceWh,
+            },
+          },
+        });
+
+        if (!stock || stock.stock_qty < qty) {
+          throw new Error(
+            `Insufficient stock for product ${productId} in warehouse ${sourceWh}. ` +
+            `Available: ${stock?.stock_qty || 0}, Required: ${qty}`
+          );
+        }
+      }
+
+      // 3️⃣ UPDATE TRANSFER HEADER
       const updated = await tx.transfers.update({
         where: { id: Number(id) },
         data: {
@@ -449,48 +496,28 @@ export const updateTransfer = async (req, res) => {
           voucher_no: voucher_no ?? oldTransfer.voucher_no,
           manual_voucher_no: manual_voucher_no ?? oldTransfer.manual_voucher_no,
           transfer_date: parsedDate,
-          destination_warehouse_id:
-            destination_warehouse_id
-              ? Number(destination_warehouse_id)
-              : oldTransfer.destination_warehouse_id,
+          destination_warehouse_id: newDestinationWh,
           notes: notes ?? oldTransfer.notes,
         },
       });
 
-      // 3️⃣ DELETE OLD ITEMS
+      // 4️⃣ DELETE OLD ITEMS
       await tx.transfer_items.deleteMany({
         where: { transfer_id: Number(id) },
       });
 
-      // 4️⃣ PROCESS NEW ITEMS
+      // 5️⃣ APPLY NEW STOCK + CREATE NEW ITEMS
       for (const item of parsedItems) {
+        const productId = Number(item.product_id);
+        const sourceWh = Number(item.source_warehouse_id);
         const qty = Number(item.qty);
 
-        if (qty <= 0)
-          throw new Error("Qty must be greater than zero");
-
-        // Check stock availability
-        const sourceStock = await tx.product_warehouses.findUnique({
-          where: {
-            product_id_warehouse_id: {
-              product_id: Number(item.product_id),
-              warehouse_id: Number(item.source_warehouse_id),
-            },
-          },
-        });
-
-        if (!sourceStock || sourceStock.stock_qty < qty) {
-          throw new Error(
-            `Insufficient stock for product ID ${item.product_id} in warehouse ${item.source_warehouse_id}`
-          );
-        }
-
-        // Deduct from source
+        // Reduce stock from NEW SOURCE warehouse
         await tx.product_warehouses.update({
           where: {
             product_id_warehouse_id: {
-              product_id: Number(item.product_id),
-              warehouse_id: Number(item.source_warehouse_id),
+              product_id: productId,
+              warehouse_id: sourceWh,
             },
           },
           data: {
@@ -498,37 +525,31 @@ export const updateTransfer = async (req, res) => {
           },
         });
 
-        // Add to destination (create row if not exists)
+        // Increase stock in NEW DESTINATION warehouse
         await tx.product_warehouses.upsert({
           where: {
             product_id_warehouse_id: {
-              product_id: Number(item.product_id),
-              warehouse_id: Number(
-                destination_warehouse_id ||
-                  oldTransfer.destination_warehouse_id
-              ),
+              product_id: productId,
+              warehouse_id: newDestinationWh,
             },
           },
           update: {
             stock_qty: { increment: qty },
           },
           create: {
-            product_id: Number(item.product_id),
-            warehouse_id: Number(
-              destination_warehouse_id ||
-                oldTransfer.destination_warehouse_id
-            ),
+            product_id: productId,
+            warehouse_id: newDestinationWh,
             stock_qty: qty,
           },
         });
 
-        // Create new transfer item record
+        // Create new transfer_items entry
         await tx.transfer_items.create({
           data: {
             transfer_id: Number(id),
-            product_id: Number(item.product_id),
-            source_warehouse_id: Number(item.source_warehouse_id),
-            qty: qty,
+            product_id: productId,
+            source_warehouse_id: sourceWh,
+            qty,
             rate: Number(item.rate || 0),
             narration: item.narration || null,
           },
@@ -538,9 +559,9 @@ export const updateTransfer = async (req, res) => {
       return updated;
     });
 
-    // ==========================
+    // ============================================================
     // SUCCESS RESPONSE
-    // ==========================
+    // ============================================================
     return res.status(200).json({
       success: true,
       message: "Transfer updated successfully",
@@ -548,6 +569,7 @@ export const updateTransfer = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("❌ Error updating transfer:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update transfer",
@@ -555,6 +577,8 @@ export const updateTransfer = async (req, res) => {
     });
   }
 };
+
+
 
 /** ✅ Get All Transfers (simplified) */
 // export const getAllTransfers = async (req, res) => {
@@ -609,7 +633,12 @@ export const getAllTransfers = async (req, res) => {
       include: {
         transfer_items: {
           include: {
-            products: true,
+            products: {
+          include: {
+            unit_detail: true,       // 👈 FIXED
+            item_category: true,     // (optional but useful)
+          },
+        },
             warehouses: true
           },
         },
@@ -646,7 +675,12 @@ export const getTransferById = async (req, res) => {
       include: {
         transfer_items: {
           include: {
-            products: true,
+            products: {
+          include: {
+            unit_detail: true,       // 👈 FIXED
+            item_category: true,     // (optional but useful)
+          },
+        },
             warehouses: true,
           },
         },
@@ -682,7 +716,12 @@ export const getTransfersByCompany = async (req, res) => {
       include: {
         transfer_items: {
           include: {
-            products: true,
+           products: {
+          include: {
+            unit_detail: true,       // 👈 FIXED
+            item_category: true,     // (optional but useful)
+          },
+        },
             warehouses: true,
           },
         },

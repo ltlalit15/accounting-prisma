@@ -150,7 +150,7 @@ export const createposinvoice = async (req, res) => {
       products,
       symbol,
       currency,
-      warehouse_id, // ✅ NEW: global warehouse ID
+    //  warehouse_id, // ✅ NEW: global warehouse ID
     } = req.body;
 
     // Validate required fields
@@ -314,6 +314,190 @@ export const createposinvoice = async (req, res) => {
   }
 };
 
+// export const getAllinvoice = async (req, res) => {
+//   try {
+//     const { company_id } = req.params;
+
+//     // ✅ Validate company_id
+//     if (!company_id || isNaN(company_id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Valid company_id is required",
+//       });
+//     }
+
+//     // ✅ Fetch all invoices with related data
+//     const invoices = await prisma.pos_invoices.findMany({
+//       where: { company_id: Number(company_id) },
+//       orderBy: { created_at: "desc" },
+//       include: {
+//         products: {
+//           include: {
+//             product: {
+//               select: {
+//                 id: true,
+//                 item_name: true,
+//               },
+//             },
+//             warehouse: {
+//               select: {
+//                 warehouse_name: true, // ✅ Only warehouse name
+//               },
+//             },
+//           },
+//         },
+//         customer: {
+//           select: {
+//             id: true,
+//             name_english: true,
+//             email: true,
+//             phone: true,
+//             address: true,
+//           },
+//         },
+//         tax_class: {
+//           select: {
+//             tax_class: true,
+//             tax_value: true,
+//           },
+//         },
+//       },
+//     });
+
+//     // ✅ Handle no invoices found
+//     if (!invoices.length) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No invoices found for this company",
+//       });
+//     }
+
+//     // ✅ Format response
+//     const formattedInvoices = invoices.map((invoice) => ({
+//       id: invoice.id,
+//       company_id: invoice.company_id,
+//       subtotal: invoice.subtotal,
+//       total: invoice.total,
+//       payment_status: invoice.payment_status,
+//       created_at: invoice.created_at,
+
+//       customer: invoice.customer
+//         ? {
+//             id: invoice.customer.id,
+//             name_english: invoice.customer.name_english,
+//             email: invoice.customer.email,
+//             phone: invoice.customer.phone,
+//             address: invoice.customer.address,
+//           }
+//         : null,
+
+//       tax: invoice.tax_class
+//         ? {
+//             tax_class: invoice.tax_class.tax_class,
+//             tax_value: invoice.tax_class.tax_value,
+//           }
+//         : null,
+
+//       products:
+//         invoice.products?.map((p) => ({
+//           product_id: p.product_id,
+//           item_name: p.product?.item_name || null,
+//           warehouse_name: p.warehouse?.warehouse_name || null, // ✅ only warehouse name
+//         })) || [],
+//     }));
+
+//     // ✅ Send final structured response
+//     return res.status(200).json({
+//       success: true,
+//       message: "✅ Invoices fetched successfully",
+//       count: formattedInvoices.length,
+//       data: formattedInvoices,
+//     });
+//   } catch (error) {
+//     console.error("❌ getAllinvoice Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch invoices",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+// 📌 Get Single Invoice by ID (same structure)
+// export const getinvoiceById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const invoice = await prisma.pos_invoices.findUnique({
+//       where: { id: Number(id) },
+//       include: {
+//         products: {
+//           include: {
+//             product: {
+//               select: {
+//                 id: true,
+//                 item_name: true,
+//               },
+//             },
+//           },
+//         },
+//         customer: {
+//           select: {
+//             id: true,
+//             name_english: true,
+//             email: true,
+//             phone: true,
+//             address: true, // ✅ Added field
+//           },
+//         },
+//         tax: {
+//           select: {
+//             tax_class: true,
+//             tax_value: true,
+//           },
+//         },
+//       },
+//     });
+
+//     if (!invoice) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Invoice not found",
+//       });
+//     }
+
+//     const formattedInvoice = {
+//       ...invoice,
+//       products: invoice.products.map((p) => ({
+//         id: p.id,
+//         product_id: p.product_id,
+//         item_name: p.product?.item_name || null,
+//         quantity: p.quantity,
+//         price: p.price,
+//       })),
+//       tax: invoice.tax
+//         ? {
+//             tax_class: invoice.tax.tax_class,
+//             tax_value: invoice.tax.tax_value,
+//           }
+//         : null,
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       data: formattedInvoice,
+//     });
+//   } catch (error) {
+//     console.error("❌ getinvoiceById Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to get invoice",
+//       error: error.message,
+//     });
+//   }
+// };
 export const getAllinvoice = async (req, res) => {
   try {
     const { company_id } = req.params;
@@ -341,7 +525,7 @@ export const getAllinvoice = async (req, res) => {
             },
             warehouse: {
               select: {
-                warehouse_name: true, // ✅ Only warehouse name
+                warehouse_name: true, // only name
               },
             },
           },
@@ -364,7 +548,7 @@ export const getAllinvoice = async (req, res) => {
       },
     });
 
-    // ✅ Handle no invoices found
+    // ❌ No invoices
     if (!invoices.length) {
       return res.status(404).json({
         success: false,
@@ -372,7 +556,7 @@ export const getAllinvoice = async (req, res) => {
       });
     }
 
-    // ✅ Format response
+    // ✅ Format response (ADDED quantity + price ONLY)
     const formattedInvoices = invoices.map((invoice) => ({
       id: invoice.id,
       company_id: invoice.company_id,
@@ -402,11 +586,13 @@ export const getAllinvoice = async (req, res) => {
         invoice.products?.map((p) => ({
           product_id: p.product_id,
           item_name: p.product?.item_name || null,
-          warehouse_name: p.warehouse?.warehouse_name || null, // ✅ only warehouse name
+          quantity: p.quantity,     // ⭐ ADDED
+          price: p.price,           // ⭐ ADDED
+          warehouse_name: p.warehouse?.warehouse_name || null,
         })) || [],
     }));
 
-    // ✅ Send final structured response
+    // ✅ Final response
     return res.status(200).json({
       success: true,
       message: "✅ Invoices fetched successfully",
@@ -423,9 +609,6 @@ export const getAllinvoice = async (req, res) => {
   }
 };
 
-
-
-// 📌 Get Single Invoice by ID (same structure)
 export const getinvoiceById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -439,6 +622,24 @@ export const getinvoiceById = async (req, res) => {
               select: {
                 id: true,
                 item_name: true,
+                sku: true,
+                sale_price: true,
+                purchase_price: true,
+                barcode: true,
+                image: true,
+              },
+            },
+            warehouse: {
+              select: {
+                id: true,
+                warehouse_name: true,
+                location: true,
+                address_line1: true,
+                address_line2: true,
+                city: true,
+                state: true,
+                country: true,
+                pincode: true,
               },
             },
           },
@@ -449,10 +650,13 @@ export const getinvoiceById = async (req, res) => {
             name_english: true,
             email: true,
             phone: true,
-            address: true, // ✅ Added field
+            address: true,
+            company_name: true,
+            gstIn: true,
+            shipping_address: true,
           },
         },
-        tax: {
+        tax_class: {
           select: {
             tax_class: true,
             tax_value: true,
@@ -468,27 +672,49 @@ export const getinvoiceById = async (req, res) => {
       });
     }
 
+    // Format output
     const formattedInvoice = {
       ...invoice,
+
+      tax: invoice.tax_class
+        ? {
+            tax_class: invoice.tax_class.tax_class,
+            tax_value: invoice.tax_class.tax_value,
+          }
+        : null,
+
       products: invoice.products.map((p) => ({
         id: p.id,
+        invoice_id: p.invoice_id,
         product_id: p.product_id,
         item_name: p.product?.item_name || null,
         quantity: p.quantity,
         price: p.price,
+        sku: p.product?.sku || null,
+        barcode: p.product?.barcode || null,
+        image: p.product?.image || null,
+
+        warehouse: p.warehouse
+          ? {
+              id: p.warehouse.id,
+              warehouse_name: p.warehouse.warehouse_name,
+              location: p.warehouse.location,
+              address_line1: p.warehouse.address_line1,
+              address_line2: p.warehouse.address_line2,
+              city: p.warehouse.city,
+              state: p.warehouse.state,
+              country: p.warehouse.country,
+              pincode: p.warehouse.pincode,
+            }
+          : null,
       })),
-      tax: invoice.tax
-        ? {
-            tax_class: invoice.tax.tax_class,
-            tax_value: invoice.tax.tax_value,
-          }
-        : null,
     };
 
     return res.status(200).json({
       success: true,
       data: formattedInvoice,
     });
+
   } catch (error) {
     console.error("❌ getinvoiceById Error:", error);
     return res.status(500).json({

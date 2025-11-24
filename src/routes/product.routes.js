@@ -1,6 +1,5 @@
 // src/routes/product.routes.js
 import { Router } from "express";
-import { upload } from "../config/multer.js";
 import {
   createProduct,
   deleteProduct,
@@ -15,7 +14,7 @@ import {
 
 const router = Router();
 
-router.post("/", upload.single("image"), createProduct);
+router.post("/", createProduct);
 
 // 🟡 Get all
 router.get("/", getAllProducts);
@@ -36,7 +35,7 @@ router.get(
 router.get("/:id", getProductById);
 
 // 🟠 Update
-router.put("/:id", upload.single("image"), updateProduct);
+router.put("/:id", updateProduct);
 
 // 🔴 Delete
 router.delete("/:id", deleteProduct);

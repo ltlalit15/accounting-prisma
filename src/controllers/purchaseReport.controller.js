@@ -12,88 +12,88 @@ const toNumber = (val) => {
 };
 
 // ✅ Get Purchase Report Summary Metrics
-export const getPurchaseReportSummary = async (req, res) => {
-  try {
-    const { company_id, start_date, end_date } = req.query;
+// export const getPurchaseReportSummary = async (req, res) => {
+//   try {
+//     const { company_id, start_date, end_date } = req.query;
 
-    // Build where clause
-    const where = {};
-    if (company_id) {
-      where.company_id = parseInt(company_id);
-    }
-    if (start_date || end_date) {
-      where.created_at = {};
-      if (start_date) {
-        where.created_at.gte = new Date(start_date);
-      }
-      if (end_date) {
-        where.created_at.lte = new Date(end_date);
-      }
-    }
+//     // Build where clause
+//     const where = {};
+//     if (company_id) {
+//       where.company_id = parseInt(company_id);
+//     }
+//     if (start_date || end_date) {
+//       where.created_at = {};
+//       if (start_date) {
+//         where.created_at.gte = new Date(start_date);
+//       }
+//       if (end_date) {
+//         where.created_at.lte = new Date(end_date);
+//       }
+//     }
 
-    // Get all purchase orders with items
-    const purchaseOrders = await prisma.purchaseorder.findMany({
-      where,
-      include: {
-        purchaseorderitems: true,
-      },
-    });
+//     // Get all purchase orders with items
+//     const purchaseOrders = await prisma.purchaseorder.findMany({
+//       where,
+//       include: {
+//         purchaseorderitems: true,
+//       },
+//     });
 
-    // Calculate metrics
-    let totalPurchase = 0;
-    let totalPaid = 0;
-    let totalPending = 0;
-    let overdue = 0;
+//     // Calculate metrics
+//     let totalPurchase = 0;
+//     let totalPaid = 0;
+//     let totalPending = 0;
+//     let overdue = 0;
 
-    purchaseOrders.forEach((order) => {
-      const orderTotal = toNumber(order.total_amount || order.total || 0);
-      const amountPaid = toNumber(order.amount_paid || 0);
-      const balance = toNumber(order.balance || 0);
-      const paymentStatus = order.payment_status || "Pending";
+//     purchaseOrders.forEach((order) => {
+//       const orderTotal = toNumber(order.total_amount || order.total || 0);
+//       const amountPaid = toNumber(order.amount_paid || 0);
+//       const balance = toNumber(order.balance || 0);
+//       const paymentStatus = order.payment_status || "Pending";
 
-      totalPurchase += orderTotal;
+//       totalPurchase += orderTotal;
 
-      if (paymentStatus === "Paid" || paymentStatus === "paid") {
-        totalPaid += amountPaid;
-      } else {
-        totalPending += balance || orderTotal - amountPaid;
-      }
+//       if (paymentStatus === "Paid" || paymentStatus === "paid") {
+//         totalPaid += amountPaid;
+//       } else {
+//         totalPending += balance || orderTotal - amountPaid;
+//       }
 
-      // Check if overdue (balance > 0 and status is not paid)
-      if (balance > 0 && paymentStatus !== "Paid" && paymentStatus !== "paid") {
-        // Check if due date has passed (if due_date exists)
-        if (order.due_date) {
-          const dueDate = new Date(order.due_date);
-          const today = new Date();
-          if (dueDate < today) {
-            overdue += balance;
-          }
-        } else {
-          // If no due_date, consider unpaid as overdue
-          overdue += balance;
-        }
-      }
-    });
+//       // Check if overdue (balance > 0 and status is not paid)
+//       if (balance > 0 && paymentStatus !== "Paid" && paymentStatus !== "paid") {
+//         // Check if due date has passed (if due_date exists)
+//         if (order.due_date) {
+//           const dueDate = new Date(order.due_date);
+//           const today = new Date();
+//           if (dueDate < today) {
+//             overdue += balance;
+//           }
+//         } else {
+//           // If no due_date, consider unpaid as overdue
+//           overdue += balance;
+//         }
+//       }
+//     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Purchase report summary fetched successfully",
-      data: {
-        total_purchase: totalPurchase.toFixed(2),
-        paid_amount: totalPaid.toFixed(2),
-        pending_payment: totalPending.toFixed(2),
-        overdue: overdue.toFixed(2),
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching purchase report summary:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-};
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase report summary fetched successfully",
+//       data: {
+//         total_purchase: totalPurchase.toFixed(2),
+//         paid_amount: totalPaid.toFixed(2),
+//         pending_payment: totalPending.toFixed(2),
+//         overdue: overdue.toFixed(2),
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error fetching purchase report summary:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
 
 // ✅ Get Detailed Purchase Report with Filtering
 export const getPurchaseReport = async (req, res) => {
@@ -397,3 +397,141 @@ export const getPurchaseReportOptimized = async (req, res) => {
     });
   }
 };
+
+
+export const getPurchaseReportSummary = async (req, res) => {
+  try {
+    const { company_id } = req.query;
+
+    if (!company_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id is required",
+      });
+    }
+
+    const companyId = Number(company_id);
+
+    // 1️⃣ Fetch purchase orders with items
+    const purchases = await prisma.purchaseorder.findMany({
+      where: { company_id: companyId },
+      include: { purchaseorderitems: true },
+      orderBy: { id: "desc" },
+    });
+
+    // 2️⃣ Fetch vendors (type = vender)
+    const vendors = await prisma.vendorscustomer.findMany({
+      where: {
+        company_id: companyId,
+        type: "vender",
+      },
+    });
+
+    // Helper → Match vendor by bill_to_vendor_name
+    const getVendorByBillName = (billName) => {
+      if (!billName) return null;
+
+      const formatted = billName.trim().toLowerCase();
+
+      return vendors.find((v) =>
+        v.name_english?.trim().toLowerCase() === formatted ||
+        v.name_arabic?.trim().toLowerCase() === formatted ||
+        v.company_name?.trim().toLowerCase() === formatted
+      );
+    };
+
+    // 3️⃣ Fetch products for category mapping
+    const products = await prisma.products.findMany({
+      where: { company_id: companyId },
+      include: { item_category: true },
+    });
+
+    // Helper to match product by item_name
+   const findProduct = (itemName) => {
+      if (!itemName) return null;
+
+      const clean = itemName.trim().toLowerCase();
+
+      return products.find((p) => {
+        const pName = p.item_name?.toLowerCase().trim() || "";
+
+        return (
+          pName === clean ||              // exact
+          pName.includes(clean) ||        // "Steel Rod" contains "rod"
+          clean.includes(pName)           // "Steel Rod 12mm" contains "steel rod"
+        );
+      });
+    };
+
+    const table = [];
+
+    // 4️⃣ Build table rows
+    purchases.forEach((po) => {
+      // Resolve vendor by bill_to_vendor_name
+      const vendor = getVendorByBillName(po.bill_to_vendor_name);
+
+      po.purchaseorderitems.forEach((item) => {
+        const product = findProduct(item.item_name);
+
+        table.push({
+          poNumber: po.PO_no || "",
+          vendorName: po.bill_to_vendor_name || "",
+          vendorArabicName: vendor?.name_arabic || "",
+          productName: item.item_name || "",
+          category: product?.item_category?.item_category_name || "",
+          qtyOrdered: Number(item.qty) || 0,
+          unitPrice: Number(item.rate) || 0,
+          totalAmount: Number(item.amount) || 0,
+          status: po.payment_status || "Pending",
+        });
+      });
+    });
+    const normalizeStatus = (status) => {
+  if (!status) return "pending";
+  const s = status.toLowerCase();
+
+  if (["paid", "completed", "partialpaid", "partial", "settled"].includes(s))
+    return "paid";
+
+  if (["overdue", "late"].includes(s))
+    return "overdue";
+
+  if (["pending", "unpaid"].includes(s))
+    return "pending";
+
+  return "pending";
+};
+
+    // 5️⃣ Summary calculation
+   const summary = {
+  totalPurchase: table.reduce((sum, r) => sum + r.totalAmount, 0),
+
+  paidAmount: table
+    .filter((r) => normalizeStatus(r.status) === "paid")
+    .reduce((s, r) => s + r.totalAmount, 0),
+
+  pendingPayment: table
+    .filter((r) => normalizeStatus(r.status) === "pending")
+    .reduce((s, r) => s + r.totalAmount, 0),
+
+  overdue: table
+    .filter((r) => normalizeStatus(r.status) === "overdue")
+    .reduce((s, r) => s + r.totalAmount, 0),
+};
+    return res.status(200).json({
+      success: true,
+      summary,
+      table,
+    });
+
+  } catch (error) {
+    console.log("Purchase Report Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching purchase report",
+      error: error.message,
+    });
+  }
+};
+
+

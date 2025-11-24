@@ -28,6 +28,8 @@ import company from "./src/routes/companies.Routes.js";
 import purchaseOrder from "./src/routes/purchaseOrderRoutes.js";
 import inventoryRoutes from "./src/routes/inventory.routes.js"
 import planRequestRoutes from "./src/routes/requestforplan.Routes.js"
+import posReportRoutes from "./src/routes/posReport.routes.js"
+import vatReportRoutes from "./src/routes/vatReport.routes.js"
 
 const router = express.Router();
 
@@ -51,6 +53,8 @@ router.use("/income-vouchers", incomeVoucherRoutes);
 router.use("/contravouchers", contravouchersRoutes);
 router.use("/taxclasses", taxClassRoutes);
 router.use("/posinvoice", posinvoiceRoutes);
+router.use("/pos-report", posReportRoutes);
+router.use("/vat-report",vatReportRoutes);
 router.use("/", purchase);
 router.use("/sales-return", salesreturn);
 router.use("/sales-order", salesorder);

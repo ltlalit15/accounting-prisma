@@ -19,12 +19,6 @@ const swaggerFile = JSON.parse(
 );
 
 const app = express();
-
-// Middleware
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-
 app.use(
   fileUpload({
     useTempFiles: true,
@@ -32,6 +26,13 @@ app.use(
     limits: { fileSize: 50 * 1024 * 1024 } // optional 50MB limit
   })
 );
+
+// Middleware
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+
+
 
 // Enable CORS for React frontend
 // app.use(cors({

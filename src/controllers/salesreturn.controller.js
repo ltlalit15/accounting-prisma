@@ -610,48 +610,129 @@ export const createSalesReturn = async (req, res) => {
 
 // ✅ Get All Sales Returns
 // ✅ Get All Sales Returns (Fixed Version)
+// export const getAllSalesReturns = async (req, res) => {
+//   try {
+//     const { company_id, status, start_date, end_date, return_no, invoice_no } = req.query;
+
+//     console.log("🟢 Incoming Query Params:", req.query);
+
+//     const where = {};
+
+//     if (company_id && !isNaN(parseInt(company_id)) && parseInt(company_id) > 0) {
+//       where.company_id = parseInt(company_id);
+//     }
+
+//     if (status && status.trim() !== "") where.status = status.trim();
+//     if (return_no && return_no.trim() !== "") where.return_no = { contains: return_no.trim() };
+//     if (invoice_no && invoice_no.trim() !== "") where.invoice_no = { contains: invoice_no.trim() };
+
+//     if (start_date || end_date) {
+//       where.return_date = {};
+//       if (start_date) where.return_date.gte = new Date(start_date);
+//       if (end_date) where.return_date.lte = new Date(end_date);
+//     }
+
+//     console.log("🟢 Prisma WHERE Object:", where);
+
+//     const allData = await prisma.sales_return.findMany();
+//     console.log("🟢 Total Records In DB:", allData.length);
+
+//     const salesReturns = await prisma.sales_return.findMany({
+//       where: Object.keys(where).length > 0 ? where : undefined,
+//       include: { sales_return_items: true },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     console.log("🟢 Matched Records After Filter:", salesReturns.length);
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Sales returns fetched successfully",
+//       total_in_db: allData.length,
+//       matched: salesReturns.length,
+//       filter: where,
+//       data: salesReturns,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching sales returns:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
 export const getAllSalesReturns = async (req, res) => {
   try {
-    const { company_id, status, start_date, end_date, return_no, invoice_no } = req.query;
+    const { company_id } = req.query;
 
-    console.log("🟢 Incoming Query Params:", req.query);
-
-    const where = {};
-
-    if (company_id && !isNaN(parseInt(company_id)) && parseInt(company_id) > 0) {
-      where.company_id = parseInt(company_id);
+    if (!company_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id is required",
+      });
     }
 
-    if (status && status.trim() !== "") where.status = status.trim();
-    if (return_no && return_no.trim() !== "") where.return_no = { contains: return_no.trim() };
-    if (invoice_no && invoice_no.trim() !== "") where.invoice_no = { contains: invoice_no.trim() };
+    const companyId = parseInt(company_id);
 
-    if (start_date || end_date) {
-      where.return_date = {};
-      if (start_date) where.return_date.gte = new Date(start_date);
-      if (end_date) where.return_date.lte = new Date(end_date);
-    }
-
-    console.log("🟢 Prisma WHERE Object:", where);
-
-    const allData = await prisma.sales_return.findMany();
-    console.log("🟢 Total Records In DB:", allData.length);
-
+    // -----------------------------
+    // 1️⃣ Fetch all sales returns
+    // -----------------------------
     const salesReturns = await prisma.sales_return.findMany({
-      where: Object.keys(where).length > 0 ? where : undefined,
-      include: { sales_return_items: true },
+      where: { company_id: companyId },
+      include: {
+        sales_return_items: true,
+      },
       orderBy: { created_at: "desc" },
     });
 
-    console.log("🟢 Matched Records After Filter:", salesReturns.length);
+    // -----------------------------
+    // 2️⃣ Compute UI Summary Numbers
+    // -----------------------------
+    const totalReturns = salesReturns.length;
 
+    const processed = salesReturns.filter(s => s.status?.toLowerCase() === "processed").length;
+
+    const pending = salesReturns.filter(s => s.status?.toLowerCase() === "pending").length;
+
+    const totalValue = salesReturns.reduce(
+      (sum, s) => sum + Number(s.grand_total || 0),
+      0
+    );
+
+    // -----------------------------
+    // 3️⃣ Format table rows EXACTLY like UI
+    // -----------------------------
+
+    const tableData = salesReturns.map((s, index) => ({
+      sr_no: index + 1,
+      return_no: s.return_no,
+      reference_id: s.reference_id,
+      manual_voucher_no: s.manual_voucher_no,
+      auto_voucher_no: s.auto_voucher_no,
+      invoice_no: s.invoice_no,
+      customer_id: s.customer_id,
+      warehouse_id: s.warehouse_id,
+      return_date: s.return_date,
+      items: s.sales_return_items.length,
+      amount: Number(s.grand_total || 0),
+      return_type: s.return_type,
+      reason: s.reason_for_return,
+      status: s.status,
+    }));
+
+    // -----------------------------
+    // FINAL RESPONSE (UI format)
+    // -----------------------------
     return res.status(200).json({
       success: true,
-      message: "Sales returns fetched successfully",
-      total_in_db: allData.length,
-      matched: salesReturns.length,
-      filter: where,
-      data: salesReturns,
+      summary: {
+        totalReturns,
+        processed,
+        pending,
+        totalValue,
+      },
+      data: tableData,
     });
   } catch (error) {
     console.error("❌ Error fetching sales returns:", error);

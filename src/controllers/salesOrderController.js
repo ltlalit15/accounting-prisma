@@ -4108,6 +4108,13 @@ export const createOrUpdateSalesOrder = async (req, res) => {
         : existingOrder?.subtotal || 0,
       total: body.total ? Number(body.total) : existingOrder?.total || 0,
       updated_at: new Date(),
+      total_invoice: steps.payment.total_invoice !== undefined 
+  ? Number(steps.payment.total_invoice)
+  : existingOrder?.total_invoice || 0,
+
+balance: steps.payment.balance !== undefined
+  ? Number(steps.payment.balance)
+  : existingOrder?.balance || 0,
     };
 
     // ================= CREATE OR UPDATE =================
@@ -4216,7 +4223,9 @@ export const createOrUpdateSalesOrder = async (req, res) => {
             manual_payment_no: savedOrder.Manual_payment_no,
             payment_date: savedOrder.payment_date,
             amount_received: savedOrder.amount_received,
-            payment_note: savedOrder.payment_note
+            balance:savedOrder.balance,
+            payment_note: savedOrder.payment_note,
+            total_invoice: savedOrder.total_invoice 
           }
         },
 
@@ -4610,6 +4619,8 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             manual_payment_no: order.Manual_payment_no,
             payment_date: order.payment_date,
             amount_received: order.amount_received,
+            balance:order.balance,
+            total_invoice: order.total_invoice,
             payment_note: order.payment_note
           }
         },
@@ -4794,6 +4805,8 @@ export const getSalesOrderById = async (req, res) => {
           manual_payment_no: order.Manual_payment_no,
           payment_date: order.payment_date,
           amount_received: order.amount_received,
+           balance:order.balance,
+            total_invoice: order.total_invoice,
           payment_note: order.payment_note
         }
       },

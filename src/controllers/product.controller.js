@@ -239,9 +239,9 @@ export const createProduct = async (req, res) => {
     // 📌 Upload Image if Available
     // ---------------------------
     let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file.buffer, "products");
-    }
+    if (req.files && req.files.image) {
+  imageUrl = await uploadToCloudinary(req.files.image, "products");
+}
 
     // ---------------------------
     // 📌 Parse Warehouses
@@ -1172,9 +1172,9 @@ export const updateProduct = async (req, res) => {
 
     // Handle image upload
     let imageUrl = existingProduct.image;
-    if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file.buffer, "products");
-    }
+    if (req.files && req.files.image) {
+  imageUrl = await uploadToCloudinary(req.files.image, "products");
+}
 
     // Parse warehouses
     let parsedWarehouses = [];
