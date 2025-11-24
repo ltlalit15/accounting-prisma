@@ -170,7 +170,7 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   } catch (error) {
 //     console.error("Error creating sales order:", error);
-    
+
 //     if (error.code === 'P1001' || error.message.includes('Server has closed the connection')) {
 //       return res.status(503).json({
 //         success: false,
@@ -178,7 +178,7 @@ import { v2 as cloudinary } from 'cloudinary';
 //         error: "The database server is not reachable or the connection was closed."
 //       });
 //     }
-    
+
 //     if (error.code === 'P2021' || error.message.includes("doesn't exist")) {
 //       return res.status(500).json({
 //         success: false,
@@ -186,7 +186,7 @@ import { v2 as cloudinary } from 'cloudinary';
 //         error: "The salesorder table does not exist in the database."
 //       });
 //     }
-    
+
 //     return res.status(500).json({
 //       success: false,
 //       message: "Internal Server Error",
@@ -909,7 +909,7 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   }
 // };
-{/*------------------------------------------------------------------------------- */}
+{/*------------------------------------------------------------------------------- */ }
 {/*
 
 cloudinary.config({
@@ -1686,7 +1686,7 @@ export const updateSalesOrderStep = async (req, res) => {
  */}
 
 
- import { uploadToCloudinary } from "../config/cloudinary.js";
+import { uploadToCloudinary } from "../config/cloudinary.js";
 import prisma from "../config/db.js";
 
 // Helper function to convert base64 to buffer
@@ -1951,7 +1951,7 @@ const handleFileUploads = async (data, fileFields) => {
 //     // ============ MAP ITEMS (only if provided) ============
 //     const itemsData = body.items
 //       ? body.items.map((item) => ({
-         
+
 //           item_name: item.item_name,
 //           qty: Number(item.qty),
 //           rate: Number(item.rate),
@@ -2387,7 +2387,7 @@ const handleFileUploads = async (data, fileFields) => {
 //     // ============ MAP ITEMS (only if provided) ============
 //     const itemsData = body.items
 //       ? body.items.map((item) => ({
-         
+
 //           item_name: item.item_name,
 //           qty: Number(item.qty),
 //           rate: Number(item.rate),
@@ -2828,7 +2828,7 @@ const handleFileUploads = async (data, fileFields) => {
 //     // ============ MAP ITEMS (only if provided) ============
 //     const itemsData = body.items
 //       ? body.items.map((item) => ({
-         
+
 //           item_name: item.item_name,
 //           qty: Number(item.qty),
 //           rate: Number(item.rate),
@@ -3376,7 +3376,7 @@ const handleFileUploads = async (data, fileFields) => {
 //             SO_no: savedOrder.SO_no,
 //             manual_ref_no: savedOrder.Manual_SO_ref,
 //             manual_quo_no: savedOrder.manual_quo_no,
-           
+
 //           },
 //         },
 //         {
@@ -3444,30 +3444,419 @@ const handleFileUploads = async (data, fileFields) => {
 //     });
 //   }
 // };
+// export const createOrUpdateSalesOrder = async (req, res) => {
+//   try {
+//     const body = { ...req.body };
+//     const orderId = req.method === "PUT" ? Number(req.params.id) : null;
+
+//     // ================= VALIDATION =================
+//     // if (!orderId && !body.company_info) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "company_info is mandatory for new orders",
+//     //   });
+//     // }
+
+
+//     // if (!orderId && (!Array.isArray(body.items) || body.items.length === 0)) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "items must be provided and not empty for new orders",
+//     //   });
+//     // }
+
+//     let existingOrder = null;
+//     let existingItems = [];
+
+//     if (orderId) {
+//       existingOrder = await prisma.salesorder.findUnique({
+//         where: { id: orderId },
+//         include: { salesorderitems: true },
+//       });
+
+//       if (!existingOrder) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Sales order not found",
+//         });
+//       }
+
+//       existingItems = existingOrder.salesorderitems || [];
+//     }
+
+//     // ================= FILE UPLOAD HANDLER =================
+//     if (body.company_info) {
+//       body.company_info = await handleFileUploads(body.company_info, ["logo_url"]);
+//     }
+
+//     if (body.additional_info) {
+//       body.additional_info = await handleFileUploads(body.additional_info, [
+//         "signature_url",
+//         "photo_url",
+//         "attachment_url",
+//       ]);
+//     }
+
+//     // ================= STEP COMPLETION RULES =================
+//     const stepCompleted = (data, fields) =>
+//       fields.every((field) => data[field] !== "" && data[field] !== null && data[field] !== undefined);
+
+//     const stepRules = {
+//       quotation: ["quotation_no", "quotation_date"],
+//       sales_order: ["SO_no"],
+//       delivery_challan: ["challan_no"],
+//       invoice: ["invoice_no", "invoice_date"],
+//       payment: ["payment_no", "amount_received"],
+//     };
+
+//     // ================= MERGE STEPS =================
+//     const steps = {
+//       quotation: orderId
+//         ? {
+//             quotation_no: existingOrder.quotation_no || "",
+//             manual_quo_no: existingOrder.manual_quo_no || "",
+//             quotation_date: existingOrder.quotation_date,
+//             valid_till: existingOrder.valid_till,
+//             qoutation_to_customer_name: existingOrder.qoutation_to_customer_name || "",
+//             qoutation_to_customer_address: existingOrder.qoutation_to_customer_address || "",
+//             qoutation_to_customer_email: existingOrder.qoutation_to_customer_email || "",
+//             qoutation_to_customer_phone: existingOrder.qoutation_to_customer_phone || "",
+//             notes: existingOrder.notes || "",
+//             customer_ref: existingOrder.customer_ref || "",
+//             ...(body.steps?.quotation || {}),
+//           }
+//         : body.steps?.quotation || {},
+
+//       // SALES ORDER (NO SHIPPING HERE ANYMORE)
+//       sales_order: orderId
+//         ? {
+//             SO_no: existingOrder.SO_no || "",
+//             manual_ref_no: existingOrder.Manual_SO_ref || "",
+//             manual_quo_no: existingOrder.manual_quo_no || "",
+//             sales_order_status: existingOrder.sales_order_status,
+//             ...(body.steps?.sales_order || {}),
+//           }
+//         : body.steps?.sales_order || {},
+
+//       delivery_challan: orderId
+//         ? {
+//             challan_no: existingOrder.Challan_no || "",
+//             manual_challan_no: existingOrder.Manual_challan_no || "",
+//             driver_name: existingOrder.driver_name || "",
+//             driver_phone: existingOrder.driver_phone || "",
+//             ...(body.steps?.delivery_challan || {}),
+//           }
+//         : body.steps?.delivery_challan || {},
+
+//       invoice: orderId
+//         ? {
+//             invoice_no: existingOrder.invoice_no || "",
+//             manual_invoice_no: existingOrder.Manual_invoice_no || "",
+//             invoice_date: existingOrder.invoice_date,
+//             due_date: existingOrder.due_date,
+//             ...(body.steps?.invoice || {}),
+//           }
+//         : body.steps?.invoice || {},
+
+//       payment: orderId
+//         ? {
+//             payment_no: existingOrder.Payment_no || "",
+//             manual_payment_no: existingOrder.Manual_payment_no || "",
+//             payment_date: existingOrder.payment_date,
+//             amount_received: existingOrder.amount_received || 0,
+//             payment_note: existingOrder.payment_note || "",
+//             ...(body.steps?.payment || {}),
+//           }
+//         : body.steps?.payment || {},
+//     };
+
+//     for (const step of Object.keys(steps)) {
+//       steps[step].status = stepCompleted(steps[step], stepRules[step]) ? "completed" : "pending";
+//     }
+
+//     // ================= SHIPPING DETAILS =================
+//     const shipping = body.shipping_details
+//       ? {
+//           bill_to_company_name: body.shipping_details.bill_to_name || "",
+//           bill_to_company_address: body.shipping_details.bill_to_address || "",
+//           bill_to_company_email: body.shipping_details.bill_to_email || "",
+//           bill_to_company_phone: body.shipping_details.bill_to_phone || "",
+//           bill_to_attention_name: body.shipping_details.bill_to_attention_name || "",
+
+//           ship_to_company_name: body.shipping_details.ship_to_name || "",
+//           ship_to_company_address: body.shipping_details.ship_to_address || "",
+//           ship_to_company_email: body.shipping_details.ship_to_email || "",
+//           ship_to_company_phone: body.shipping_details.ship_to_phone || "",
+//           ship_to_attention_name: body.shipping_details.ship_to_attention_name || "",
+//         }
+//       : orderId
+//       ? {
+//           bill_to_company_name: existingOrder.bill_to_company_name || "",
+//           bill_to_company_address: existingOrder.bill_to_company_address || "",
+//           bill_to_company_email: existingOrder.bill_to_company_email || "",
+//           bill_to_company_phone: existingOrder.bill_to_company_phone || "",
+//           bill_to_attention_name: existingOrder.bill_to_attention_name || "",
+
+//           ship_to_company_name: existingOrder.ship_to_company_name || "",
+//           ship_to_company_address: existingOrder.ship_to_company_address || "",
+//           ship_to_company_email: existingOrder.ship_to_company_email || "",
+//           ship_to_company_phone: existingOrder.ship_to_company_phone || "",
+//           ship_to_attention_name: existingOrder.ship_to_attention_name || "",
+//         }
+//       : {};
+
+//     // ================= COMPANY INFO =================
+//     const companyData = body.company_info
+//       ? {
+//           company_id: Number(body.company_info.company_id),
+//           company_name: body.company_info.company_name,
+//           company_address: body.company_info.company_address,
+//           company_email: body.company_info.company_email,
+//           company_phone: body.company_info.company_phone,
+//           logo_url: body.company_info.logo_url ?? "",
+//           bank_name: body.company_info.bank_name ?? "",
+//           account_no: body.company_info.account_no ?? "",
+//           account_holder: body.company_info.account_holder ?? "",
+//           ifsc_code: body.company_info.ifsc_code ?? "",
+//           terms: body.company_info.terms ?? "",
+//         }
+//       : orderId
+//       ? {
+//           company_id: existingOrder.company_id,
+//           company_name: existingOrder.company_name,
+//           company_address: existingOrder.company_address,
+//           company_email: existingOrder.company_email,
+//           company_phone: existingOrder.company_phone,
+//           logo_url: existingOrder.logo_url,
+//           bank_name: existingOrder.bank_name,
+//           account_no: existingOrder.account_no,
+//           account_holder: existingOrder.account_holder,
+//           ifsc_code: existingOrder.ifsc_code,
+//           terms: existingOrder.terms,
+//         }
+//       : {};
+
+//     // ================= ITEMS =================
+//     const itemsData = body.items
+//       ? body.items.map((item) => ({
+//           item_name: item.item_name,
+//           qty: Number(item.qty),
+//           rate: Number(item.rate),
+//           tax_percent: Number(item.tax_percent),
+//           discount: Number(item.discount),
+//           amount: Number(item.amount),
+//           warehouse_id: item.warehouse_id ? Number(item.warehouse_id) : null,
+//         }))
+//       : orderId
+//       ? existingItems
+//       : [];
+
+//     // ================= DB PAYLOAD =================
+//     const dbData = {
+//       ...companyData,
+//       ...shipping,
+
+//       quotation_no: steps.quotation.quotation_no || "",
+//       manual_quo_no: steps.quotation.manual_quo_no || "",
+//       quotation_date: steps.quotation.quotation_date ? new Date(steps.quotation.quotation_date) : null,
+//       valid_till: steps.quotation.valid_till ? new Date(steps.quotation.valid_till) : null,
+//       quotation_status: steps.quotation.status,
+//       qoutation_to_customer_name: steps.quotation.qoutation_to_customer_name || "",
+//       qoutation_to_customer_address: steps.quotation.qoutation_to_customer_address || "",
+//       qoutation_to_customer_email: steps.quotation.qoutation_to_customer_email || "",
+//       qoutation_to_customer_phone: steps.quotation.qoutation_to_customer_phone || "",
+//       notes: steps.quotation.notes || "",
+//       customer_ref: steps.quotation.customer_ref || "",
+
+//       SO_no: steps.sales_order.SO_no || "",
+//       Manual_SO_ref: steps.sales_order.manual_ref_no || "",
+//       manual_quo_no: steps.sales_order.manual_quo_no || "",
+//       sales_order_status: steps.sales_order.status,
+
+//       Challan_no: steps.delivery_challan.challan_no || "",
+//       Manual_challan_no: steps.delivery_challan.manual_challan_no || "",
+//       delivery_challan_status: steps.delivery_challan.status,
+//       driver_name: steps.delivery_challan.driver_name || "",
+//       driver_phone: steps.delivery_challan.driver_phone || "",
+
+//       invoice_no: steps.invoice.invoice_no || "",
+//       Manual_invoice_no: steps.invoice.manual_invoice_no || "",
+//       invoice_date: steps.invoice.invoice_date ? new Date(steps.invoice.invoice_date) : null,
+//       due_date: steps.invoice.due_date ? new Date(steps.invoice.due_date) : null,
+//       invoice_status: steps.invoice.status,
+
+//       Payment_no: steps.payment.payment_no || "",
+//       Manual_payment_no: steps.payment.manual_payment_no || "",
+//       payment_date: steps.payment.payment_date ? new Date(steps.payment.payment_date) : null,
+//       payment_status: steps.payment.status,
+//       amount_received: Number(steps.payment.amount_received) || 0,
+//       payment_note: steps.payment.payment_note || "",
+
+//       signature_url: body.additional_info?.signature_url ?? existingOrder?.signature_url ?? "",
+//       photo_url: body.additional_info?.photo_url ?? existingOrder?.photo_url ?? "",
+//       attachment_url: body.additional_info?.attachment_url ?? existingOrder?.attachment_url ?? "",
+// subtotal: body.sub_total ? Number(body.sub_total) : existingOrder?.subtotal || 0,
+//       total: body.total ? Number(body.total) : existingOrder?.total || 0,
+//       updated_at: new Date(),
+//     };
+
+//     // ================= CREATE OR UPDATE =================
+//     let savedOrder;
+
+//     if (orderId) {
+//       if (body.items) {
+//         await prisma.salesorderitems.deleteMany({
+//           where: { sales_order_id: orderId },
+//         });
+//       }
+
+//       savedOrder = await prisma.salesorder.update({
+//         where: { id: orderId },
+//         data: {
+//           ...dbData,
+//           ...(body.items && { salesorderitems: { create: itemsData } }),
+//         },
+//         include: { salesorderitems: true },
+//       });
+//     } else {
+//       savedOrder = await prisma.salesorder.create({
+//         data: {
+//           ...dbData,
+//           created_at: new Date(),
+//           salesorderitems: { create: itemsData },
+//         },
+//         include: { salesorderitems: true },
+//       });
+//     }
+
+//     // ================= RESPONSE =================
+//     const response = {
+//       company_info: {
+//         ...companyData,
+//         id: savedOrder.id,
+//         created_at: savedOrder.created_at,
+//         updated_at: savedOrder.updated_at,
+//         terms: savedOrder.terms,
+//       },
+
+//       shipping_details: {
+//         bill_to_name: savedOrder.bill_to_company_name,
+//         bill_to_address: savedOrder.bill_to_company_address,
+//         bill_to_email: savedOrder.bill_to_company_email,
+//         bill_to_phone: savedOrder.bill_to_company_phone,
+//         bill_to_attention_name: savedOrder.bill_to_attention_name,
+
+//         ship_to_name: savedOrder.ship_to_company_name,
+//         ship_to_address: savedOrder.ship_to_company_address,
+//         ship_to_email: savedOrder.ship_to_company_email,
+//         ship_to_phone: savedOrder.ship_to_company_phone,
+//         ship_to_attention_name: savedOrder.ship_to_attention_name,
+//       },
+
+//       items: savedOrder.salesorderitems,
+//       sub_total: savedOrder.subtotal,
+//       total: savedOrder.total,
+
+//       steps: [
+//         {
+//           step: "quotation",
+//           status: savedOrder.quotation_status,
+//           data: {
+//             quotation_no: savedOrder.quotation_no,
+//             manual_quo_no: savedOrder.manual_quo_no,
+//             quotation_date: savedOrder.quotation_date,
+//             valid_till: savedOrder.valid_till,
+//             qoutation_to_customer_name: savedOrder.qoutation_to_customer_name,
+//             qoutation_to_customer_address: savedOrder.qoutation_to_customer_address,
+//             qoutation_to_customer_email: savedOrder.qoutation_to_customer_email,
+//             qoutation_to_customer_phone: savedOrder.qoutation_to_customer_phone,
+//             notes: savedOrder.notes,
+//             customer_ref: savedOrder.customer_ref,
+//           },
+//         },
+
+//         {
+//           step: "sales_order",
+//           status: savedOrder.sales_order_status,
+//           data: {
+//             SO_no: savedOrder.SO_no,
+//             manual_ref_no: savedOrder.Manual_SO_ref,
+//             manual_quo_no: savedOrder.manual_quo_no,
+//           },
+//         },
+
+//         {
+//           step: "delivery_challan",
+//           status: savedOrder.delivery_challan_status,
+//           data: {
+//             challan_no: savedOrder.Challan_no,
+//             manual_challan_no: savedOrder.Manual_challan_no,
+//             driver_name: savedOrder.driver_name,
+//             driver_phone: savedOrder.driver_phone,
+//           },
+//         },
+
+//         {
+//           step: "invoice",
+//           status: savedOrder.invoice_status,
+//           data: {
+//             invoice_no: savedOrder.invoice_no,
+//             manual_invoice_no: savedOrder.Manual_invoice_no,
+//             invoice_date: savedOrder.invoice_date,
+//             due_date: savedOrder.due_date,
+//           },
+//         },
+
+//         {
+//           step: "payment",
+//           status: savedOrder.payment_status,
+//           data: {
+//             payment_no: savedOrder.Payment_no,
+//             manual_payment_no: savedOrder.Manual_payment_no,
+//             payment_date: savedOrder.payment_date,
+//             amount_received: savedOrder.amount_received,
+//             note: savedOrder.payment_note,
+//           },
+//         },
+//       ],
+
+//       additional_info: {
+//         signature_url: savedOrder.signature_url,
+//         photo_url: savedOrder.photo_url,
+//         attachment_url: savedOrder.attachment_url,
+//       },
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: orderId ? "Sales order updated" : "Sales order created",
+//       data: response,
+//     });
+//   } catch (err) {
+//     console.error("Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: err.message,
+//     });
+//   }
+// };
+
+
+
+
 export const createOrUpdateSalesOrder = async (req, res) => {
   try {
     const body = { ...req.body };
     const orderId = req.method === "PUT" ? Number(req.params.id) : null;
 
-    // ================= VALIDATION =================
-    // if (!orderId && !body.company_info) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "company_info is mandatory for new orders",
-    //   });
-    // }
-    
-
-    // if (!orderId && (!Array.isArray(body.items) || body.items.length === 0)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "items must be provided and not empty for new orders",
-    //   });
-    // }
+    if (!body.company_info) body.company_info = {};
+    if (!body.additional_info) body.additional_info = {};
 
     let existingOrder = null;
     let existingItems = [];
 
+    // ================= EXISTING ORDER (FOR PUT) =================
     if (orderId) {
       existingOrder = await prisma.salesorder.findUnique({
         where: { id: orderId },
@@ -3484,24 +3873,74 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       existingItems = existingOrder.salesorderitems || [];
     }
 
-    // ================= FILE UPLOAD HANDLER =================
-    if (body.company_info) {
-      body.company_info = await handleFileUploads(body.company_info, ["logo_url"]);
+    // ================= FILE UPLOADS (MULTER + CLOUDINARY) =================
+    // if (req.files) {
+    //   // MULTIPLE IMAGES ARRAY -> files[]
+    //   if (req.files.files) {
+    //     body.additional_info.files = req.files.files.map((f) => f.path);
+    //   }
+
+    //   // SINGLE FILES
+    //   if (req.files.logo_url) {
+    //     body.company_info.logo_url = req.files.logo_url[0].path;
+    //   }
+    //   if (req.files.signature_url) {
+    //     body.additional_info.signature_url = req.files.signature_url[0].path;
+    //   }
+    //   if (req.files.photo_url) {
+    //     body.additional_info.photo_url = req.files.photo_url[0].path;
+    //   }
+    //   if (req.files.attachment_url) {
+    //     body.additional_info.attachment_url = req.files.attachment_url[0].path;
+    //   }
+    // }
+
+    if (req.files) {
+
+      // MULTIPLE IMAGES: files[]
+      if (req.files.files) {
+        const filesArr = Array.isArray(req.files.files)
+          ? req.files.files
+          : [req.files.files];
+
+        body.additional_info.files = [];
+
+        for (const file of filesArr) {
+          const url = await uploadToCloudinary(file, "sales_order_files");
+          if (url) body.additional_info.files.push(url);
+        }
+      }
+
+      // SINGLE FILE: logo_url
+
+      if (req.files.logo_url) {
+        const url = await uploadToCloudinary(req.files.logo_url, "sales_logo");
+        if (url) body.company_info.logo_url = url;
+      }
+
+      // SINGLE FILE: signature_url
+      if (req.files.signature_url) {
+        const url = await uploadToCloudinary(req.files.signature_url, "sales_signature");
+        if (url) body.additional_info.signature_url = url;
+      }
+
+      // SINGLE FILE: photo_url
+      if (req.files.photo_url) {
+        const url = await uploadToCloudinary(req.files.photo_url, "sales_photo");
+        if (url) body.additional_info.photo_url = url;
+      }
+
+      // SINGLE FILE: attachment_url
+      if (req.files.attachment_url) {
+        const url = await uploadToCloudinary(req.files.attachment_url, "sales_attachment");
+        if (url) body.additional_info.attachment_url = url;
+      }
     }
 
-    if (body.additional_info) {
-      body.additional_info = await handleFileUploads(body.additional_info, [
-        "signature_url",
-        "photo_url",
-        "attachment_url",
-      ]);
-    }
+
 
     // ================= STEP COMPLETION RULES =================
-    const stepCompleted = (data, fields) =>
-      fields.every((field) => data[field] !== "" && data[field] !== null && data[field] !== undefined);
-
-    const stepRules = {
+    const stepRequired = {
       quotation: ["quotation_no", "quotation_date"],
       sales_order: ["SO_no"],
       delivery_challan: ["challan_no"],
@@ -3509,164 +3948,119 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       payment: ["payment_no", "amount_received"],
     };
 
+    const stepCompleted = (obj, required) =>
+      required.every(
+        (f) => obj?.[f] !== "" && obj?.[f] !== null && obj?.[f] !== undefined
+      );
+
     // ================= MERGE STEPS =================
+    const mergeStep = (stepName) =>
+      orderId
+        ? { ...existingOrder, ...(body.steps?.[stepName] || {}) }
+        : body.steps?.[stepName] || {};
+
     const steps = {
-      quotation: orderId
-        ? {
-            quotation_no: existingOrder.quotation_no || "",
-            manual_quo_no: existingOrder.manual_quo_no || "",
-            quotation_date: existingOrder.quotation_date,
-            valid_till: existingOrder.valid_till,
-            qoutation_to_customer_name: existingOrder.qoutation_to_customer_name || "",
-            qoutation_to_customer_address: existingOrder.qoutation_to_customer_address || "",
-            qoutation_to_customer_email: existingOrder.qoutation_to_customer_email || "",
-            qoutation_to_customer_phone: existingOrder.qoutation_to_customer_phone || "",
-            notes: existingOrder.notes || "",
-            customer_ref: existingOrder.customer_ref || "",
-            ...(body.steps?.quotation || {}),
-          }
-        : body.steps?.quotation || {},
-
-      // SALES ORDER (NO SHIPPING HERE ANYMORE)
-      sales_order: orderId
-        ? {
-            SO_no: existingOrder.SO_no || "",
-            manual_ref_no: existingOrder.Manual_SO_ref || "",
-            manual_quo_no: existingOrder.manual_quo_no || "",
-            sales_order_status: existingOrder.sales_order_status,
-            ...(body.steps?.sales_order || {}),
-          }
-        : body.steps?.sales_order || {},
-
-      delivery_challan: orderId
-        ? {
-            challan_no: existingOrder.Challan_no || "",
-            manual_challan_no: existingOrder.Manual_challan_no || "",
-            driver_name: existingOrder.driver_name || "",
-            driver_phone: existingOrder.driver_phone || "",
-            ...(body.steps?.delivery_challan || {}),
-          }
-        : body.steps?.delivery_challan || {},
-
-      invoice: orderId
-        ? {
-            invoice_no: existingOrder.invoice_no || "",
-            manual_invoice_no: existingOrder.Manual_invoice_no || "",
-            invoice_date: existingOrder.invoice_date,
-            due_date: existingOrder.due_date,
-            ...(body.steps?.invoice || {}),
-          }
-        : body.steps?.invoice || {},
-
-      payment: orderId
-        ? {
-            payment_no: existingOrder.Payment_no || "",
-            manual_payment_no: existingOrder.Manual_payment_no || "",
-            payment_date: existingOrder.payment_date,
-            amount_received: existingOrder.amount_received || 0,
-            payment_note: existingOrder.payment_note || "",
-            ...(body.steps?.payment || {}),
-          }
-        : body.steps?.payment || {},
+      quotation: mergeStep("quotation"),
+      sales_order: mergeStep("sales_order"),
+      delivery_challan: mergeStep("delivery_challan"),
+      invoice: mergeStep("invoice"),
+      payment: mergeStep("payment"),
     };
 
-    for (const step of Object.keys(steps)) {
-      steps[step].status = stepCompleted(steps[step], stepRules[step]) ? "completed" : "pending";
-    }
+    Object.keys(steps).forEach((step) => {
+      steps[step].status = stepCompleted(steps[step], stepRequired[step])
+        ? "completed"
+        : "pending";
+    });
 
-    // ================= SHIPPING DETAILS =================
+    // ================= SHIPPING =================
     const shipping = body.shipping_details
       ? {
-          bill_to_company_name: body.shipping_details.bill_to_name || "",
-          bill_to_company_address: body.shipping_details.bill_to_address || "",
-          bill_to_company_email: body.shipping_details.bill_to_email || "",
-          bill_to_company_phone: body.shipping_details.bill_to_phone || "",
-          bill_to_attention_name: body.shipping_details.bill_to_attention_name || "",
+        bill_to_company_name: body.shipping_details.bill_to_name || "",
+        bill_to_company_address: body.shipping_details.bill_to_address || "",
+        bill_to_company_email: body.shipping_details.bill_to_email || "",
+        bill_to_company_phone: body.shipping_details.bill_to_phone || "",
+        bill_to_attention_name:
+          body.shipping_details.bill_to_attention_name || "",
 
-          ship_to_company_name: body.shipping_details.ship_to_name || "",
-          ship_to_company_address: body.shipping_details.ship_to_address || "",
-          ship_to_company_email: body.shipping_details.ship_to_email || "",
-          ship_to_company_phone: body.shipping_details.ship_to_phone || "",
-          ship_to_attention_name: body.shipping_details.ship_to_attention_name || "",
-        }
+        ship_to_company_name: body.shipping_details.ship_to_name || "",
+        ship_to_company_address: body.shipping_details.ship_to_address || "",
+        ship_to_company_email: body.shipping_details.ship_to_email || "",
+        ship_to_company_phone: body.shipping_details.ship_to_phone || "",
+        ship_to_attention_name:
+          body.shipping_details.ship_to_attention_name || "",
+      }
       : orderId
-      ? {
-          bill_to_company_name: existingOrder.bill_to_company_name || "",
-          bill_to_company_address: existingOrder.bill_to_company_address || "",
-          bill_to_company_email: existingOrder.bill_to_company_email || "",
-          bill_to_company_phone: existingOrder.bill_to_company_phone || "",
-          bill_to_attention_name: existingOrder.bill_to_attention_name || "",
+        ? {
+          bill_to_company_name: existingOrder.bill_to_company_name,
+          bill_to_company_address: existingOrder.bill_to_company_address,
+          bill_to_company_email: existingOrder.bill_to_company_email,
+          bill_to_company_phone: existingOrder.bill_to_company_phone,
+          bill_to_attention_name: existingOrder.bill_to_attention_name,
 
-          ship_to_company_name: existingOrder.ship_to_company_name || "",
-          ship_to_company_address: existingOrder.ship_to_company_address || "",
-          ship_to_company_email: existingOrder.ship_to_company_email || "",
-          ship_to_company_phone: existingOrder.ship_to_company_phone || "",
-          ship_to_attention_name: existingOrder.ship_to_attention_name || "",
+          ship_to_company_name: existingOrder.ship_to_company_name,
+          ship_to_company_address: existingOrder.ship_to_company_address,
+          ship_to_company_email: existingOrder.ship_to_company_email,
+          ship_to_company_phone: existingOrder.ship_to_company_phone,
+          ship_to_attention_name: existingOrder.ship_to_attention_name,
         }
-      : {};
+        : {};
 
     // ================= COMPANY INFO =================
     const companyData = body.company_info
       ? {
-          company_id: Number(body.company_info.company_id),
-          company_name: body.company_info.company_name,
-          company_address: body.company_info.company_address,
-          company_email: body.company_info.company_email,
-          company_phone: body.company_info.company_phone,
-          logo_url: body.company_info.logo_url ?? "",
-          bank_name: body.company_info.bank_name ?? "",
-          account_no: body.company_info.account_no ?? "",
-          account_holder: body.company_info.account_holder ?? "",
-          ifsc_code: body.company_info.ifsc_code ?? "",
-          terms: body.company_info.terms ?? "",
-        }
+        company_id: Number(body.company_info.company_id),
+        company_name: body.company_info.company_name,
+        company_address: body.company_info.company_address,
+        company_email: body.company_info.company_email,
+        company_phone: body.company_info.company_phone,
+        logo_url: body.company_info.logo_url || "",
+        bank_name: body.company_info.bank_name || "",
+        account_no: body.company_info.account_no || "",
+        account_holder: body.company_info.account_holder || "",
+        ifsc_code: body.company_info.ifsc_code || "",
+        terms: body.company_info.terms || "",
+      }
       : orderId
-      ? {
-          company_id: existingOrder.company_id,
-          company_name: existingOrder.company_name,
-          company_address: existingOrder.company_address,
-          company_email: existingOrder.company_email,
-          company_phone: existingOrder.company_phone,
-          logo_url: existingOrder.logo_url,
-          bank_name: existingOrder.bank_name,
-          account_no: existingOrder.account_no,
-          account_holder: existingOrder.account_holder,
-          ifsc_code: existingOrder.ifsc_code,
-          terms: existingOrder.terms,
-        }
-      : {};
+        ? existingOrder
+        : {};
 
     // ================= ITEMS =================
     const itemsData = body.items
-      ? body.items.map((item) => ({
-          item_name: item.item_name,
-          qty: Number(item.qty),
-          rate: Number(item.rate),
-          tax_percent: Number(item.tax_percent),
-          discount: Number(item.discount),
-          amount: Number(item.amount),
-          warehouse_id: item.warehouse_id ? Number(item.warehouse_id) : null,
-        }))
-      : orderId
-      ? existingItems
-      : [];
+      ? body.items.map((i) => ({
+        item_name: i.item_name,
+        qty: Number(i.qty),
+        rate: Number(i.rate),
+        tax_percent: Number(i.tax_percent),
+        discount: Number(i.discount),
+        amount: Number(i.amount),
+        warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
+      }))
+      : existingItems;
 
-    // ================= DB PAYLOAD =================
+    // ================= DB DATA =================
     const dbData = {
       ...companyData,
       ...shipping,
 
       quotation_no: steps.quotation.quotation_no || "",
       manual_quo_no: steps.quotation.manual_quo_no || "",
-      quotation_date: steps.quotation.quotation_date ? new Date(steps.quotation.quotation_date) : null,
-      valid_till: steps.quotation.valid_till ? new Date(steps.quotation.valid_till) : null,
+      quotation_date: steps.quotation.quotation_date
+        ? new Date(steps.quotation.quotation_date)
+        : null,
+      valid_till: steps.quotation.valid_till
+        ? new Date(steps.quotation.valid_till)
+        : null,
       quotation_status: steps.quotation.status,
-      qoutation_to_customer_name: steps.quotation.qoutation_to_customer_name || "",
-      qoutation_to_customer_address: steps.quotation.qoutation_to_customer_address || "",
-      qoutation_to_customer_email: steps.quotation.qoutation_to_customer_email || "",
-      qoutation_to_customer_phone: steps.quotation.qoutation_to_customer_phone || "",
-      notes: steps.quotation.notes || "",
-      customer_ref: steps.quotation.customer_ref || "",
+      qoutation_to_customer_name: steps.quotation.qoutation_to_customer_name,
+      qoutation_to_customer_address:
+        steps.quotation.qoutation_to_customer_address,
+      qoutation_to_customer_email:
+        steps.quotation.qoutation_to_customer_email,
+      qoutation_to_customer_phone:
+        steps.quotation.qoutation_to_customer_phone,
+      notes: steps.quotation.notes,
+      customer_ref: steps.quotation.customer_ref,
 
       SO_no: steps.sales_order.SO_no || "",
       Manual_SO_ref: steps.sales_order.manual_ref_no || "",
@@ -3676,26 +4070,42 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       Challan_no: steps.delivery_challan.challan_no || "",
       Manual_challan_no: steps.delivery_challan.manual_challan_no || "",
       delivery_challan_status: steps.delivery_challan.status,
-      driver_name: steps.delivery_challan.driver_name || "",
-      driver_phone: steps.delivery_challan.driver_phone || "",
+      driver_name: steps.delivery_challan.driver_name,
+      driver_phone: steps.delivery_challan.driver_phone,
 
       invoice_no: steps.invoice.invoice_no || "",
       Manual_invoice_no: steps.invoice.manual_invoice_no || "",
-      invoice_date: steps.invoice.invoice_date ? new Date(steps.invoice.invoice_date) : null,
-      due_date: steps.invoice.due_date ? new Date(steps.invoice.due_date) : null,
+      invoice_date: steps.invoice.invoice_date
+        ? new Date(steps.invoice.invoice_date)
+        : null,
+      due_date: steps.invoice.due_date
+        ? new Date(steps.invoice.due_date)
+        : null,
       invoice_status: steps.invoice.status,
 
       Payment_no: steps.payment.payment_no || "",
       Manual_payment_no: steps.payment.manual_payment_no || "",
-      payment_date: steps.payment.payment_date ? new Date(steps.payment.payment_date) : null,
+      payment_date: steps.payment.payment_date
+        ? new Date(steps.payment.payment_date)
+        : null,
       payment_status: steps.payment.status,
       amount_received: Number(steps.payment.amount_received) || 0,
       payment_note: steps.payment.payment_note || "",
 
-      signature_url: body.additional_info?.signature_url ?? existingOrder?.signature_url ?? "",
-      photo_url: body.additional_info?.photo_url ?? existingOrder?.photo_url ?? "",
-      attachment_url: body.additional_info?.attachment_url ?? existingOrder?.attachment_url ?? "",
-subtotal: body.sub_total ? Number(body.sub_total) : existingOrder?.subtotal || 0,
+      signature_url:
+        body.additional_info.signature_url ||
+        existingOrder?.signature_url ||
+        "",
+      photo_url:
+        body.additional_info.photo_url || existingOrder?.photo_url || "",
+      attachment_url:
+        body.additional_info.attachment_url ||
+        existingOrder?.attachment_url ||
+        "",
+
+      subtotal: body.sub_total
+        ? Number(body.sub_total)
+        : existingOrder?.subtotal || 0,
       total: body.total ? Number(body.total) : existingOrder?.total || 0,
       updated_at: new Date(),
     };
@@ -3729,39 +4139,42 @@ subtotal: body.sub_total ? Number(body.sub_total) : existingOrder?.subtotal || 0
       });
     }
 
-    // ================= RESPONSE =================
-    const response = {
-      company_info: {
-        ...companyData,
-        id: savedOrder.id,
-        created_at: savedOrder.created_at,
-        updated_at: savedOrder.updated_at,
-        terms: savedOrder.terms,
-      },
+    return res.status(200).json({
+      success: true,
+      message: orderId ? "Sales order updated" : "Sales order created",
+      data: {
+        sales_order_id: savedOrder.id,
+        company_info: {
+          company_id: savedOrder.company_id,
+          company_name: savedOrder.company_name,
+          company_address: savedOrder.company_address,
+          company_email: savedOrder.company_email,
+          company_phone: savedOrder.company_phone,
+          logo_url: savedOrder.logo_url,
+          bank_name: savedOrder.bank_name,
+          account_no: savedOrder.account_no,
+          account_holder: savedOrder.account_holder,
+          ifsc_code: savedOrder.ifsc_code,
+          terms: savedOrder.terms
+        },
 
-      shipping_details: {
-        bill_to_name: savedOrder.bill_to_company_name,
-        bill_to_address: savedOrder.bill_to_company_address,
-        bill_to_email: savedOrder.bill_to_company_email,
-        bill_to_phone: savedOrder.bill_to_company_phone,
-        bill_to_attention_name: savedOrder.bill_to_attention_name,
+        shipping_details: {
+          bill_to_name: savedOrder.bill_to_company_name,
+          bill_to_address: savedOrder.bill_to_company_address,
+          bill_to_email: savedOrder.bill_to_company_email,
+          bill_to_phone: savedOrder.bill_to_company_phone,
+          bill_to_attention_name: savedOrder.bill_to_attention_name,
 
-        ship_to_name: savedOrder.ship_to_company_name,
-        ship_to_address: savedOrder.ship_to_company_address,
-        ship_to_email: savedOrder.ship_to_company_email,
-        ship_to_phone: savedOrder.ship_to_company_phone,
-        ship_to_attention_name: savedOrder.ship_to_attention_name,
-      },
+          ship_to_name: savedOrder.ship_to_company_name,
+          ship_to_address: savedOrder.ship_to_company_address,
+          ship_to_email: savedOrder.ship_to_company_email,
+          ship_to_phone: savedOrder.ship_to_company_phone,
+          ship_to_attention_name: savedOrder.ship_to_attention_name
+        },
 
-      items: savedOrder.salesorderitems,
-      sub_total: savedOrder.subtotal,
-      total: savedOrder.total,
-
-      steps: [
-        {
-          step: "quotation",
-          status: savedOrder.quotation_status,
-          data: {
+        steps: {
+          quotation: {
+            status: savedOrder.quotation_status,    // ← status added
             quotation_no: savedOrder.quotation_no,
             manual_quo_no: savedOrder.manual_quo_no,
             quotation_date: savedOrder.quotation_date,
@@ -3771,66 +4184,54 @@ subtotal: body.sub_total ? Number(body.sub_total) : existingOrder?.subtotal || 0
             qoutation_to_customer_email: savedOrder.qoutation_to_customer_email,
             qoutation_to_customer_phone: savedOrder.qoutation_to_customer_phone,
             notes: savedOrder.notes,
-            customer_ref: savedOrder.customer_ref,
+            customer_ref: savedOrder.customer_ref
           },
-        },
 
-        {
-          step: "sales_order",
-          status: savedOrder.sales_order_status,
-          data: {
+          sales_order: {
+            status: savedOrder.sales_order_status,   // ← added
             SO_no: savedOrder.SO_no,
             manual_ref_no: savedOrder.Manual_SO_ref,
-            manual_quo_no: savedOrder.manual_quo_no,
+            manual_quo_no: savedOrder.manual_quo_no
           },
-        },
 
-        {
-          step: "delivery_challan",
-          status: savedOrder.delivery_challan_status,
-          data: {
+          delivery_challan: {
+            status: savedOrder.delivery_challan_status,  // ← added
             challan_no: savedOrder.Challan_no,
             manual_challan_no: savedOrder.Manual_challan_no,
             driver_name: savedOrder.driver_name,
-            driver_phone: savedOrder.driver_phone,
+            driver_phone: savedOrder.driver_phone
           },
-        },
 
-        {
-          step: "invoice",
-          status: savedOrder.invoice_status,
-          data: {
+          invoice: {
+            status: savedOrder.invoice_status,     // ← added
             invoice_no: savedOrder.invoice_no,
             manual_invoice_no: savedOrder.Manual_invoice_no,
             invoice_date: savedOrder.invoice_date,
-            due_date: savedOrder.due_date,
+            due_date: savedOrder.due_date
           },
-        },
 
-        {
-          step: "payment",
-          status: savedOrder.payment_status,
-          data: {
+          payment: {
+            status: savedOrder.payment_status,    // ← added
             payment_no: savedOrder.Payment_no,
             manual_payment_no: savedOrder.Manual_payment_no,
             payment_date: savedOrder.payment_date,
             amount_received: savedOrder.amount_received,
-            note: savedOrder.payment_note,
-          },
+            payment_note: savedOrder.payment_note
+          }
         },
-      ],
 
-      additional_info: {
-        signature_url: savedOrder.signature_url,
-        photo_url: savedOrder.photo_url,
-        attachment_url: savedOrder.attachment_url,
-      },
-    };
+        items: savedOrder.salesorderitems,
 
-    return res.status(200).json({
-      success: true,
-      message: orderId ? "Sales order updated" : "Sales order created",
-      data: response,
+        additional_info: {
+          files: body.additional_info.files || existingOrder?.files || [],
+          signature_url: savedOrder.signature_url,
+          photo_url: savedOrder.photo_url,
+          attachment_url: savedOrder.attachment_url
+        },
+
+        sub_total: savedOrder.subtotal,
+        total: savedOrder.total
+      }
     });
   } catch (err) {
     console.error("Error:", err);
@@ -3932,7 +4333,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
   // Quotation step
   const quotationStep = {
     step: 'quotation',
-    status: isStepCompleted1({ 
+    status: isStepCompleted1({
       step: 'quotation',
       quotation_no: salesOrder.quotation_no,
       quotation_date: salesOrder.quotation_date,
@@ -3965,7 +4366,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
   // Sales Order step
   const salesOrderStep = {
     step: 'sales_order',
-    status: isStepCompleted1({ 
+    status: isStepCompleted1({
       step: 'sales_order',
       SO_no: salesOrder.SO_no,
       Manual_SO_ref: salesOrder.Manual_SO_ref
@@ -3984,7 +4385,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
   // Delivery Challan step
   const deliveryChallanStep = {
     step: 'delivery_challan',
-    status: isStepCompleted1({ 
+    status: isStepCompleted1({
       step: 'delivery_challan',
       Challan_no: salesOrder.Challan_no,
       Manual_challan_no: salesOrder.Manual_challan_no
@@ -4006,7 +4407,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
   // Invoice step
   const invoiceStep = {
     step: 'invoice',
-    status: isStepCompleted1({ 
+    status: isStepCompleted1({
       step: 'invoice',
       invoice_no: salesOrder.invoice_no,
       Manual_invoice_no: salesOrder.Manual_invoice_no
@@ -4026,7 +4427,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
   // Payment step
   const paymentStep = {
     step: 'payment',
-    status: isStepCompleted1({ 
+    status: isStepCompleted1({
       step: 'payment',
       Payment_no: salesOrder.Payment_no,
       Manual_payment_no: salesOrder.Manual_payment_no,
@@ -4125,55 +4526,50 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 
     const salesOrders = await prisma.salesorder.findMany({
       where: { company_id: Number(companyId) },
-      include: {
-        salesorderitems: true,
-      },
+      include: { salesorderitems: true },
       orderBy: { created_at: "desc" },
     });
+    const formattedOrders = salesOrders.map(order => {
 
-    // =============================== FORMAT EACH ORDER ===============================
-    const formattedOrders = salesOrders.map(order => ({
-      company_info: {
-        company_id: order.company_id,
-        company_name: order.company_name,
-        company_address: order.company_address,
-        company_email: order.company_email,
-        company_phone: order.company_phone,
-        logo_url: order.logo_url,
-        bank_name: order.bank_name,
-        account_no: order.account_no,
-        account_holder: order.account_holder,
-        ifsc_code: order.ifsc_code,
-        terms: order.terms,
-        id: order.id,
-        created_at: order.created_at,
-        updated_at: order.updated_at
-      },
+      const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
 
-      shipping_details: {
-        bill_to_name: order.bill_to_company_name,
-        bill_to_address: order.bill_to_company_address,
-        bill_to_email: order.bill_to_company_email,
-        bill_to_phone: order.bill_to_company_phone,
-        bill_to_attention_name: order.bill_to_attention_name,
+      return {
+        company_info: {
+          company_id: order.company_id,
+          company_name: order.company_name,
+          company_address: order.company_address,
+          company_email: order.company_email,
+          company_phone: order.company_phone,
+          logo_url: order.logo_url,
+          bank_name: order.bank_name,
+          account_no: order.account_no,
+          account_holder: order.account_holder,
+          ifsc_code: order.ifsc_code,
+          terms: order.terms,
+          id: order.id,
+          created_at: order.created_at,
+          updated_at: order.updated_at
+        },
 
-        ship_to_name: order.ship_to_company_name,
-        ship_to_address: order.ship_to_company_address,
-        ship_to_email: order.ship_to_company_email,
-        ship_to_phone: order.ship_to_company_phone,
-        ship_to_attention_name: order.ship_to_attention_name
-      },
+        shipping_details: {
 
-      items: order.salesorderitems,
+          bill_to_name: order.bill_to_company_name,
+          bill_to_address: order.bill_to_company_address,
+          bill_to_email: order.bill_to_company_email,
+          bill_to_phone: order.bill_to_company_phone,
+          bill_to_attention_name: order.bill_to_attention_name,
 
-      sub_total: order.subtotal,
-      total: order.total,
+          ship_to_name: order.ship_to_company_name,
+          ship_to_address: order.ship_to_company_address,
+          ship_to_email: order.ship_to_company_email,
+          ship_to_phone: order.ship_to_company_phone,
+          ship_to_attention_name: order.ship_to_attention_name
 
-      steps: [
-        {
-          step: "quotation",
-          status: order.quotation_status,
-          data: {
+        },
+
+        steps: {
+          quotation: {
+            status: stepStatus(order.quotation_no),
             quotation_no: order.quotation_no,
             manual_quo_no: order.manual_quo_no,
             quotation_date: order.quotation_date,
@@ -4184,58 +4580,59 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             qoutation_to_customer_phone: order.qoutation_to_customer_phone,
             notes: order.notes,
             customer_ref: order.customer_ref
-          }
-        },
-        {
-          step: "sales_order",
-          status: order.sales_order_status,
-          data: {
+          },
+
+          sales_order: {
+            status: stepStatus(order.Manual_SO_ref),
             SO_no: order.SO_no,
             manual_ref_no: order.Manual_SO_ref,
-            manual_quo_no: order.manual_quo_no
-          }
-        },
-        {
-          step: "delivery_challan",
-          status: order.delivery_challan_status,
-          data: {
+          },
+
+          delivery_challan: {
+            status: stepStatus(order.Manual_challan_no),
             challan_no: order.Challan_no,
             manual_challan_no: order.Manual_challan_no,
             driver_name: order.driver_name,
             driver_phone: order.driver_phone
-          }
-        },
-        {
-          step: "invoice",
-          status: order.invoice_status,
-          data: {
+          },
+
+          invoice: {
+            status: stepStatus(order.Manual_invoice_no),
             invoice_no: order.invoice_no,
             manual_invoice_no: order.Manual_invoice_no,
             invoice_date: order.invoice_date,
             due_date: order.due_date
-          }
-        },
-        {
-          step: "payment",
-          status: order.payment_status,
-          data: {
-            payment_no: order.Payment_no,
+          },
+
+          payment: {
+            status: stepStatus(order.Manual_payment_no),
+            Payment_no: order.Payment_no,
             manual_payment_no: order.Manual_payment_no,
             payment_date: order.payment_date,
             amount_received: order.amount_received,
-            note: order.payment_note
+            payment_note: order.payment_note
           }
-        }
-      ],
+        },
 
-      additional_info: {
-        signature_url: order.signature_url,
-        photo_url: order.photo_url,
-        attachment_url: order.attachment_url
-      }
-    }));
+        items: order.salesorderitems,
 
-    // =================================================================================
+        additional_info: {
+          files: order.files || [],
+          signature_url: order.signature_url,
+          photo_url: order.photo_url,
+          attachment_url: order.attachment_url
+
+        },
+
+        sub_total: order.subtotal,
+        total: order.total
+      };
+    });
+
+
+
+
+
 
     return res.status(200).json({
       success: true,
@@ -4244,7 +4641,6 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
     return res.status(500).json({
       success: false,
       message: "Something went wrong while fetching sales orders",
@@ -4312,9 +4708,7 @@ export const getSalesOrderById = async (req, res) => {
 
     const order = await prisma.salesorder.findUnique({
       where: { id: Number(id) },
-      include: {
-        salesorderitems: true,
-      },
+      include: { salesorderitems: true },
     });
 
     if (!order) {
@@ -4324,7 +4718,6 @@ export const getSalesOrderById = async (req, res) => {
       });
     }
 
-    // ======================= FORMAT EXACT LIKE CREATE RESPONSE =======================
     const formattedOrder = {
       company_info: {
         company_id: order.company_id,
@@ -4354,97 +4747,122 @@ export const getSalesOrderById = async (req, res) => {
         ship_to_address: order.ship_to_company_address,
         ship_to_email: order.ship_to_company_email,
         ship_to_phone: order.ship_to_company_phone,
-        ship_to_attention_name: order.ship_to_attention_name,
+        ship_to_attention_name: order.ship_to_attention_name
+      },
+
+      steps: {
+        quotation: {
+          status: order.quotation_status,
+          quotation_no: order.quotation_no,
+          manual_quo_no: order.manual_quo_no,
+          quotation_date: order.quotation_date,
+          valid_till: order.valid_till,
+          qoutation_to_customer_name: order.qoutation_to_customer_name,
+          qoutation_to_customer_address: order.qoutation_to_customer_address,
+          qoutation_to_customer_email: order.qoutation_to_customer_email,
+          qoutation_to_customer_phone: order.qoutation_to_customer_phone,
+          notes: order.notes,
+          customer_ref: order.customer_ref
+        },
+
+        sales_order: {
+          status: order.sales_order_status,
+          SO_no: order.SO_no,
+          manual_ref_no: order.Manual_SO_ref,
+          manual_quo_no: order.manual_quo_no
+        },
+
+        delivery_challan: {
+          status: order.delivery_challan_status,
+          challan_no: order.Challan_no,
+          manual_challan_no: order.Manual_challan_no,
+          driver_name: order.driver_name,
+          driver_phone: order.driver_phone
+        },
+
+        invoice: {
+          status: order.invoice_status,
+          invoice_no: order.invoice_no,
+          manual_invoice_no: order.Manual_invoice_no,
+          invoice_date: order.invoice_date,
+          due_date: order.due_date
+        },
+
+        payment: {
+          status: order.payment_status,
+          payment_no: order.Payment_no,
+          manual_payment_no: order.Manual_payment_no,
+          payment_date: order.payment_date,
+          amount_received: order.amount_received,
+          payment_note: order.payment_note
+        }
       },
 
       items: order.salesorderitems,
 
-      sub_total: order.subtotal,
-      total: order.total,
-
-      steps: [
-        {
-          step: "quotation",
-          status: order.quotation_status,
-          data: {
-            quotation_no: order.quotation_no,
-            manual_quo_no: order.manual_quo_no,
-            quotation_date: order.quotation_date,
-            valid_till: order.valid_till,
-            qoutation_to_customer_name: order.qoutation_to_customer_name,
-            qoutation_to_customer_address: order.qoutation_to_customer_address,
-            qoutation_to_customer_email: order.qoutation_to_customer_email,
-            qoutation_to_customer_phone: order.qoutation_to_customer_phone,
-            notes: order.notes,
-            customer_ref: order.customer_ref,
-          },
-        },
-
-        {
-          step: "sales_order",
-          status: order.sales_order_status,
-          data: {
-            SO_no: order.SO_no,
-            manual_ref_no: order.Manual_SO_ref,
-            manual_quo_no: order.manual_quo_no
-          },
-        },
-
-        {
-          step: "delivery_challan",
-          status: order.delivery_challan_status,
-          data: {
-            challan_no: order.Challan_no,
-            manual_challan_no: order.Manual_challan_no,
-            driver_name: order.driver_name,
-            driver_phone: order.driver_phone,
-          },
-        },
-
-        {
-          step: "invoice",
-          status: order.invoice_status,
-          data: {
-            invoice_no: order.invoice_no,
-            manual_invoice_no: order.Manual_invoice_no,
-            invoice_date: order.invoice_date,
-            due_date: order.due_date,
-          },
-        },
-
-        {
-          step: "payment",
-          status: order.payment_status,
-          data: {
-            payment_no: order.Payment_no,
-            manual_payment_no: order.Manual_payment_no,
-            payment_date: order.payment_date,
-            amount_received: order.amount_received,
-            note: order.payment_note,
-          },
-        },
-      ],
-
       additional_info: {
+        files: order.files || [],
         signature_url: order.signature_url,
         photo_url: order.photo_url,
-        attachment_url: order.attachment_url,
+        attachment_url: order.attachment_url
       },
+
+      sub_total: order.subtotal,
+      total: order.total
     };
 
-    // ================================================================================
     return res.status(200).json({
       success: true,
       message: `Sales Order with ID ${id} fetched successfully`,
-      data: formattedOrder,
+      data: formattedOrder
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while fetching the sales order",
+      error: error.message,
+    });
+  }
+};
+
+
+export const deleteSalesOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const salesOrder = await prisma.salesorder.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!salesOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Sales order not found",
+      });
+    }
+
+    // Delete child items first
+    await prisma.salesorderitems.deleteMany({
+      where: { sales_order_id: Number(id) }
+    });
+
+    // Delete parent order
+    await prisma.salesorder.delete({
+      where: { id: Number(id) }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Sales order deleted successfully"
     });
 
   } catch (error) {
     console.error(error);
     return res.status(500).json({
       success: false,
-      message: "Something went wrong while fetching the sales order",
-      error: error.message,
+      message: "Failed to delete sales order",
+      error: error.message
     });
   }
 };

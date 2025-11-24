@@ -5,6 +5,10 @@ import morgan from "morgan";
 import mainAppRouters from "./app.js"; // Your routes
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
+import fileUpload from "express-fileupload";
+
+
+
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +23,15 @@ const app = express();
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+
+app.use(
+  fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+    limits: { fileSize: 50 * 1024 * 1024 } // optional 50MB limit
+  })
+);
 
 // Enable CORS for React frontend
 // app.use(cors({

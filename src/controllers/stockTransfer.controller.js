@@ -46,6 +46,84 @@ import prisma from "../config/db.js";
 // };
 
 
+// export const createTransfer = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       voucher_no,
+//       manual_voucher_no,
+//       transfer_date,
+//       destination_warehouse_id,
+//       notes,
+//       items, // array of transfer items
+//     } = req.body;
+
+//     // 🧩 Validate inputs
+//     if (!company_id || !destination_warehouse_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_id and destination_warehouse_id are required",
+//       });
+//     }
+
+//     // 🗓️ Parse date safely
+//     const parsedDate = transfer_date ? new Date(transfer_date) : new Date();
+//     if (isNaN(parsedDate.getTime())) {
+//       return res.status(400).json({ success: false, message: "Invalid transfer date" });
+//     }
+
+//     // 🧾 Parse items safely
+//     let parsedItems = [];
+//     if (items) {
+//       parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+//     }
+
+//     // 🧮 Transaction — create transfer + items
+//     const transfer = await prisma.$transaction(async (tx) => {
+//       // Create main transfer record
+//       const createdTransfer = await tx.transfers.create({
+//         data: {
+//           company_id: Number(company_id),
+//           voucher_no: voucher_no || null,
+//           manual_voucher_no: manual_voucher_no || null,
+//           transfer_date: parsedDate,
+//           destination_warehouse_id: Number(destination_warehouse_id),
+//           notes: notes || null,
+//         },
+//       });
+
+//       // Create related items (if any)
+//       if (parsedItems.length > 0) {
+//         const formattedItems = parsedItems.map((item) => ({
+//           transfer_id: createdTransfer.id,
+//           product_id: Number(item.product_id),
+//           source_warehouse_id: Number(item.source_warehouse_id),
+//           qty: new Prisma.Decimal(item.qty || 0),
+//           rate: new Prisma.Decimal(item.rate || 0),
+//           narration: item.narration || null,
+//         }));
+
+//         await tx.transfer_items.createMany({ data: formattedItems });
+//       }
+
+//       return createdTransfer;
+//     });
+
+//     // ✅ Success Response
+//     res.status(201).json({
+//       success: true,
+//       message: "Transfer created successfully",
+//       data: transfer,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error creating transfer:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to create transfer",
+//       error: error.message,
+//     });
+//   }
+// };
 export const createTransfer = async (req, res) => {
   try {
     const {
@@ -55,10 +133,9 @@ export const createTransfer = async (req, res) => {
       transfer_date,
       destination_warehouse_id,
       notes,
-      items, // array of transfer items
+      items,
     } = req.body;
 
-    // 🧩 Validate inputs
     if (!company_id || !destination_warehouse_id) {
       return res.status(400).json({
         success: false,
@@ -66,21 +143,49 @@ export const createTransfer = async (req, res) => {
       });
     }
 
-    // 🗓️ Parse date safely
     const parsedDate = transfer_date ? new Date(transfer_date) : new Date();
     if (isNaN(parsedDate.getTime())) {
       return res.status(400).json({ success: false, message: "Invalid transfer date" });
     }
 
-    // 🧾 Parse items safely
     let parsedItems = [];
-    if (items) {
-      parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+    if (items) parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+
+    // ========================================================================
+    // 🚨 STOCK VALIDATION BEFORE TRANSACTION
+    // ========================================================================
+    for (const item of parsedItems) {
+      const productId = Number(item.product_id);
+      const sourceWh = Number(item.source_warehouse_id);
+      const qty = Number(item.qty);
+
+      const sourceStock = await prisma.product_warehouses.findUnique({
+        where: {
+          product_id_warehouse_id: { product_id: productId, warehouse_id: sourceWh },
+        },
+      });
+
+      // ❌ if no record found
+      if (!sourceStock) {
+        return res.status(400).json({
+          success: false,
+          message: `No stock found for product_id ${productId} in warehouse ${sourceWh}`,
+        });
+      }
+
+      // ❌ if stock insufficient
+      if (sourceStock.stock_qty < qty) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for product_id ${productId} in warehouse ${sourceWh}. Available: ${sourceStock.stock_qty}, Required: ${qty}`,
+        });
+      }
     }
 
-    // 🧮 Transaction — create transfer + items
+    // ========================================================================
+    // 🧮 TRANSACTION — Create transfer, items, and update stock
+    // ========================================================================
     const transfer = await prisma.$transaction(async (tx) => {
-      // Create main transfer record
       const createdTransfer = await tx.transfers.create({
         data: {
           company_id: Number(company_id),
@@ -92,32 +197,69 @@ export const createTransfer = async (req, res) => {
         },
       });
 
-      // Create related items (if any)
-      if (parsedItems.length > 0) {
-        const formattedItems = parsedItems.map((item) => ({
-          transfer_id: createdTransfer.id,
-          product_id: Number(item.product_id),
-          source_warehouse_id: Number(item.source_warehouse_id),
-          qty: new Prisma.Decimal(item.qty || 0),
-          rate: new Prisma.Decimal(item.rate || 0),
-          narration: item.narration || null,
-        }));
+      for (const item of parsedItems) {
+        const productId = Number(item.product_id);
+        const sourceWh = Number(item.source_warehouse_id);
+        const destWh = Number(destination_warehouse_id);
+        const qty = Number(item.qty);
 
-        await tx.transfer_items.createMany({ data: formattedItems });
+        await tx.transfer_items.create({
+          data: {
+            transfer_id: createdTransfer.id,
+            product_id: productId,
+            source_warehouse_id: sourceWh,
+            qty,
+            rate: item.rate || 0,
+            narration: item.narration || null,
+          },
+        });
+
+        // 1️⃣ Reduce stock from source warehouse
+        await tx.product_warehouses.update({
+          where: {
+            product_id_warehouse_id: { product_id: productId, warehouse_id: sourceWh },
+          },
+          data: {
+            stock_qty: { decrement: qty },
+          },
+        });
+
+        // 2️⃣ Increase stock in destination warehouse
+        const destStock = await tx.product_warehouses.findUnique({
+          where: {
+            product_id_warehouse_id: { product_id: productId, warehouse_id: destWh },
+          },
+        });
+
+        if (destStock) {
+          await tx.product_warehouses.update({
+            where: {
+              product_id_warehouse_id: { product_id: productId, warehouse_id: destWh },
+            },
+            data: { stock_qty: { increment: qty } },
+          });
+        } else {
+          await tx.product_warehouses.create({
+            data: {
+              product_id: productId,
+              warehouse_id: destWh,
+              stock_qty: qty,
+            },
+          });
+        }
       }
 
       return createdTransfer;
     });
 
-    // ✅ Success Response
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Transfer created successfully",
       data: transfer,
     });
   } catch (error) {
     console.error("❌ Error creating transfer:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to create transfer",
       error: error.message,
@@ -126,6 +268,107 @@ export const createTransfer = async (req, res) => {
 };
 
 
+
+// export const updateTransfer = async (req, res) => {
+//   try {
+//     const { id } = req.params; // transfer ID
+//     const {
+//       company_id,
+//       voucher_no,
+//       manual_voucher_no,
+//       transfer_date,
+//       destination_warehouse_id,
+//       notes,
+//       items, // updated array of transfer items
+//     } = req.body;
+
+//     // 🧩 Validate
+//     if (!id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Transfer ID is required",
+//       });
+//     }
+
+//     // Check if transfer exists
+//     const existingTransfer = await prisma.transfers.findUnique({
+//       where: { id: Number(id) },
+//     });
+
+//     if (!existingTransfer) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Transfer not found",
+//       });
+//     }
+
+//     // 🗓️ Parse date
+//     const parsedDate = transfer_date ? new Date(transfer_date) : existingTransfer.transfer_date;
+//     if (isNaN(parsedDate.getTime())) {
+//       return res.status(400).json({ success: false, message: "Invalid transfer date" });
+//     }
+
+//     // 🧾 Parse items safely
+//     let parsedItems = [];
+//     if (items) {
+//       parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+//     }
+
+//     // ✅ Run transaction for update consistency
+//     const updatedTransfer = await prisma.$transaction(async (tx) => {
+//       // Update main transfer
+//       const updated = await tx.transfers.update({
+//         where: { id: Number(id) },
+//         data: {
+//           company_id: company_id ? Number(company_id) : existingTransfer.company_id,
+//           voucher_no: voucher_no ?? existingTransfer.voucher_no,
+//           manual_voucher_no: manual_voucher_no ?? existingTransfer.manual_voucher_no,
+//           transfer_date: parsedDate,
+//           destination_warehouse_id: destination_warehouse_id
+//             ? Number(destination_warehouse_id)
+//             : existingTransfer.destination_warehouse_id,
+//           notes: notes ?? existingTransfer.notes,
+//         },
+//       });
+
+//       // ✅ Update items only if provided
+//       if (parsedItems.length > 0) {
+//         // Delete old transfer items
+//         await tx.transfer_items.deleteMany({
+//           where: { transfer_id: Number(id) },
+//         });
+
+//         // Insert new ones
+//         const formattedItems = parsedItems.map((item) => ({
+//           transfer_id: Number(id),
+//           product_id: Number(item.product_id),
+//           source_warehouse_id: Number(item.source_warehouse_id),
+//           qty: new Prisma.Decimal(item.qty || 0),
+//           rate: new Prisma.Decimal(item.rate || 0),
+//           narration: item.narration || null,
+//         }));
+
+//         await tx.transfer_items.createMany({ data: formattedItems });
+//       }
+
+//       return updated;
+//     });
+
+//     // ✅ Return success
+//     res.status(200).json({
+//       success: true,
+//       message: "Transfer updated successfully",
+//       data: updatedTransfer,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error updating transfer:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to update transfer",
+//       error: error.message,
+//     });
+//   }
+// };
 
 export const updateTransfer = async (req, res) => {
   try {
@@ -137,10 +380,9 @@ export const updateTransfer = async (req, res) => {
       transfer_date,
       destination_warehouse_id,
       notes,
-      items, // updated array of transfer items
+      items, // updated array
     } = req.body;
 
-    // 🧩 Validate
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -148,86 +390,171 @@ export const updateTransfer = async (req, res) => {
       });
     }
 
-    // Check if transfer exists
-    const existingTransfer = await prisma.transfers.findUnique({
+    // Fetch old transfer + items
+    const oldTransfer = await prisma.transfers.findUnique({
       where: { id: Number(id) },
+      include: { transfer_items: true },
     });
 
-    if (!existingTransfer) {
+    if (!oldTransfer) {
       return res.status(404).json({
         success: false,
         message: "Transfer not found",
       });
     }
 
-    // 🗓️ Parse date
-    const parsedDate = transfer_date ? new Date(transfer_date) : existingTransfer.transfer_date;
-    if (isNaN(parsedDate.getTime())) {
-      return res.status(400).json({ success: false, message: "Invalid transfer date" });
-    }
-
-    // 🧾 Parse items safely
+    // Parse items
     let parsedItems = [];
     if (items) {
       parsedItems = typeof items === "string" ? JSON.parse(items) : items;
     }
 
-    // ✅ Run transaction for update consistency
+    const parsedDate = transfer_date ? new Date(transfer_date) : oldTransfer.transfer_date;
+
+    // =========================
+    // 🔥 MAIN TRANSACTION
+    // =========================
     const updatedTransfer = await prisma.$transaction(async (tx) => {
-      // Update main transfer
+      
+      // 1️⃣ REVERSE OLD STOCK MOVEMENTS
+      for (const oldItem of oldTransfer.transfer_items) {
+        // Increase old source stock
+        await tx.product_warehouses.updateMany({
+          where: {
+            product_id: oldItem.product_id,
+            warehouse_id: oldItem.source_warehouse_id,
+          },
+          data: {
+            stock_qty: { increment: Number(oldItem.qty) },
+          },
+        });
+
+        // Reduce old destination stock (if exists)
+        await tx.product_warehouses.updateMany({
+          where: {
+            product_id: oldItem.product_id,
+            warehouse_id: oldTransfer.destination_warehouse_id,
+          },
+          data: {
+            stock_qty: { decrement: Number(oldItem.qty) },
+          },
+        });
+      }
+
+      // 2️⃣ UPDATE TRANSFER MAIN RECORD
       const updated = await tx.transfers.update({
         where: { id: Number(id) },
         data: {
-          company_id: company_id ? Number(company_id) : existingTransfer.company_id,
-          voucher_no: voucher_no ?? existingTransfer.voucher_no,
-          manual_voucher_no: manual_voucher_no ?? existingTransfer.manual_voucher_no,
+          company_id: company_id ? Number(company_id) : oldTransfer.company_id,
+          voucher_no: voucher_no ?? oldTransfer.voucher_no,
+          manual_voucher_no: manual_voucher_no ?? oldTransfer.manual_voucher_no,
           transfer_date: parsedDate,
-          destination_warehouse_id: destination_warehouse_id
-            ? Number(destination_warehouse_id)
-            : existingTransfer.destination_warehouse_id,
-          notes: notes ?? existingTransfer.notes,
+          destination_warehouse_id:
+            destination_warehouse_id
+              ? Number(destination_warehouse_id)
+              : oldTransfer.destination_warehouse_id,
+          notes: notes ?? oldTransfer.notes,
         },
       });
 
-      // ✅ Update items only if provided
-      if (parsedItems.length > 0) {
-        // Delete old transfer items
-        await tx.transfer_items.deleteMany({
-          where: { transfer_id: Number(id) },
+      // 3️⃣ DELETE OLD ITEMS
+      await tx.transfer_items.deleteMany({
+        where: { transfer_id: Number(id) },
+      });
+
+      // 4️⃣ PROCESS NEW ITEMS
+      for (const item of parsedItems) {
+        const qty = Number(item.qty);
+
+        if (qty <= 0)
+          throw new Error("Qty must be greater than zero");
+
+        // Check stock availability
+        const sourceStock = await tx.product_warehouses.findUnique({
+          where: {
+            product_id_warehouse_id: {
+              product_id: Number(item.product_id),
+              warehouse_id: Number(item.source_warehouse_id),
+            },
+          },
         });
 
-        // Insert new ones
-        const formattedItems = parsedItems.map((item) => ({
-          transfer_id: Number(id),
-          product_id: Number(item.product_id),
-          source_warehouse_id: Number(item.source_warehouse_id),
-          qty: new Prisma.Decimal(item.qty || 0),
-          rate: new Prisma.Decimal(item.rate || 0),
-          narration: item.narration || null,
-        }));
+        if (!sourceStock || sourceStock.stock_qty < qty) {
+          throw new Error(
+            `Insufficient stock for product ID ${item.product_id} in warehouse ${item.source_warehouse_id}`
+          );
+        }
 
-        await tx.transfer_items.createMany({ data: formattedItems });
+        // Deduct from source
+        await tx.product_warehouses.update({
+          where: {
+            product_id_warehouse_id: {
+              product_id: Number(item.product_id),
+              warehouse_id: Number(item.source_warehouse_id),
+            },
+          },
+          data: {
+            stock_qty: { decrement: qty },
+          },
+        });
+
+        // Add to destination (create row if not exists)
+        await tx.product_warehouses.upsert({
+          where: {
+            product_id_warehouse_id: {
+              product_id: Number(item.product_id),
+              warehouse_id: Number(
+                destination_warehouse_id ||
+                  oldTransfer.destination_warehouse_id
+              ),
+            },
+          },
+          update: {
+            stock_qty: { increment: qty },
+          },
+          create: {
+            product_id: Number(item.product_id),
+            warehouse_id: Number(
+              destination_warehouse_id ||
+                oldTransfer.destination_warehouse_id
+            ),
+            stock_qty: qty,
+          },
+        });
+
+        // Create new transfer item record
+        await tx.transfer_items.create({
+          data: {
+            transfer_id: Number(id),
+            product_id: Number(item.product_id),
+            source_warehouse_id: Number(item.source_warehouse_id),
+            qty: qty,
+            rate: Number(item.rate || 0),
+            narration: item.narration || null,
+          },
+        });
       }
 
       return updated;
     });
 
-    // ✅ Return success
-    res.status(200).json({
+    // ==========================
+    // SUCCESS RESPONSE
+    // ==========================
+    return res.status(200).json({
       success: true,
       message: "Transfer updated successfully",
       data: updatedTransfer,
     });
+
   } catch (error) {
-    console.error("❌ Error updating transfer:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to update transfer",
       error: error.message,
     });
   }
 };
-
 
 /** ✅ Get All Transfers (simplified) */
 // export const getAllTransfers = async (req, res) => {

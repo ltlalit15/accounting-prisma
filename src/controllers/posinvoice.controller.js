@@ -4,6 +4,140 @@ const prisma = new PrismaClient();
 /**
  * 🧾 CREATE POS INVOICE
  */
+// export const createposinvoice = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       customer_id,
+//       tax_id,
+//       subtotal,
+//       total,
+//       payment_status,
+//       warehouse_id,
+//       products,
+//       symbol,
+//       currency,
+//     } = req.body;
+
+//     // ✅ Validate required fields
+//     if (!company_id || !customer_id || !products?.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields",
+//       });
+//     }
+
+//     // ✅ Create invoice and related products within a transaction
+//     const invoice = await prisma.$transaction(async (tx) => {
+//       // 1️⃣ Create the invoice
+//       const newInvoice = await tx.pos_invoices.create({
+//         data: {
+//           company_id: Number(company_id),
+//           customer_id: Number(customer_id),
+//           tax_id: tax_id ? Number(tax_id) : null,
+//           subtotal: Number(subtotal),
+//           total: Number(total),
+//           payment_status,
+//           symbol: symbol || null,
+//           currency: currency || null,
+//         },
+//       });
+
+//       // 2️⃣ Prepare invoice products including warehouse_id
+//       const invoiceProducts = products.map((item) => ({
+//         invoice_id: newInvoice.id,
+//         product_id: Number(item.product_id),
+//         warehouse_id: item.warehouse_id ? Number(item.warehouse_id) : null,
+//         quantity: Number(item.quantity),
+//         price: Number(item.price),
+//       }));
+
+//       // 3️⃣ Save all invoice products
+//       await tx.pos_invoice_products.createMany({ data: invoiceProducts });
+
+//       // 4️⃣ Fetch full invoice details including warehouse & product
+//       const fullInvoice = await tx.pos_invoices.findUnique({
+//         where: { id: newInvoice.id },
+//         include: {
+//           products: {
+//             include: {
+//               product: {
+//                 select: {
+//                   id: true,
+//                   item_name: true,
+//                 },
+//               },
+//               warehouse: {
+//                 select: {
+//                   id: true,
+//                   warehouse_name: true,
+//                 },
+//               },
+//             },
+//           },
+//           customer: {
+//             select: {
+//               id: true,
+//               name_english: true,
+//               email: true,
+//               phone: true,
+//               address: true,
+//             },
+//           },
+//           tax_class: {
+//             select: {
+//               tax_class: true,
+//               tax_value: true,
+//             },
+//           },
+//         },
+//       });
+
+//       return fullInvoice;
+//     });
+
+//     // ✅ Cleaned response structure
+//     return res.status(201).json({
+//       success: true,
+//       message: "✅ Invoice created successfully with warehouse mapping",
+//       data: {
+//         id: invoice.id,
+//         company_id: invoice.company_id,
+//         customer_id: invoice.customer_id,
+//         tax_id: invoice.tax_id,
+//         subtotal: invoice.subtotal,
+//         total: invoice.total,
+//         payment_status: invoice.payment_status,
+//         symbol: invoice.symbol,
+//         currency: invoice.currency,
+//         created_at: invoice.created_at,
+//         customer: invoice.customer,
+//         tax: invoice.tax_class
+//           ? {
+//               tax_class: invoice.tax_class.tax_class,
+//               tax_value: invoice.tax_class.tax_value,
+//             }
+//           : null,
+//         products: invoice.products.map((p) => ({
+//           product_id: p.product_id,
+//           item_name: p.product?.item_name || null,
+//           warehouse_id: p.warehouse?.id || null,
+//           warehouse_name: p.warehouse?.warehouse_name || null,
+//         })),
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ createposinvoice Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to create invoice",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+// 📌 Get All Invoices by Company
 export const createposinvoice = async (req, res) => {
   try {
     const {
@@ -16,9 +150,10 @@ export const createposinvoice = async (req, res) => {
       products,
       symbol,
       currency,
+      warehouse_id, // ✅ NEW: global warehouse ID
     } = req.body;
 
-    // ✅ Validate required fields
+    // Validate required fields
     if (!company_id || !customer_id || !products?.length) {
       return res.status(400).json({
         success: false,
@@ -26,9 +161,15 @@ export const createposinvoice = async (req, res) => {
       });
     }
 
-    // ✅ Create invoice and related products within a transaction
+    let parsedProducts =
+      typeof products === "string" ? JSON.parse(products) : products;
+
+    // ===============================
+    // 🔥 Main POS Invoice Transaction
+    // ===============================
     const invoice = await prisma.$transaction(async (tx) => {
-      // 1️⃣ Create the invoice
+
+      // 1️⃣ CREATE INVOICE
       const newInvoice = await tx.pos_invoices.create({
         data: {
           company_id: Number(company_id),
@@ -42,36 +183,70 @@ export const createposinvoice = async (req, res) => {
         },
       });
 
-      // 2️⃣ Prepare invoice products including warehouse_id
-      const invoiceProducts = products.map((item) => ({
-        invoice_id: newInvoice.id,
-        product_id: Number(item.product_id),
-        warehouse_id: item.warehouse_id ? Number(item.warehouse_id) : null,
-        quantity: Number(item.quantity),
-        price: Number(item.price),
-      }));
+      // 2️⃣ Process each product in invoice
+      for (const item of parsedProducts) {
+        const finalWarehouseId =
+          item.warehouse_id
+            ? Number(item.warehouse_id)
+            : warehouse_id
+            ? Number(warehouse_id)
+            : null;
 
-      // 3️⃣ Save all invoice products
-      await tx.pos_invoice_products.createMany({ data: invoiceProducts });
+        if (!finalWarehouseId) {
+          throw new Error(
+            `Warehouse ID missing for product_id ${item.product_id}`
+          );
+        }
 
-      // 4️⃣ Fetch full invoice details including warehouse & product
+        // Check stock before selling
+        const warehouseStock = await tx.product_warehouses.findUnique({
+          where: {
+            product_id_warehouse_id: {
+              product_id: Number(item.product_id),
+              warehouse_id: finalWarehouseId,
+            },
+          },
+        });
+
+        if (!warehouseStock || warehouseStock.stock_qty < Number(item.quantity)) {
+          throw new Error(
+            `Insufficient stock for product ${item.product_id} in warehouse ${finalWarehouseId}`
+          );
+        }
+
+        // Deduct stock
+        await tx.product_warehouses.update({
+          where: {
+            product_id_warehouse_id: {
+              product_id: Number(item.product_id),
+              warehouse_id: finalWarehouseId,
+            },
+          },
+          data: {
+            stock_qty: { decrement: Number(item.quantity) },
+          },
+        });
+
+        // Insert invoice product row
+        await tx.pos_invoice_products.create({
+          data: {
+            invoice_id: newInvoice.id,
+            product_id: Number(item.product_id),
+            warehouse_id: finalWarehouseId,
+            quantity: Number(item.quantity),
+            price: Number(item.price),
+          },
+        });
+      }
+
+      // 3️⃣ Fetch complete invoice for response
       const fullInvoice = await tx.pos_invoices.findUnique({
         where: { id: newInvoice.id },
         include: {
           products: {
             include: {
-              product: {
-                select: {
-                  id: true,
-                  item_name: true,
-                },
-              },
-              warehouse: {
-                select: {
-                  id: true,
-                  warehouse_name: true,
-                },
-              },
+              product: { select: { id: true, item_name: true } },
+              warehouse: { select: { id: true, warehouse_name: true } },
             },
           },
           customer: {
@@ -84,10 +259,7 @@ export const createposinvoice = async (req, res) => {
             },
           },
           tax_class: {
-            select: {
-              tax_class: true,
-              tax_value: true,
-            },
+            select: { tax_class: true, tax_value: true },
           },
         },
       });
@@ -95,10 +267,12 @@ export const createposinvoice = async (req, res) => {
       return fullInvoice;
     });
 
-    // ✅ Cleaned response structure
+    // ===============================
+    // 🎉 Successful Response
+    // ===============================
     return res.status(201).json({
       success: true,
-      message: "✅ Invoice created successfully with warehouse mapping",
+      message: "Invoice created successfully",
       data: {
         id: invoice.id,
         company_id: invoice.company_id,
@@ -110,18 +284,23 @@ export const createposinvoice = async (req, res) => {
         symbol: invoice.symbol,
         currency: invoice.currency,
         created_at: invoice.created_at,
+
         customer: invoice.customer,
+
         tax: invoice.tax_class
           ? {
               tax_class: invoice.tax_class.tax_class,
               tax_value: invoice.tax_class.tax_value,
             }
           : null,
+
         products: invoice.products.map((p) => ({
           product_id: p.product_id,
           item_name: p.product?.item_name || null,
           warehouse_id: p.warehouse?.id || null,
           warehouse_name: p.warehouse?.warehouse_name || null,
+          quantity: p.quantity,
+          price: p.price,
         })),
       },
     });
@@ -135,8 +314,6 @@ export const createposinvoice = async (req, res) => {
   }
 };
 
-
-// 📌 Get All Invoices by Company
 export const getAllinvoice = async (req, res) => {
   try {
     const { company_id } = req.params;

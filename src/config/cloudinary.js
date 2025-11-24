@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -9,24 +10,34 @@ cloudinary.config({
 });
 
 
-/**
- * Uploads a buffer (file from multer memory storage) to Cloudinary
- * @param {Buffer} fileBuffer - file buffer from multer
- * @param {string} folder - folder name in Cloudinary
- * @returns {Promise<string>} - secure_url of uploaded image
- */
-export const uploadToCloudinary = (fileBuffer, folder = "uploads") => {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url);
-      }
-    );
-    stream.end(fileBuffer);
-  });
+
+
+
+
+
+export const uploadToCloudinary = async (file, folder) => {
+  try {
+    // Handle single file or file array
+    const fileObj =
+      Array.isArray(file) ? file[0] : file;
+
+    const upload = await cloudinary.uploader.upload(fileObj.tempFilePath, {
+      folder,
+    });
+
+    // delete temp file after upload
+    if (fileObj.tempFilePath && fs.existsSync(fileObj.tempFilePath)) {
+      fs.unlinkSync(fileObj.tempFilePath);
+    }
+
+    return upload.secure_url;
+  } catch (err) {
+    console.log("Cloudinary error =>", err);
+    return null;
+  }
 };
+
+
 
 export const deleteFromCloudinary = async (publicId) => {
   if (!publicId) return;
