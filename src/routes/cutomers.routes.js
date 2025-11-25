@@ -6,7 +6,7 @@ import {
   getCustomerById,
   updateCustomer,
   deleteCustomer,
-  getCustomersByCompany
+  getCustomersByCompany,
 } from "../controllers/customers.controller.js";
 
 const router = Router();
@@ -35,5 +35,6 @@ router.patch("/:id", updateCustomer);
 
 // ✅ Delete a customer permanently
 router.delete("/:id", deleteCustomer);
+
 
 export default router;

@@ -988,186 +988,272 @@ export const getVendorLedger = async (req, res) => {
     // Match the route param names
     const { vendor_id, company_id } = req.params;
 
-    const vendorIdNum = Number(vendor_id);
-    const companyIdNum = Number(company_id);
+   const vendorId = Number(vendor_id);
+const companyId = Number(company_id);
 
-    if (isNaN(vendorIdNum) || isNaN(companyIdNum)) {
-      return res.status(400).json({ message: "Invalid vendor or company ID" });
+if (isNaN(vendorId) || isNaN(companyId)) {
+  return res.status(400).json({ message: "Invalid vendor or company ID" });
+}
+
+// Vendor Details
+const vendor = await prisma.vendorscustomer.findUnique({
+  where: { id: vendorId },
+  include: {
+    company: {
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        company_logo_url: true
+      }
     }
+  }
+});
 
-    // --- Fetch Vendor Info ---
-    const vendor = await prisma.vendorscustomer.findUnique({
-      where: { id: vendorIdNum },
-      include: {
-        company: {
-          select: {
-            name: true,
-            email: true,
-            phone: true,
-            // company_logo_url: true,
-          },
-        },
-      },
-    });
+if (!vendor) {
+  return res.status(404).json({ message: "Vendor not found" });
+}
 
-    if (!vendor) {
-      return res.status(404).json({ message: "Vendor not found" });
-    }
+// Fetch Transactions
+const [purchases, purchaseReturns, payments] = await Promise.all([
+  prisma.purchaseorder.findMany({
+    where: {
+      company_id: companyId,
+      bill_to_vendor_name: vendor.name_english
+    },
+    include: { purchaseorderitems: true }
+  }),
 
-    // --- Fetch All Transactions ---
-    const [purchases, purchaseReturns, payments] = await Promise.all([
-      prisma.purchaseorder.findMany({
-        where: {
-          company_id: companyIdNum,
-          bill_to_vendor_name: vendor.name_english,
-        },
-        include: { purchaseorderitems: true },
-      }),
+  prisma.purchase_return.findMany({
+    where: {
+      company_id: companyId,
+      vendor_id: vendorId
+    },
+    include: { purchase_return_items: true }
+  }),
 
-      prisma.purchase_return.findMany({
-        where: {
-          company_id: companyIdNum,
-          vendor_id: vendorIdNum,
-        },
-        include: { purchase_return_items: true },
-      }),
+  prisma.expensevouchers.findMany({
+    where: {
+      company_id: companyId,
+      expensevoucher_items: { some: { vendor_id: vendorId } }
+    },
+    include: { expensevoucher_items: true }
+  })
+]);
 
-      prisma.expensevouchers.findMany({
-        where: {
-          company_id: companyIdNum,
-          expensevoucher_items: { some: { vendor_id: vendorIdNum } },
-        },
-        include: { expensevoucher_items: true },
-      }),
-    ]);
+// Build Transaction List
+const transactions = [];
+let runningBalance = 0;
 
-    // --- Prepare Transactions ---
-    const transactions = [];
-    let openingBalance = 0;
+// Opening Balance – FIXED VERSION (No Hard Code)
+if (vendor.account_balance && vendor.account_balance !== 0) {
+  const amt = vendor.account_balance;
+  const type = vendor.balance_type === "Dr" ? "Dr" : "Cr";
 
-    if (vendor.account_balance && vendor.account_balance !== 0) {
-      const type = vendor.balance_type || "Dr";
-      openingBalance = type === "Dr" ? vendor.account_balance : -vendor.account_balance;
+  runningBalance = type === "Cr" ? amt : -amt;
 
-      transactions.push({
-        date: vendor.creation_date || vendor.created_at || new Date(),
-        particulars: "Opening Balance",
-        vch_type: "Opening",
-        vch_no: "--",
-        debit: type === "Dr" ? vendor.account_balance : 0,
-        credit: type === "Cr" ? vendor.account_balance : 0,
-        balance: openingBalance,
-        items: [],
-      });
-    }
+  transactions.push({
+    date: vendor.creation_date || vendor.created_at,
+    particulars: "Opening Balance",
+    vch_no: null,                         // FIXED
+    vch_type: "Opening",                  // Not a number, valid
+    debit: type === "Dr" ? amt : 0,
+    credit: type === "Cr" ? amt : 0,
+    balance: runningBalance,
+    narration: vendor.notes || "Opening balance",
+    items: []
+  });
+}
 
-    let runningBalance = openingBalance;
+// Purchases
+purchases.forEach(po => {
+  const total = po.total.toNumber();
+  runningBalance += total;
 
-    // 🧾 Purchases (Debit)
-    purchases.forEach((p) => {
-      const total = p.total.toNumber();
-      runningBalance += total;
-      transactions.push({
-        date: p.created_at,
-        particulars: `Purchase Invoice ${p.PO_no || ""}`,
-        vch_type: "Purchase",
-        vch_no: p.PO_no,
-        debit: total,
-        credit: 0,
-        balance: runningBalance,
-        items: p.purchaseorderitems.map((i) => ({
-          item_name: i.item_name,
-          quantity: i.qty.toNumber(),
-          rate: i.rate.toNumber(),
-          value: i.amount.toNumber(),
-        })),
-      });
-    });
+  transactions.push({
+    date: po.created_at,
+    particulars: `Purchase Invoice ${po.PO_no}`,
+    vch_no: po.PO_no,
+    vch_type: "Purchase",
+    debit: total,
+    credit: 0,
+    balance: runningBalance,
+    narration: po.notes|| "",
+    items: po.purchaseorderitems.map(i => ({
+      item_name: i.item_name,
+      quantity: i.qty.toNumber(),
+      rate: i.rate.toNumber(),
+      discount: i.discount?.toNumber() || 0,
+      tax_percent: i.tax_percent?.toNumber() || 0,
+      tax_amount: 0,
+      value: i.amount.toNumber(),
+      description: i.description || ""
+    }))
+  });
+});
 
-    // 🔁 Purchase Returns (Credit)
-    purchaseReturns.forEach((r) => {
-      const total = r.grand_total.toNumber();
-      runningBalance -= total;
-      transactions.push({
-        date: r.return_date,
-        particulars: `Purchase Return ${r.return_no}`,
-        vch_type: "Purchase Return",
-        vch_no: r.return_no,
-        debit: 0,
-        credit: total,
-        balance: runningBalance,
-        items: r.purchase_return_items.map((i) => ({
-          item_name: i.item_name,
-          quantity: i.quantity.toNumber(),
-          rate: i.rate.toNumber(),
-          value: i.amount.toNumber(),
-        })),
-      });
-    });
+// Purchase Return (Credit)
+purchaseReturns.forEach(pr => {
+  const total = pr.grand_total.toNumber();
+  runningBalance -= total;
 
-    // 💵 Payments (Credit)
-    payments.forEach((p) => {
-      const total = p.total_amount?.toNumber() || 0;
-      runningBalance -= total;
-      transactions.push({
-        date: p.voucher_date,
-        particulars: `Payment ${p.auto_receipt_no}`,
-        vch_type: "Payment",
-        vch_no: p.auto_receipt_no,
-        debit: 0,
-        credit: total,
-        balance: runningBalance,
-        items: [],
-      });
-    });
+  transactions.push({
+    date: pr.return_date,
+    particulars: `Purchase Return ${pr.return_no}`,
+    vch_no: pr.return_no,
+    vch_type: "Return",
+    debit: 0,
+    credit: total,
+    balance: runningBalance,
+    narration: pr.reason_for_return || "",
+    items: pr.purchase_return_items.map(i => ({
+      item_name: i.item_name,
+      quantity: i.quantity.toNumber(),
+      rate: i.rate.toNumber(),
+      discount: i.discount?.toNumber() || 0,
+      tax_percent: i.tax_percent?.toNumber() || 0,
+      tax_amount: 0,
+      value: i.amount.toNumber(),
+      description: i.narration || ""
+    }))
+  });
+});
 
-    // --- Sort by Date ---
-    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+// Payments (Credit)
+payments.forEach(pay => {
+  const total = pay.total_amount?.toNumber() || 0;
+  runningBalance -= total;
 
-    // --- Transaction Summary ---
-    const transactionSummary = {
-      opening_balance: vendor.account_balance ? 1 : 0,
-      purchase: purchases.length,
-      payment: payments.length,
-      purchase_return: purchaseReturns.length,
-      receipt: 0,
-      sales_return: 0,
-      manufacturing: 0,
-      stock_journal: 0,
-      stock_adjustment: 0,
-      banking: 0,
-      journal: 0,
-    };
+  transactions.push({
+    date: pay.voucher_date,
+    particulars: "Payment Made",
+    vch_no: pay.auto_receipt_no,
+    vch_type: "Payment",
+    debit: 0,
+    credit: total,
+    balance: runningBalance,
+    narration: pay.narration || "",
+    items: []
+  });
+});
 
-    const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
+// Sort Transactions
+transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // --- Ledger Summary ---
-    const totalPurchase = purchases.reduce((a, b) => a + b.total.toNumber(), 0);
-    const totalPayment = payments.reduce((a, b) => a + (b.total_amount?.toNumber() || 0), 0);
-    const totalReturn = purchaseReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+//
+const [
+  receipts,
+  salesReturns,
+  stockTransfers,
+  stockAdjustments,
+  bankingVouchers,
+  journalVouchers
+] = await Promise.all([
+  prisma.income_vouchers.count({
+    where: { company_id: companyId, received_from: vendorId }
+  }),
+  prisma.sales_return.count({
+    where: { company_id: companyId, customer_id: vendorId }
+  }),
+  prisma.transfers.count({
+    where: { company_id: companyId }
+  }),
+  prisma.adjustments.count({
+    where: { company_id: companyId }
+  }),
+  prisma.contra_vouchers.count({
+    where: { company_id: companyId }
+  }),
+  prisma.vouchers.count({
+    where: { company_id: companyId, voucher_type: "Journal" }
+  })
+]);
 
-    const closingBalance = openingBalance + totalPurchase - (totalPayment + totalReturn);
+// Transaction Summary
+const summary = {
+  opening_balance: vendor.account_balance ? 1 : 0,
+  purchase: purchases.length,
+  payment: payments.length,
+  purchase_return: purchaseReturns.length,
+  receipt: receipts,
+  sales_return: salesReturns,
+  manufacturing: 0, // No manufacturing table exists
+  stock_journal: stockTransfers,
+  stock_adjustment: stockAdjustments,
+  banking: bankingVouchers,
+  journal: journalVouchers
+};
+summary.total_transactions = Object.values(summary).reduce((a, b) => a + b, 0);
 
-    const ledgerSummary = {
-      opening_balance: Math.abs(vendor.account_balance || 0),
-      opening_balance_type: vendor.balance_type || "Dr",
-      total_purchases: totalPurchase,
-      total_returns: totalReturn,
-      total_payments: totalPayment,
-      balance: Math.abs(closingBalance),
-      balance_type: closingBalance > 0 ? "Cr" : "Dr",
-    };
+// Ledger Summary Cards
+const totalPurchase = purchases.reduce((a, b) => a + b.total.toNumber(), 0);
+const totalReturn = purchaseReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
+const totalPayment = payments.reduce((a, b) => a + (b.total_amount?.toNumber() || 0), 0);
 
-    // --- Response ---
-    return res.status(200).json({
-      vendor,
-      transactions,
-      ledger_summary: ledgerSummary,
-      transaction_summary: {
-        ...transactionSummary,
-        total_transactions: totalTransactions,
-      },
-    });
+const initialBalance = vendor.balance_type === "Cr"
+  ? vendor.account_balance
+  : -vendor.account_balance;
+
+const closing = initialBalance + totalPurchase - (totalPayment + totalReturn);
+// ===== NEW SUMMARY BLOCKS (INSERTED AFTER ledgerSummary) =====
+
+// Opening Balance Info
+const openingBalanceAmt = vendor.account_balance || 0;
+const openingBalanceType = vendor.balance_type === "Dr" ? "Dr" : "Cr";
+
+// Current Balance
+const currentBalanceAmt = Math.abs(closing);
+const currentBalanceType = closing >= 0 ? "Cr" : "Dr";
+
+// Outstanding Balance (same as closing balance)
+const outstandingBalanceAmt = currentBalanceAmt;
+const outstandingBalanceType = currentBalanceType;
+
+// Description Summary Table (for top table UI)
+const description_summary = [
+  {
+    description: "Opening Balance",
+    amount: openingBalanceAmt,
+    type: openingBalanceType
+  },
+  {
+    description: "Total Purchases (Cr)",
+    amount: totalPurchase,
+    type: "Cr"
+  },
+  {
+    description: "Total Payments (Dr)",
+    amount: totalPayment,
+    type: "Dr"
+  },
+  {
+    description: "Current Balance",
+    amount: currentBalanceAmt,
+    type: currentBalanceType
+  }
+];
+
+const ledgerSummary = {
+  total_purchases: totalPurchase,
+  total_payments: totalPayment,
+  outstanding_balance: {
+    amount: outstandingBalanceAmt,
+    type: outstandingBalanceType
+  },
+  total_returns: totalReturn,
+  balance: Math.abs(closing),
+  balance_type: closing >= 0 ? "Cr" : "Dr"
+};
+
+return res.status(200).json({
+  vendor,
+  transactions,
+  transaction_summary: summary,
+  ledger_summary: ledgerSummary,
+   description_summary,
+  
+});
   } catch (error) {
     console.error("Error fetching vendor ledger:", error);
     res.status(500).json({ message: "Internal server error", error });
@@ -1522,186 +1608,214 @@ export const getVendorLedger = async (req, res) => {
 //   }
 // };
 
+
+// customerLedger.controller.js
+
 export const getCustomerLedger = async (req, res) => {
   try {
     const { customer_id, company_id } = req.params;
-    const customerIdNum = Number(customer_id);
-    const companyIdNum = Number(company_id);
+    const customerId = Number(customer_id);
+    const companyId = Number(company_id);
 
-    if (isNaN(customerIdNum) || isNaN(companyIdNum)) {
-      return res.status(400).json({ message: "Invalid customer or company ID" });
+   if (isNaN(customerId) || isNaN(companyId)) {
+  return res.status(400).json({ message: "Invalid customer or company ID" })
+}
+
+// CUSTOMER DETAILS
+const customer = await prisma.vendorscustomer.findUnique({
+  where: { id: customerId },
+  include: {
+    company: {
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        company_logo_url: true
+      }
     }
+  }
+})
 
-    // --- Fetch Customer Info ---
-    const customer = await prisma.vendorscustomer.findUnique({
-      where: { id: customerIdNum },
-      include: {
-        company: {
-          select: {
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-      },
-    });
+if (!customer) {
+  return res.status(404).json({ message: "Customer not found" })
+}
 
-    if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
-    }
+// FETCH DOCUMENTS
+const [
+  invoices,
+  salesReturns,
+  receipts,
+  journalVouchersCount,
+  contraCount,
+  adjustmentsCount
+] = await Promise.all([
 
-    // --- Fetch All Transactions ---
-    const [sales, salesReturns, payments] = await Promise.all([
-      prisma.salesorder.findMany({
-        where: {
-          company_id: companyIdNum,
-          bill_to_customer_name: customer.name_english,
-        },
-        include: { salesorderitems: true },
-      }),
+  prisma.pos_invoices.findMany({
+    where: { company_id: companyId, customer_id: customerId },
+    include: { products: { include: { product: true } } }
+  }),
 
-      prisma.sales_return.findMany({
-        where: {
-          company_id: companyIdNum,
-          customer_id: customerIdNum,
-        },
-        include: { sales_return_items: true },
-      }),
+  prisma.sales_return.findMany({
+    where: { company_id: companyId, customer_id: customerId },
+    include: { sales_return_items: true }
+  }),
 
-      // ADD: Fetch payments
-      prisma.income_vouchers.findMany({
-        where: {
-          company_id: companyIdNum,
-          received_from: customerIdNum,
-        },
-      }),
-    ]);
+  prisma.income_vouchers.findMany({
+    where: { company_id: companyId, received_from: customerId },
+    include: { income_voucher_entries: true }
+  }),
 
-    // --- Prepare Transactions ---
-    const transactions = [];
-    let openingBalance = 0;
+  prisma.vouchers.count({ where: { company_id: companyId, voucher_type: "Journal" } }),
+  prisma.contra_vouchers.count({ where: { company_id: companyId } }),
+  prisma.adjustments.count({ where: { company_id: companyId } })
+])
 
-    if (customer.account_balance && customer.account_balance !== 0) {
-      const type = customer.balance_type || "Cr";
-      openingBalance = type === "Dr" ? customer.account_balance : -customer.account_balance;
+const entries = []
 
-      transactions.push({
-        date: customer.creation_date || customer.created_at || new Date(),
-        particulars: "Opening Balance",
-        vch_type: "Opening",
-        vch_no: "--",
-        debit: type === "Dr" ? customer.account_balance : 0,
-        credit: type === "Cr" ? customer.account_balance : 0,
-        balance: openingBalance,
-        items: [],
-      });
-    }
+// OPENING BALANCE
+if (customer.account_balance && customer.account_balance !== 0) {
+  const amt = Number(customer.account_balance)
+  const type = customer.balance_type === "Dr" ? "Dr" : "Cr"
+  entries.push({
+    date: customer.creation_date || customer.created_at,
+    particulars: "Opening Balance",
+    vch_no: "--",
+    vch_type: "Opening",
+    debit: type === "Dr" ? amt : 0,
+    credit: type === "Cr" ? amt : 0,
+    narration: customer.notes || "",
+    items: []
+  })
+}
 
-    let runningBalance = openingBalance;
+// SALES INVOICE (CREDIT)
+invoices.forEach(inv => {
+  const total = Number(inv.total)
+  entries.push({
+    date: inv.created_at,
+    particulars: `Sales Invoice ${inv.invoice_no || inv.id}`,
+    vch_no: inv.invoice_no || inv.id,
+    vch_type: "Sales",
+    debit: 0,
+    credit: total,
+    narration: inv.payment_status || "",
+    items: inv.products.map(p => ({
+      item_name: p.product?.item_name || p.item_name || "",
+      quantity: Number(p.quantity),
+      rate: Number(p.price),
+      discount: 0,
+      tax_percent: 0,
+      tax_amount: 0,
+      value: Number(p.price) * Number(p.quantity),
+      description: ""
+    }))
+  })
+})
 
-    // 🧾 Sales (Debit: increases balance)
-    sales.forEach((s) => {
-      const total = s.total.toNumber();
-      runningBalance += total; // CHANGED: += for debit
-      transactions.push({
-        date: s.created_at,
-        particulars: `Sales Invoice ${s.SO_no || ""}`,
-        vch_type: "Sales",
-        vch_no: s.SO_no,
-        debit: total, // CHANGED: debit
-        credit: 0,
-        balance: runningBalance,
-        items: s.salesorderitems.map((i) => ({
-          item_name: i.item_name,
-          quantity: i.qty.toNumber(),
-          rate: i.rate.toNumber(),
-          value: i.amount.toNumber(),
-        })),
-      });
-    });
+// SALES RETURN (DEBIT)
+salesReturns.forEach(sr => {
+  const total = Number(sr.grand_total)
+  entries.push({
+    date: sr.return_date,
+    particulars: `Return ${sr.return_no}`,
+    vch_no: sr.return_no,
+    vch_type: "Sales Return",
+    debit: total,
+    credit: 0,
+    narration: sr.reason_for_return || "",
+    items: sr.sales_return_items.map(i => ({
+      item_name: i.item_name,
+      quantity: Number(i.quantity),
+      rate: Number(i.rate),
+      discount: Number(i.discount || 0),
+      tax_percent: Number(i.tax_percent || 0),
+      tax_amount: (Number(i.quantity) * Number(i.rate) * Number(i.tax_percent)) / 100,
+      value: Number(i.amount),
+      description: i.narration || ""
+    }))
+  })
+})
 
-    // 🔁 Sales Returns (Credit: decreases balance)
-    salesReturns.forEach((r) => {
-      const total = r.grand_total.toNumber();
-      runningBalance -= total; // CHANGED: -= for credit
-      transactions.push({
-        date: r.return_date,
-        particulars: `Sales Return ${r.return_no}`,
-        vch_type: "Sales Return",
-        vch_no: r.return_no,
-        debit: 0,
-        credit: total, // CHANGED: credit
-        balance: runningBalance,
-        items: r.sales_return_items.map((i) => ({
-          item_name: i.item_name,
-          quantity: i.quantity.toNumber(),
-          rate: i.rate.toNumber(),
-          value: i.amount.toNumber(),
-        })),
-      });
-    });
+// RECEIPTS (DEBIT)
+receipts.forEach(rc => {
+  const total = Number(rc.total_amount)
+  entries.push({
+    date: rc.voucher_date,
+    particulars: "Payment / Receipt",
+    vch_no: rc.auto_receipt_no,
+    vch_type: "Receipt",
+    debit: total,
+    credit: 0,
+    narration: rc.narration || "",
+    items: []
+  })
+})
 
-    // 💳 Payments (Credit: decreases balance)
-    payments.forEach((p) => {
-      const total = p.total_amount.toNumber();
-      runningBalance -= total;
-      transactions.push({
-        date: p.voucher_date,
-        particulars: `Payment Received ${p.auto_receipt_no || ""}`,
-        vch_type: "Receipt",
-        vch_no: p.auto_receipt_no,
-        debit: 0,
-        credit: total,
-        balance: runningBalance,
-        items: [],
-      });
-    });
+// SORT TRANSACTIONS
+entries.sort((a, b) => new Date(a.date) - new Date(b.date))
 
-    // --- Sort by Date ---
-    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+// RUNNING BALANCE
+let runningBalance = 0
+const transactions = entries.map(e => {
+  const debit = Number(e.debit || 0)
+  const credit = Number(e.credit || 0)
 
-    // --- Transaction Summary ---
-    const transactionSummary = {
-      opening_balance: customer.account_balance ? 1 : 0,
-      sales: sales.length,
-      sales_return: salesReturns.length,
-      receipts: payments.length, // ADD
-      purchase_return: 0,
-      banking: 0,
-      journal: 0,
-    };
+  runningBalance = runningBalance + debit - credit
 
-    const totalTransactions = Object.values(transactionSummary).reduce((a, b) => a + b, 0);
+  return {
+    ...e,
+    balance: Math.abs(runningBalance),
+    balance_type: runningBalance >= 0 ? "Dr" : "Cr"
+  }
+})
 
-    // --- Ledger Summary ---
-    const totalSales = sales.reduce((a, b) => a + b.total.toNumber(), 0);
-    const totalReturn = salesReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
-    const totalReceipts = payments.reduce((a, b) => a + b.total_amount.toNumber(), 0); // ADD
+// TOTALS
+const totalDebit = transactions.reduce((s, t) => s + Number(t.debit || 0), 0)
+const totalCredit = transactions.reduce((s, t) => s + Number(t.credit || 0), 0)
 
-    const closingBalance = openingBalance + totalSales - totalReturn - totalReceipts;
+// CURRENT BALANCE
+const currentBalanceAmt = Math.abs(runningBalance)
+const currentBalanceType = runningBalance >= 0 ? "Dr" : "Cr"
 
-    const ledgerSummary = {
-      opening_balance: Math.abs(customer.account_balance || 0),
-      opening_balance_type: customer.balance_type || "Cr",
-      total_sales: totalSales,
-      total_returns: totalReturn,
-      total_receipts: totalReceipts, // ADD
-      balance: Math.abs(closingBalance),
-      balance_type: closingBalance >= 0 ? "Dr" : "Cr", // CHANGED condition
-    };
+// TRANSACTION SUMMARY
+const transaction_summary = {
+  opening_balance: customer.account_balance ? 1 : 0,
+  sales: invoices.length,
+  receipt: receipts.length,
+  sales_return: salesReturns.length,
+  journal: journalVouchersCount,
+  contra: contraCount,
+  adjustments: adjustmentsCount,
+  total_transactions: customer.account_balance ? 1 + invoices.length + receipts.length + salesReturns.length : invoices.length + receipts.length + salesReturns.length
+}
 
-    // --- Response ---
-    return res.status(200).json({
-      customer,
-      transactions,
-      ledger_summary: ledgerSummary,
-      transaction_summary: {
-        ...transactionSummary,
-        total_transactions: totalTransactions,
-      },
-    });
+// DESCRIPTION SUMMARY (TOP TABLE)
+const description_summary = [
+  { description: "Opening Balance", amount: Number(customer.account_balance || 0), type: customer.balance_type || "Dr" },
+  { description: "Total Debit", amount: totalDebit, type: "Dr" },
+  { description: "Total Credit", amount: totalCredit, type: "Cr" },
+  { description: "Current Balance", amount: currentBalanceAmt, type: currentBalanceType }
+]
+
+// LEDGER SUMMARY (CARD)
+const ledger_summary = {
+  total_debit: totalDebit,
+  total_credit: totalCredit,
+  outstanding_balance: { amount: currentBalanceAmt, type: currentBalanceType },
+  balance: currentBalanceAmt,
+  balance_type: currentBalanceType
+}
+
+return res.status(200).json({
+  customer,
+  transactions,
+  transaction_summary,
+  ledger_summary,
+  description_summary
+})
   } catch (error) {
     console.error("Error fetching customer ledger:", error);
-    res.status(500).json({ message: "Internal server error", error });
+    return res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };

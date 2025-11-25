@@ -30,6 +30,11 @@ import inventoryRoutes from "./src/routes/inventory.routes.js"
 import planRequestRoutes from "./src/routes/requestforplan.Routes.js"
 import posReportRoutes from "./src/routes/posReport.routes.js"
 import vatReportRoutes from "./src/routes/vatReport.routes.js"
+import ledgerReport from "./src/routes/ledgerReport.routes.js"
+import balanceSheetRoutes from "./src/routes/balncesheet.routes.js"
+import getTrialBalanceRoutes from "./src/routes/getTrialBalance.routes.js"
+import cashflowRoutes from "./src/routes/cashflow.routes.js"
+import dayBookRoutes from "./src/routes/dayBook.routes.js"
 
 const router = express.Router();
 
@@ -59,7 +64,12 @@ router.use("/", purchase);
 router.use("/sales-return", salesreturn);
 router.use("/sales-order", salesorder);
 router.use("/sales-reports", salesReport);
+router.use("/ledger-report", ledgerReport);
 router.use("/purchase-reports", purchaseReport);
+router.use("/cashflow-reports", cashflowRoutes);
+router.use("/daybook", dayBookRoutes);
+router.use("/balance-sheet", balanceSheetRoutes);
+router.use("/trial-balance", getTrialBalanceRoutes);
 router.use("/companies", company);
 router.use("/purchase-orders", purchaseOrder);
 router.use("/inventory", inventoryRoutes);

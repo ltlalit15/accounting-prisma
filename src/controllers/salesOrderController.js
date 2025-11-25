@@ -3913,29 +3913,79 @@ export const createOrUpdateSalesOrder = async (req, res) => {
 
       // SINGLE FILE: logo_url
 
+      // if (req.files.logo_url) {
+      //   const url = await uploadToCloudinary(req.files.logo_url, "sales_logo");
+      //   if (url) body.company_info.logo_url = url;
+      // }
+
       if (req.files.logo_url) {
-        const url = await uploadToCloudinary(req.files.logo_url, "sales_logo");
-        if (url) body.company_info.logo_url = url;
-      }
+  const logoFile = Array.isArray(req.files.logo_url)
+    ? req.files.logo_url[0]
+    : req.files.logo_url;
+
+  const url = await uploadToCloudinary(logoFile, "sales_logo");
+  if (url) body.company_info.logo_url = url;
+}
 
       // SINGLE FILE: signature_url
+      // if (req.files.signature_url) {
+      //   const url = await uploadToCloudinary(req.files.signature_url, "sales_signature");
+      //   if (url) body.additional_info.signature_url = url;
+      // }
       if (req.files.signature_url) {
-        const url = await uploadToCloudinary(req.files.signature_url, "sales_signature");
-        if (url) body.additional_info.signature_url = url;
-      }
+  const file = Array.isArray(req.files.signature_url)
+    ? req.files.signature_url[0]
+    : req.files.signature_url;
+
+  const url = await uploadToCloudinary(file, "sales_signature");
+  if (url) body.additional_info.signature_url = url;
+}
 
       // SINGLE FILE: photo_url
-      if (req.files.photo_url) {
-        const url = await uploadToCloudinary(req.files.photo_url, "sales_photo");
-        if (url) body.additional_info.photo_url = url;
-      }
+      // if (req.files.photo_url) {
+      //   const url = await uploadToCloudinary(req.files.photo_url, "sales_photo");
+      //   if (url) body.additional_info.photo_url = url;
+      // }
+       if (req.files.photo_url) {
+  const file = Array.isArray(req.files.photo_url)
+    ? req.files.photo_url[0]
+    : req.files.photo_url;
+
+  const url = await uploadToCloudinary(file, "sales_photo");
+  if (url) body.additional_info.photo_url = url;
+}
+      
 
       // SINGLE FILE: attachment_url
-      if (req.files.attachment_url) {
-        const url = await uploadToCloudinary(req.files.attachment_url, "sales_attachment");
-        if (url) body.additional_info.attachment_url = url;
-      }
+      // if (req.files.attachment_url) {
+      //   const url = await uploadToCloudinary(req.files.attachment_url, "sales_attachment");
+      //   if (url) body.additional_info.attachment_url = url;
+      // }
+       if (req.files.attachment_url) {
+  const file = Array.isArray(req.files.attachment_url)
+    ? req.files.attachment_url[0]
+    : req.files.attachment_url;
+
+  const url = await uploadToCloudinary(file, "sales_attachment");
+  if (url) body.additional_info.attachment_url = url;
+}
     }
+
+   
+    //Safe helper to preserve existing values
+      const safeMerge = (oldObj = {}, newObj = {}) => {
+  const merged = { ...oldObj };
+  for (const key in newObj) {
+    if (
+      newObj[key] !== undefined &&
+      newObj[key] !== null &&
+      newObj[key] !== ""
+    ) {
+      merged[key] = newObj[key];
+    }
+  }
+  return merged;
+};
 
 
 
@@ -4062,19 +4112,19 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       notes: steps.quotation.notes,
       customer_ref: steps.quotation.customer_ref,
 
-      SO_no: steps.sales_order.SO_no || "",
-      Manual_SO_ref: steps.sales_order.manual_ref_no || "",
-      manual_quo_no: steps.sales_order.manual_quo_no || "",
+      SO_no: steps.sales_order.SO_no ,
+      Manual_SO_ref: steps.sales_order.manual_ref_no ,
+      manual_quo_no: steps.sales_order.manual_quo_no ,
       sales_order_status: steps.sales_order.status,
 
-      Challan_no: steps.delivery_challan.challan_no || "",
-      Manual_challan_no: steps.delivery_challan.manual_challan_no || "",
+      Challan_no: steps.delivery_challan.challan_no ,
+      Manual_challan_no: steps.delivery_challan.manual_challan_no ,
       delivery_challan_status: steps.delivery_challan.status,
       driver_name: steps.delivery_challan.driver_name,
       driver_phone: steps.delivery_challan.driver_phone,
 
-      invoice_no: steps.invoice.invoice_no || "",
-      Manual_invoice_no: steps.invoice.manual_invoice_no || "",
+      invoice_no: steps.invoice.invoice_no ,
+      Manual_invoice_no: steps.invoice.manual_invoice_no ,
       invoice_date: steps.invoice.invoice_date
         ? new Date(steps.invoice.invoice_date)
         : null,
@@ -4127,14 +4177,25 @@ balance: steps.payment.balance !== undefined
         });
       }
 
+      
+
+
+      // savedOrder = await prisma.salesorder.update({
+      //   where: { id: orderId },
+      //   data: {
+      //     ...dbData,
+      //     ...(body.items && { salesorderitems: { create: itemsData } }),
+      //   },
+      //   include: { salesorderitems: true },
+      // });
       savedOrder = await prisma.salesorder.update({
-        where: { id: orderId },
-        data: {
-          ...dbData,
-          ...(body.items && { salesorderitems: { create: itemsData } }),
-        },
-        include: { salesorderitems: true },
-      });
+  where: { id: orderId },
+  data: {
+    ...safeMerge(existingOrder, dbData),
+    ...(body.items && { salesorderitems: { create: itemsData } }),
+  },
+  include: { salesorderitems: true },
+});
     } else {
       savedOrder = await prisma.salesorder.create({
         data: {
@@ -4535,7 +4596,11 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 
     const salesOrders = await prisma.salesorder.findMany({
       where: { company_id: Number(companyId) },
-      include: { salesorderitems: true },
+      include: { salesorderitems: {
+        include: {
+      warehouse: true
+    }
+      } },
       orderBy: { created_at: "desc" },
     });
     const formattedOrders = salesOrders.map(order => {
@@ -4706,6 +4771,139 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 // };
 
 
+// export const getSalesOrderById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Sales Order ID is required",
+//       });
+//     }
+
+//     const order = await prisma.salesorder.findUnique({
+//       where: { id: Number(id) },
+//       include: { salesorderitems: true },
+//     });
+
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Sales Order not found",
+//       });
+//     }
+
+//     const formattedOrder = {
+//       company_info: {
+//         company_id: order.company_id,
+//         company_name: order.company_name,
+//         company_address: order.company_address,
+//         company_email: order.company_email,
+//         company_phone: order.company_phone,
+//         logo_url: order.logo_url,
+//         bank_name: order.bank_name,
+//         account_no: order.account_no,
+//         account_holder: order.account_holder,
+//         ifsc_code: order.ifsc_code,
+//         terms: order.terms,
+//         id: order.id,
+//         created_at: order.created_at,
+//         updated_at: order.updated_at
+//       },
+
+//       shipping_details: {
+//         bill_to_name: order.bill_to_company_name,
+//         bill_to_address: order.bill_to_company_address,
+//         bill_to_email: order.bill_to_company_email,
+//         bill_to_phone: order.bill_to_company_phone,
+//         bill_to_attention_name: order.bill_to_attention_name,
+
+//         ship_to_name: order.ship_to_company_name,
+//         ship_to_address: order.ship_to_company_address,
+//         ship_to_email: order.ship_to_company_email,
+//         ship_to_phone: order.ship_to_company_phone,
+//         ship_to_attention_name: order.ship_to_attention_name
+//       },
+
+//       steps: {
+//         quotation: {
+//           status: order.quotation_status,
+//           quotation_no: order.quotation_no,
+//           manual_quo_no: order.manual_quo_no,
+//           quotation_date: order.quotation_date,
+//           valid_till: order.valid_till,
+//           qoutation_to_customer_name: order.qoutation_to_customer_name,
+//           qoutation_to_customer_address: order.qoutation_to_customer_address,
+//           qoutation_to_customer_email: order.qoutation_to_customer_email,
+//           qoutation_to_customer_phone: order.qoutation_to_customer_phone,
+//           notes: order.notes,
+//           customer_ref: order.customer_ref
+//         },
+
+//         sales_order: {
+//           status: order.sales_order_status,
+//           SO_no: order.SO_no,
+//           manual_ref_no: order.Manual_SO_ref,
+//           manual_quo_no: order.manual_quo_no
+//         },
+
+//         delivery_challan: {
+//           status: order.delivery_challan_status,
+//           challan_no: order.Challan_no,
+//           manual_challan_no: order.Manual_challan_no,
+//           driver_name: order.driver_name,
+//           driver_phone: order.driver_phone
+//         },
+
+//         invoice: {
+//           status: order.invoice_status,
+//           invoice_no: order.invoice_no,
+//           manual_invoice_no: order.Manual_invoice_no,
+//           invoice_date: order.invoice_date,
+//           due_date: order.due_date
+//         },
+
+//         payment: {
+//           status: order.payment_status,
+//           payment_no: order.Payment_no,
+//           manual_payment_no: order.Manual_payment_no,
+//           payment_date: order.payment_date,
+//           amount_received: order.amount_received,
+//            balance:order.balance,
+//             total_invoice: order.total_invoice,
+//           payment_note: order.payment_note
+//         }
+//       },
+
+//       items: order.salesorderitems,
+
+//       additional_info: {
+//         files: order.files || [],
+//         signature_url: order.signature_url,
+//         photo_url: order.photo_url,
+//         attachment_url: order.attachment_url
+//       },
+
+//       sub_total: order.subtotal,
+//       total: order.total
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `Sales Order with ID ${id} fetched successfully`,
+//       data: formattedOrder
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({
+//       success: false,
+//       message: "Something went wrong while fetching the sales order",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const getSalesOrderById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -4717,9 +4915,14 @@ export const getSalesOrderById = async (req, res) => {
       });
     }
 
+    // Fetch only 1 sales order
     const order = await prisma.salesorder.findUnique({
       where: { id: Number(id) },
-      include: { salesorderitems: true },
+      include: { salesorderitems: {
+        include: {
+      warehouse: true
+    }
+      } },
     });
 
     if (!order) {
@@ -4728,6 +4931,9 @@ export const getSalesOrderById = async (req, res) => {
         message: "Sales Order not found",
       });
     }
+
+    // same logic used in getSalesOrdersByCompanyId
+    const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
 
     const formattedOrder = {
       company_info: {
@@ -4763,7 +4969,7 @@ export const getSalesOrderById = async (req, res) => {
 
       steps: {
         quotation: {
-          status: order.quotation_status,
+          status: stepStatus(order.quotation_no),
           quotation_no: order.quotation_no,
           manual_quo_no: order.manual_quo_no,
           quotation_date: order.quotation_date,
@@ -4777,14 +4983,13 @@ export const getSalesOrderById = async (req, res) => {
         },
 
         sales_order: {
-          status: order.sales_order_status,
+          status: stepStatus(order.Manual_SO_ref),
           SO_no: order.SO_no,
           manual_ref_no: order.Manual_SO_ref,
-          manual_quo_no: order.manual_quo_no
         },
 
         delivery_challan: {
-          status: order.delivery_challan_status,
+          status: stepStatus(order.Manual_challan_no),
           challan_no: order.Challan_no,
           manual_challan_no: order.Manual_challan_no,
           driver_name: order.driver_name,
@@ -4792,7 +4997,7 @@ export const getSalesOrderById = async (req, res) => {
         },
 
         invoice: {
-          status: order.invoice_status,
+          status: stepStatus(order.Manual_invoice_no),
           invoice_no: order.invoice_no,
           manual_invoice_no: order.Manual_invoice_no,
           invoice_date: order.invoice_date,
@@ -4800,13 +5005,13 @@ export const getSalesOrderById = async (req, res) => {
         },
 
         payment: {
-          status: order.payment_status,
-          payment_no: order.Payment_no,
+          status: stepStatus(order.Manual_payment_no),
+          Payment_no: order.Payment_no,
           manual_payment_no: order.Manual_payment_no,
           payment_date: order.payment_date,
           amount_received: order.amount_received,
-           balance:order.balance,
-            total_invoice: order.total_invoice,
+          balance: order.balance,
+          total_invoice: order.total_invoice,
           payment_note: order.payment_note
         }
       },

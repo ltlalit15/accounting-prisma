@@ -44,7 +44,7 @@ router.post("/create-sales-return", createSalesReturn);
 router.get("/get-returns", getAllSalesReturns);
 
 // Get Sales Return by ID (GET) - supports both path parameter and query parameter
-router.get("/get-particular/:id", getSalesReturnById);
+router.get("/get- /:id", getSalesReturnById);
 router.get("/get-particular", getSalesReturnById); // For query parameter format: ?id=1
 
 // Update Sales Return (PUT)
