@@ -1515,3 +1515,166 @@ export const getInventoryItemDetails = async (req, res) => {
     });
   }
 };
+
+
+export const getInventoryDetails = async (req, res) => {
+ try {
+    const { company_id, product_id } = req.params;
+
+    // 1️⃣ Product Details
+    const product = await prisma.products.findFirst({
+      where: { id: Number(product_id), company_id: Number(company_id) },
+      include: {
+        item_category: true,
+        unit_detail: true,
+        product_warehouses: {
+          include: { warehouse: true }
+        }
+      }
+    });
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    // 2️⃣ All Transactions (Merged Across All Modules)
+    let allTransactions = [];
+
+    // PURCHASE
+    const purchase = await prisma.voucher_items.findMany({
+      where: { item_name: product.item_name, vouchers: { company_id: Number(company_id), voucher_type: "Purchase" } },
+      include: { vouchers: true }
+    });
+
+    purchase.forEach(p => {
+      allTransactions.push({
+        date: p.vouchers.date,
+        vch_type: p.vouchers.voucher_type,
+        particulars: p.vouchers.from_name || "", // vendor name stored in vouchers
+        vch_no: p.vouchers.voucher_number,
+        auto_voucher_no: p.vouchers.manual_voucher_no || p.vouchers.voucher_number,
+        rate: p.rate,
+        inwards_qty: p.quantity,
+        inwards_value: p.amount,
+        outwards_qty: 0,
+        outwards_value: 0,
+        description: p.description,
+        narration: p.vouchers.notes
+      });
+    });
+
+    // SALES
+    const sales = await prisma.pos_invoice_products.findMany({
+      where: { product_id: Number(product_id), invoice: { company_id: Number(company_id) } },
+      include: { invoice: { include: { customer: true } } }
+    });
+
+    sales.forEach(s => {
+      allTransactions.push({
+        date: s.invoice.created_at,
+        vch_type: "Sales Invoice",
+        particulars: s.invoice.customer?.name_english || "",
+        vch_no: s.invoice.id,
+        auto_voucher_no: s.invoice.id,
+        rate: s.price,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: s.quantity,
+        outwards_value: (Number(s.quantity) * Number(s.price)),
+        description: "",
+        narration: ""
+      });
+    });
+
+    // PURCHASE RETURN
+    const purchaseReturn = await prisma.purchase_return_items.findMany({
+      where: { product_id: Number(product_id), purchase_return: { company_id: Number(company_id) } },
+      include: { purchase_return: true }
+    });
+
+    purchaseReturn.forEach(r => {
+      allTransactions.push({
+        date: r.purchase_return.return_date,
+        vch_type: r.purchase_return.return_type,
+        particulars: r.purchase_return.vendor_name || "",
+        vch_no: r.purchase_return.return_no,
+        auto_voucher_no: r.purchase_return.auto_voucher_no,
+        rate: r.rate,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: r.quantity,
+        outwards_value: r.amount,
+        description: r.narration,
+        narration: r.purchase_return.notes
+      });
+    });
+
+    // SALES RETURN
+    const salesReturn = await prisma.sales_return_items.findMany({
+      where: { product_id: Number(product_id), sales_return: { company_id: Number(company_id) } },
+      include: { sales_return: true }
+    });
+
+    salesReturn.forEach(r => {
+      allTransactions.push({
+        date: r.sales_return.return_date,
+        vch_type: r.sales_return.return_type,
+        particulars: r.sales_return.customer_id ? r.sales_return.customer_id : "",
+        vch_no: r.sales_return.return_no,
+        auto_voucher_no: r.sales_return.auto_voucher_no,
+        rate: r.rate,
+        inwards_qty: r.quantity,
+        inwards_value: r.amount,
+        outwards_qty: 0,
+        outwards_value: 0,
+        description: r.narration,
+        narration: r.sales_return.notes
+      });
+    });
+
+    // DELIVERY CHALLAN (sales order)
+    const deliveryChallan = await prisma.salesorderitems.findMany({
+      where: { item_name: product.item_name, salesorder: { company_id: Number(company_id) } },
+      include: { salesorder: true }
+    });
+
+    deliveryChallan.forEach(dc => {
+      allTransactions.push({
+        date: dc.salesorder.quotation_date,
+        vch_type: "Delivery Challan",
+        particulars: dc.salesorder.bill_to_customer_name || dc.salesorder.bill_to_company_name || "",
+        vch_no: dc.salesorder.Challan_no,
+        auto_voucher_no: dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
+        rate: dc.rate,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: dc.qty,
+        outwards_value: Number(dc.qty) * Number(dc.rate),
+        description: "",
+        narration: dc.salesorder.notes
+      });
+    });
+
+    // Sort by date
+    allTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // 3️⃣ Separate sections for Purchase / Sales / Return History
+    const purchase_history = purchase;
+    const sales_history = sales;
+    const return_history = [...purchaseReturn, ...salesReturn];
+
+    return res.status(200).json({
+      success: true,
+      product_info: product,
+      all_transactions: allTransactions,
+      purchase_history,
+      sales_history,
+      return_history
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error", error });
+  }
+};
+

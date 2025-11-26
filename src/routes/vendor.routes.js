@@ -10,7 +10,7 @@ import {
   getVendorLedger,
   getCustomerLedger,
 } from "../controllers/vendor.controller.js";
-import { upload } from "../config/multer.js";
+//import { upload } from "../config/multer.js";
 // import {
 //   createVendor,
 //   updateVendor,
@@ -29,17 +29,17 @@ const router = Router();
 // router.put("/:id", updateVendor);
 // router.delete("/:id", deleteVendor);
 
-const uploadFields = upload.fields([
-  { name: "id_card_image", maxCount: 1 },
-  { name: "any_file", maxCount: 1 },
-]);
+// const uploadFields = upload.fields([
+//   { name: "id_card_image", maxCount: 1 },
+//   { name: "any_file", maxCount: 1 },
+// ]);
 
-router.post("/", uploadFields, createVendor);
+router.post("/", createVendor);
 router.get("/", getAllVendors);
 router.get("/company/:company_id", getVendorsByCompanyId);
 router.get("/:id", getVendorById);
 router.get("/vendor-ledger/:vendor_id/:company_id", getVendorLedger);
-router.put("/:id", uploadFields, updateVendor);
+router.put("/:id", updateVendor);
 router.delete("/:id", deleteVendor);
 
 router.get("/customer-ledger/:customer_id/:company_id", getCustomerLedger);

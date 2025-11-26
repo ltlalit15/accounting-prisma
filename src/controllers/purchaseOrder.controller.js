@@ -1987,6 +1987,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
     });
 
     const formatted = orders.map(order => {
+      const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
       return {
         company_info: {
           company_id: order.company_id,
@@ -2029,7 +2030,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
         steps: [
           {
             step: "quotation",
-            status: order.quotation_status,
+            status: stepStatus(order.manual_quo_no),
             data: {
               quotation_from_vendor_name: order.quotation_from_vendor_name,
               quotation_from_vendor_address: order.quotation_from_vendor_address,
@@ -2045,7 +2046,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
 
           {
             step: "purchase_order",
-            status: order.purchase_order_status,
+            status: stepStatus(order.Manual_PO_ref),
             data: {
               PO_no: order.PO_no,
               Manual_PO_ref: order.Manual_PO_ref
@@ -2054,7 +2055,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
 
           {
             step: "goods_receipt",
-            status: order.goods_receipt_status,
+            status: stepStatus(order.Manual_GR_no),
             data: {
               GR_no: order.GR_no,
               Manual_GR_no: order.Manual_GR_no
@@ -2063,7 +2064,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
 
           {
             step: "bill",
-            status: order.bill_status,
+            status: stepStatus(order.Manual_Bill_no),
             data: {
               Bill_no: order.Bill_no,
               Manual_Bill_no: order.Manual_Bill_no,
@@ -2075,7 +2076,7 @@ export const getPurchaseOrdersByCompanyId = async (req, res) => {
 
           {
             step: "payment",
-            status: order.payment_status,
+            status: stepStatus(order.Manual_payment_no),
             data: {
               Payment_no: order.Payment_no,
               Manual_payment_no: order.Manual_payment_no,
@@ -2253,6 +2254,8 @@ export const getPurchaseOrderById = async (req, res) => {
       });
     }
 
+    const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
+
     const formatted = {
       company_info: {
         company_id: order.company_id,
@@ -2295,7 +2298,7 @@ export const getPurchaseOrderById = async (req, res) => {
       steps: [
         {
           step: "quotation",
-          status: order.quotation_status,
+          status: stepStatus(order.manual_quo_no),
           data: {
             quotation_from_vendor_name: order.quotation_from_vendor_name,
             quotation_from_vendor_address: order.quotation_from_vendor_address,
@@ -2311,7 +2314,7 @@ export const getPurchaseOrderById = async (req, res) => {
 
         {
           step: "purchase_order",
-          status: order.purchase_order_status,
+          status:stepStatus(order.Manual_PO_ref),
           data: {
             PO_no: order.PO_no,
             Manual_PO_ref: order.Manual_PO_ref
@@ -2320,7 +2323,7 @@ export const getPurchaseOrderById = async (req, res) => {
 
         {
           step: "goods_receipt",
-          status: order.goods_receipt_status,
+          status: stepStatus(order.Manual_GR_no),
           data: {
             GR_no: order.GR_no,
             Manual_GR_no: order.Manual_GR_no
@@ -2329,7 +2332,7 @@ export const getPurchaseOrderById = async (req, res) => {
 
         {
           step: "bill",
-          status: order.bill_status,
+          status: stepStatus(order.Manual_Bill_no),
           data: {
             Bill_no: order.Bill_no,
             Manual_Bill_no: order.Manual_Bill_no,
@@ -2341,7 +2344,7 @@ export const getPurchaseOrderById = async (req, res) => {
 
         {
           step: "payment",
-          status: order.payment_status,
+          status: stepStatus(order.Manual_payment_no),
           data: {
             Payment_no: order.Payment_no,
             Manual_payment_no: order.Manual_payment_no,

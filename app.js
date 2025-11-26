@@ -35,6 +35,9 @@ import balanceSheetRoutes from "./src/routes/balncesheet.routes.js"
 import getTrialBalanceRoutes from "./src/routes/getTrialBalance.routes.js"
 import cashflowRoutes from "./src/routes/cashflow.routes.js"
 import dayBookRoutes from "./src/routes/dayBook.routes.js"
+import taxReportRoutes from "./src/routes/taxReport.routes.js"
+import getDashboardRoutes from "./src/routes/dashboard.routes.js"
+
 
 const router = express.Router();
 
@@ -67,6 +70,8 @@ router.use("/sales-reports", salesReport);
 router.use("/ledger-report", ledgerReport);
 router.use("/purchase-reports", purchaseReport);
 router.use("/cashflow-reports", cashflowRoutes);
+router.use("/tax-report",taxReportRoutes);
+router.use("/dashboard",getDashboardRoutes);
 router.use("/daybook", dayBookRoutes);
 router.use("/balance-sheet", balanceSheetRoutes);
 router.use("/trial-balance", getTrialBalanceRoutes);

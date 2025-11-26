@@ -1,5 +1,5 @@
 import express from "express";
-import { createAccount, createParentAccount, createSubOfSubgroup, deleteAccount, deleteSubOfSubgroup, getAccountsByCompanyId, getAllAccounts, getParentAccountsByCompanyId, getSubOfSubgroupsBySubgroupId, updateAccount } from "../controllers/account.controller.js";
+import { createAccount, createParentAccount, createSubOfSubgroup, deleteAccount, deleteSubOfSubgroup, getAccountsByCompanyId, getAllAccounts, getLedger, getParentAccountsByCompanyId, getSubOfSubgroupsBySubgroupId, updateAccount } from "../controllers/account.controller.js";
 
 
 const router = express.Router();
@@ -20,4 +20,5 @@ router.get("/", getAllAccounts);
 router.get("/company/:company_id", getAccountsByCompanyId);
 router.put("/:id", updateAccount);
 router.delete("/:id", deleteAccount);
+router.get("/ledger/:company_id/:account_id",getLedger)
 export default router;

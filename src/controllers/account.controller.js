@@ -371,3 +371,475 @@ export const deleteAccount = async (req, res) => {
     });
   }
 };
+
+// export const getLedger = async (req, res) => {
+//   try {
+//     const account_id = Number(req.params.account_id);
+//     const company_id = Number(req.params.company_id);
+
+//     if (!account_id || !company_id) {
+//       return res.status(400).json({ success: false, message: "company_id & account_id required" });
+//     }
+
+//     // Opening Balance (initial)
+//     const accountInfo = await prisma.accounts.findFirst({
+//       where: { id: account_id, company_id },
+//       select: { accountBalance: true }
+//     });
+
+//     let rows = [];
+
+//     // ---------- 1) VOUCHERS ----------
+//     const vouchers = await prisma.vouchers.findMany({
+//       where: {
+//         company_id,
+//         OR: [{ from_account: account_id }, { to_account: account_id }]
+//       }
+//     });
+
+//     vouchers.forEach(v => {
+//       const isDebit = v.from_account === account_id;
+//       rows.push({
+//         date: v.date,
+//         particulars: v.voucher_type,
+//         vch_no: v.voucher_number,
+//         ref_no: v.manual_voucher_no,
+//         vch_type: v.voucher_type,
+//         debit: isDebit ? Number(v.transfer_amount) : 0,
+//         credit: isDebit ? 0 : Number(v.transfer_amount)
+//       });
+//     });
+
+//     // ---------- 2) CONTRA ----------
+//     const contra = await prisma.contra_vouchers.findMany({
+//       where: {
+//         company_id,
+//         OR: [{ account_from_id: account_id }, { account_to_id: account_id }]
+//       }
+//     });
+
+//     contra.forEach(c => {
+//       const isDebit = c.account_from_id === account_id;
+//       rows.push({
+//         date: c.voucher_date,
+//         particulars: "Contra Entry",
+//         vch_no: c.voucher_number,
+//         ref_no: c.voucher_no_auto,
+//         vch_type: "Contra",
+//         debit: isDebit ? Number(c.amount) : 0,
+//         credit: isDebit ? 0 : Number(c.amount)
+//       });
+//     });
+
+//     // ---------- 3) INCOME ----------
+//     const income = await prisma.income_voucher_entries.findMany({
+//       where: {
+//         income_vouchers: { company_id },
+//         income_account: String(account_id)
+//       },
+//       include: { income_vouchers: true }
+//     });
+
+//     income.forEach(i => {
+//       rows.push({
+//         date: i.income_vouchers.voucher_date,
+//         particulars: "Income",
+//         vch_no: i.income_vouchers.auto_receipt_no,
+//         ref_no: i.income_vouchers.manual_receipt_no,
+//         vch_type: "Income",
+//         debit: 0,
+//         credit: Number(i.amount)
+//       });
+//     });
+
+//     // ---------- 4) EXPENSE ----------
+//     const expense = await prisma.expensevouchers.findMany({
+//       where: { company_id, paid_from_account_id: account_id }
+//     });
+
+//     expense.forEach(e => {
+//       rows.push({
+//         date: e.voucher_date,
+//         particulars: "Expense",
+//         vch_no: e.auto_receipt_no,
+//         ref_no: e.manual_receipt_no,
+//         vch_type: "Expense",
+//         debit: Number(e.total_amount),
+//         credit: 0
+//       });
+//     });
+
+//     // ---------- 5) POS INVOICES (cash/bank sales) ----------
+//     const posInvoices = await prisma.pos_invoices.findMany({
+//       where: { company_id }
+//     });
+
+//     posInvoices.forEach(p => {
+//       if (p.payment_status === "Paid") {
+//         rows.push({
+//           date: p.created_at,
+//           particulars: "POS Invoice",
+//           vch_no: `POS-${p.id}`,
+//           ref_no: null,
+//           vch_type: "POS",
+//           debit: 0,
+//           credit: Number(p.total)
+//         });
+//       }
+//     });
+
+//     // ---------- 6) SALES RETURN ----------
+//     const salesReturn = await prisma.sales_return.findMany({
+//       where: { company_id }
+//     });
+
+//     salesReturn.forEach(s => {
+//       rows.push({
+//         date: s.return_date,
+//         particulars: "Sales Return",
+//         vch_no: s.return_no,
+//         ref_no: s.auto_voucher_no,
+//         vch_type: "Sales Return",
+//         debit: Number(s.grand_total),
+//         credit: 0
+//       });
+//     });
+
+//     // ---------- 7) PURCHASE ORDER ----------
+//     const purchaseOrders = await prisma.purchaseorder.findMany({
+//       where: { company_id }
+//     });
+
+//     purchaseOrders.forEach(p => {
+//       rows.push({
+//         date: p.created_at,
+//         particulars: "Purchase Order",
+//         vch_no: p.PO_no,
+//         ref_no: p.Manual_PO_ref,
+//         vch_type: "Purchase Order",
+//         debit: 0,
+//         credit: Number(p.total)
+//       });
+//     });
+
+//     // ---------- 8) PURCHASE RETURN ----------
+//     const purchaseReturn = await prisma.purchase_return.findMany({
+//       where: { company_id }
+//     });
+
+//     purchaseReturn.forEach(p => {
+//       rows.push({
+//         date: p.return_date,
+//         particulars: "Purchase Return",
+//         vch_no: p.return_no,
+//         ref_no: p.auto_voucher_no,
+//         vch_type: "Purchase Return",
+//         debit: Number(p.grand_total),
+//         credit: 0
+//       });
+//     });
+
+//     // ---------- 9) ADJUSTMENTS ----------
+//     const adjustments = await prisma.adjustments.findMany({
+//       where: { company_id }
+//     });
+
+//     adjustments.forEach(a => {
+//       rows.push({
+//         date: a.voucher_date,
+//         particulars: "Stock Adjustment",
+//         vch_no: a.voucher_no,
+//         ref_no: a.manual_voucher_no,
+//         vch_type: "Adjustment",
+//         debit: Number(a.total_value),
+//         credit: 0
+//       });
+//     });
+
+//     // ---------- 10) JOURNAL (transactions table) ----------
+//     const journal = await prisma.transactions.findMany({ where: { company_id } });
+
+//     journal.forEach(j => {
+//       if (Number(j.from_id) === account_id) {
+//         rows.push({
+//           date: j.date,
+//           particulars: j.note,
+//           vch_no: j.voucher_no,
+//           ref_no: j.transaction_id,
+//           vch_type: j.voucher_type,
+//           debit: Number(j.amount),
+//           credit: 0
+//         });
+//       }
+//       if (Number(j.balance_type) === account_id) {
+//         rows.push({
+//           date: j.date,
+//           particulars: j.note,
+//           vch_no: j.voucher_no,
+//           ref_no: j.transaction_id,
+//           vch_type: j.voucher_type,
+//           debit: 0,
+//           credit: Number(j.amount)
+//         });
+//       }
+//     });
+
+//     // Sort by date
+//     rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+//     // Running Balance
+//     let running = Number(accountInfo?.accountBalance || 0);
+//     rows = rows.map(r => {
+//       running = running + r.credit - r.debit;
+//       return { ...r, running_balance: running.toFixed(2) };
+//     });
+
+//     return res.json({
+//       success: true,
+//       opening_balance: Number(accountInfo?.accountBalance || 0),
+//       closing_balance: running.toFixed(2),
+//       ledger: rows
+//     });
+
+//   } catch (err) {
+//     console.log(err);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
+
+export const getLedger = async (req, res) => {
+  try {
+    const account_id = Number(req.params.account_id);
+    const company_id = Number(req.params.company_id);
+
+    if (!account_id || !company_id) {
+      return res.status(400).json({ success: false, message: "company_id & account_id required" });
+    }
+
+    // Opening Balance
+    const accountInfo = await prisma.accounts.findFirst({
+      where: { id: account_id, company_id },
+      select: { accountBalance: true }
+    });
+
+    let rows = [];
+
+    // --------- 1) VOUCHERS ----------
+    const vouchers = await prisma.vouchers.findMany({
+      where: {
+        company_id,
+        OR: [{ from_account: account_id }, { to_account: account_id }]
+      }
+    });
+
+    vouchers.forEach(v => {
+      const isDebit = v.from_account === account_id;
+      rows.push({
+        date: v.date,
+        particulars: v.voucher_type,
+        vch_no: v.voucher_number,
+        ref_no: v.manual_voucher_no,
+        vch_type: v.voucher_type,
+        debit: isDebit ? Number(v.transfer_amount) : 0,
+        credit: isDebit ? 0 : Number(v.transfer_amount)
+      });
+    });
+
+    // --------- 2) CONTRA ----------
+    const contra = await prisma.contra_vouchers.findMany({
+      where: {
+        company_id,
+        OR: [{ account_from_id: account_id }, { account_to_id: account_id }]
+      }
+    });
+
+    contra.forEach(c => {
+      const isDebit = c.account_from_id === account_id;
+      rows.push({
+        date: c.voucher_date,
+        particulars: "Contra",
+        vch_no: c.voucher_number,
+        ref_no: c.voucher_no_auto,
+        vch_type: "Contra",
+        debit: isDebit ? Number(c.amount) : 0,
+        credit: isDebit ? 0 : Number(c.amount)
+      });
+    });
+
+    // --------- 3) INCOME ----------
+    const income = await prisma.income_voucher_entries.findMany({
+      where: {
+        income_vouchers: { company_id },
+        income_account: String(account_id)
+      },
+      include: { income_vouchers: true }
+    });
+
+    income.forEach(i => {
+      rows.push({
+        date: i.income_vouchers.voucher_date,
+        particulars: "Income",
+        vch_no: i.income_vouchers.auto_receipt_no,
+        ref_no: i.income_vouchers.manual_receipt_no,
+        vch_type: "Income",
+        debit: 0,
+        credit: Number(i.amount)
+      });
+    });
+
+    // --------- 4) EXPENSE ----------
+    const expense = await prisma.expensevouchers.findMany({
+      where: {
+        company_id,
+        paid_from_account_id: account_id
+      }
+    });
+
+    expense.forEach(e => {
+      rows.push({
+        date: e.voucher_date,
+        particulars: "Expense",
+        vch_no: e.auto_receipt_no,
+        ref_no: e.manual_receipt_no,
+        vch_type: "Expense",
+        debit: Number(e.total_amount),
+        credit: 0
+      });
+    });
+
+    // --------- 5) POS INVOICES ----------
+    const posInvoices = await prisma.pos_invoices.findMany({ where: { company_id } });
+
+    posInvoices.forEach(p => {
+      if (p.payment_status === "Paid") {
+        rows.push({
+          date: p.created_at,
+          particulars: "POS Invoice",
+          vch_no: `POS-${p.id}`,
+          ref_no: null,
+          vch_type: "POS",
+          debit: 0,
+          credit: Number(p.total)
+        });
+      }
+    });
+
+    // --------- 6) SALES RETURN ----------
+    const salesReturn = await prisma.sales_return.findMany({ where: { company_id } });
+
+    salesReturn.forEach(s => {
+      rows.push({
+        date: s.return_date,
+        particulars: "Sales Return",
+        vch_no: s.return_no,
+        ref_no: s.auto_voucher_no,
+        vch_type: "Sales Return",
+        debit: Number(s.grand_total),
+        credit: 0
+      });
+    });
+
+    // --------- 7) PURCHASE ORDER ----------
+    const purchaseOrders = await prisma.purchaseorder.findMany({ where: { company_id } });
+
+    purchaseOrders.forEach(p => {
+      rows.push({
+        date: p.created_at,
+        particulars: "Purchase Order",
+        vch_no: p.PO_no,
+        ref_no: p.Manual_PO_ref,
+        vch_type: "Purchase Order",
+        debit: 0,
+        credit: Number(p.total)
+      });
+    });
+
+    // --------- 8) PURCHASE RETURN ----------
+    const purchaseReturn = await prisma.purchase_return.findMany({ where: { company_id } });
+
+    purchaseReturn.forEach(p => {
+      rows.push({
+        date: p.return_date,
+        particulars: "Purchase Return",
+        vch_no: p.return_no,
+        ref_no: p.auto_voucher_no,
+        vch_type: "Purchase Return",
+        debit: Number(p.grand_total),
+        credit: 0
+      });
+    });
+
+    // --------- 9) ADJUSTMENTS ----------
+    const adjustments = await prisma.adjustments.findMany({ where: { company_id } });
+
+    adjustments.forEach(a => {
+      rows.push({
+        date: a.voucher_date,
+        particulars: "Stock Adjustment",
+        vch_no: a.voucher_no,
+        ref_no: a.manual_voucher_no,
+        vch_type: "Adjustment",
+        debit: Number(a.total_value),
+        credit: 0
+      });
+    });
+
+    // --------- 10) JOURNAL ----------
+    const journal = await prisma.transactions.findMany({ where: { company_id } });
+
+    journal.forEach(j => {
+      if (Number(j.from_id) === account_id) {
+        rows.push({
+          date: j.date,
+          particulars: j.note,
+          vch_no: j.voucher_no,
+          ref_no: j.transaction_id,
+          vch_type: j.voucher_type,
+          debit: Number(j.amount),
+          credit: 0
+        });
+      }
+      if (Number(j.balance_type) === account_id) {
+        rows.push({
+          date: j.date,
+          particulars: j.note,
+          vch_no: j.voucher_no,
+          ref_no: j.transaction_id,
+          vch_type: j.voucher_type,
+          debit: 0,
+          credit: Number(j.amount)
+        });
+      }
+    });
+
+    // Sort by date
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Running Balance
+    let running = Number(accountInfo?.accountBalance || 0);
+    rows = rows.map(r => {
+      running = running + r.credit - r.debit;
+      return { ...r, running_balance: running.toFixed(2) };
+    });
+
+    return res.json({
+      success: true,
+      opening_balance: Number(accountInfo?.accountBalance || 0),
+      closing_balance: running.toFixed(2),
+      ledger: rows
+    });
+
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/*
+Opening Balance         +12000
+Total Debit             -118865.10
+Total Credit            +15731
+---------------------------------
+Closing Balance        = -91134.10
+*/

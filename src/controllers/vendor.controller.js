@@ -4,6 +4,107 @@ import {
 } from "../config/cloudinary.js";
 import prisma from "../config/db.js";
 
+// export const createVendor = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       name_english,
+//       name_arabic,
+//       company_name,
+//       google_location,
+//       account_type,
+//       balance_type,
+//       account_name,
+//       account_balance,
+//       creation_date,
+//       bank_account_number,
+//       bank_ifsc,
+//       bank_name_branch,
+//       country,
+//       state,
+//       pincode,
+//       address,
+//       state_code,
+//       shipping_address,
+//       phone,
+//       email,
+//       credit_period_days,
+//       enable_gst,
+//       gstIn,
+//       type,
+//     } = req.body;
+
+//     if (!company_id || !name_english || !type) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_id and name_english are required",
+//       });
+//     }
+
+//     // 📤 Upload files to Cloudinary
+//     let idCardImageUrl = null;
+//     let anyFileUrl = null;
+
+//     if (req.files?.id_card_image?.[0]) {
+//       idCardImageUrl = await uploadToCloudinary(
+//         req.files.id_card_image[0].buffer,
+//         "vendorsCustomer/id_cards"
+//       );
+//     }
+
+//     if (req.files?.any_file?.[0]) {
+//       anyFileUrl = await uploadToCloudinary(
+//         req.files.any_file[0].buffer,
+//         "vendorsCustomer/files"
+//       );
+//     }
+
+//     // ✅ Save Vendor
+//     const vendor = await prisma.vendorscustomer.create({
+//       data: {
+//         company_id: parseInt(company_id),
+//         name_english,
+//         name_arabic,
+//         company_name,
+//         google_location,
+//         id_card_image: idCardImageUrl,
+//         any_file: anyFileUrl,
+//         account_type,
+//         balance_type,
+//         account_name,
+//         account_balance: account_balance ? parseFloat(account_balance) : 0.0,
+//         creation_date: creation_date ? new Date(creation_date) : undefined,
+//         bank_account_number,
+//         bank_ifsc,
+//         bank_name_branch,
+//         country,
+//         state,
+//         pincode,
+//         address,
+//         state_code,
+//         shipping_address,
+//         phone,
+//         email,
+//         type,
+//         credit_period_days: credit_period_days
+//           ? parseInt(credit_period_days)
+//           : 0,
+//         enable_gst: enable_gst === true || enable_gst === "true",
+//         gstIn,
+//       },
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Vendor created successfully",
+//       data: vendor,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error creating vendor:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const createVendor = async (req, res) => {
   try {
     const {
@@ -41,25 +142,25 @@ export const createVendor = async (req, res) => {
       });
     }
 
-    // 📤 Upload files to Cloudinary
+    // 📤 Upload files to Cloudinary (tempFilePath expected)
     let idCardImageUrl = null;
     let anyFileUrl = null;
 
-    if (req.files?.id_card_image?.[0]) {
+    if (req.files?.id_card_image) {
       idCardImageUrl = await uploadToCloudinary(
-        req.files.id_card_image[0].buffer,
+        req.files.id_card_image,     // <-- pass whole file object (NOT buffer)
         "vendorsCustomer/id_cards"
       );
     }
 
-    if (req.files?.any_file?.[0]) {
+    if (req.files?.any_file) {
       anyFileUrl = await uploadToCloudinary(
-        req.files.any_file[0].buffer,
+        req.files.any_file,          // <-- pass whole file object
         "vendorsCustomer/files"
       );
     }
 
-    // ✅ Save Vendor
+    // 🟢 Save Vendor
     const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
@@ -86,9 +187,7 @@ export const createVendor = async (req, res) => {
         phone,
         email,
         type,
-        credit_period_days: credit_period_days
-          ? parseInt(credit_period_days)
-          : 0,
+        credit_period_days: credit_period_days ? parseInt(credit_period_days) : 0,
         enable_gst: enable_gst === true || enable_gst === "true",
         gstIn,
       },
