@@ -1,11 +1,12 @@
+import express from "express";
+import {
+  getAdminDashboardData,
+  getDashboard,
+} from "../controllers/dashboard.controller.js";
 
+const router = express.Router();
 
+router.get("/admin", getAdminDashboardData);
+router.get("/:company_id", getDashboard);
 
-import express from "express"
-import { getDashboard } from "../controllers/dashboard.controller.js"
-
-const router = express.Router()
-
-router.get("/:company_id", getDashboard)
-
-export default router
+export default router;
