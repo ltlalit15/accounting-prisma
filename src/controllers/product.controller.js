@@ -240,8 +240,8 @@ export const createProduct = async (req, res) => {
     // ---------------------------
     let imageUrl = null;
     if (req.files && req.files.image) {
-      imageUrl = await uploadToCloudinary(req.files.image, "products");
-    }
+  imageUrl = await uploadToCloudinary(req.files.image, "products");
+}
 
     // ---------------------------
     // 📌 Parse Warehouses
@@ -262,7 +262,12 @@ export const createProduct = async (req, res) => {
     // Supports: stock_qty, quantity, initial_qty
     // ---------------------------
     const totalStock = parsedWarehouses.reduce((sum, w) => {
-      const qty = Number(w.stock_qty ?? w.quantity ?? w.initial_qty ?? 0);
+      const qty = Number(
+        w.stock_qty ??
+        w.quantity ??
+        w.initial_qty ??
+        0
+      );
       return sum + qty;
     }, 0);
 
@@ -295,7 +300,12 @@ export const createProduct = async (req, res) => {
         product_warehouses: {
           create: parsedWarehouses.map((w) => ({
             warehouse_id: Number(w.warehouse_id),
-            stock_qty: Number(w.stock_qty ?? w.quantity ?? w.initial_qty ?? 0),
+            stock_qty: Number(
+              w.stock_qty ??
+              w.quantity ??
+              w.initial_qty ??
+              0
+            ),
           })),
         },
       },
@@ -369,11 +379,14 @@ export const createProduct = async (req, res) => {
         updated_at: product.updated_at,
       },
     });
+
   } catch (error) {
     console.error("Create product error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
 
 // export const getAllProducts = async (req, res) => {
 //   try {
@@ -511,6 +524,7 @@ export const getAllProducts = async (req, res) => {
     });
   }
 };
+
 
 // export const getProductsByCompany = async (req, res) => {
 //   try {
@@ -661,8 +675,8 @@ export const getProductsByCompany = async (req, res) => {
           select: {
             id: true,
             company_id: true,
-            uom_name: true, // Using uom_name instead of uom_id
-            category: true, // Include category field
+            uom_name: true,     // Using uom_name instead of uom_id
+            category: true,      // Include category field
             weight_per_unit: true,
             created_at: true,
           },
@@ -795,12 +809,12 @@ export const getProductsByCompanyAndWarehouse = async (req, res) => {
         // ✅ Include unit details
         unit_detail: {
           select: {
-            id: true,
-            company_id: true,
-            uom_name: true,
-            category: true,
-            weight_per_unit: true,
-            created_at: true,
+           id: true,
+    company_id: true,
+    uom_name: true,
+    category: true,
+    weight_per_unit: true,
+    created_at: true,
           },
         },
       },
@@ -893,11 +907,11 @@ export const getProductById = async (req, res) => {
         unit_detail: {
           select: {
             id: true,
-            company_id: true,
-            uom_name: true,
-            category: true,
-            weight_per_unit: true,
-            created_at: true,
+    company_id: true,
+    uom_name: true,
+    category: true,
+    weight_per_unit: true,
+    created_at: true,
           },
         },
       },
@@ -1159,8 +1173,8 @@ export const updateProduct = async (req, res) => {
     // Handle image upload
     let imageUrl = existingProduct.image;
     if (req.files && req.files.image) {
-      imageUrl = await uploadToCloudinary(req.files.image, "products");
-    }
+  imageUrl = await uploadToCloudinary(req.files.image, "products");
+}
 
     // Parse warehouses
     let parsedWarehouses = [];
@@ -1178,16 +1192,16 @@ export const updateProduct = async (req, res) => {
     // ✅ VALIDATE: Make sure warehouse_id exists in DB
     // ----------------------------------------------------------
     if (parsedWarehouses.length > 0) {
-      const warehouseIds = parsedWarehouses.map((w) => Number(w.warehouse_id));
+      const warehouseIds = parsedWarehouses.map(w => Number(w.warehouse_id));
 
       const existing = await prisma.warehouses.findMany({
         where: { id: { in: warehouseIds } },
         select: { id: true },
       });
 
-      const existingIds = existing.map((w) => w.id);
+      const existingIds = existing.map(w => w.id);
 
-      const invalidIds = warehouseIds.filter((id) => !existingIds.includes(id));
+      const invalidIds = warehouseIds.filter(id => !existingIds.includes(id));
 
       if (invalidIds.length > 0) {
         return res.status(400).json({
@@ -1232,20 +1246,12 @@ export const updateProduct = async (req, res) => {
       barcode: barcode ?? existingProduct.barcode,
       sku: sku ?? existingProduct.sku,
       description: description ?? existingProduct.description,
-      initial_qty: initial_qty
-        ? Number(initial_qty)
-        : existingProduct.initial_qty,
-      min_order_qty: min_order_qty
-        ? Number(min_order_qty)
-        : existingProduct.min_order_qty,
+      initial_qty: initial_qty ? Number(initial_qty) : existingProduct.initial_qty,
+      min_order_qty: min_order_qty ? Number(min_order_qty) : existingProduct.min_order_qty,
       as_of_date: as_of_date ?? existingProduct.as_of_date,
-      initial_cost: initial_cost
-        ? Number(initial_cost)
-        : existingProduct.initial_cost,
+      initial_cost: initial_cost ? Number(initial_cost) : existingProduct.initial_cost,
       sale_price: sale_price ? Number(sale_price) : existingProduct.sale_price,
-      purchase_price: purchase_price
-        ? Number(purchase_price)
-        : existingProduct.purchase_price,
+      purchase_price: purchase_price ? Number(purchase_price) : existingProduct.purchase_price,
       discount: discount ? Number(discount) : existingProduct.discount,
       tax_account: tax_account ?? existingProduct.tax_account,
       remarks: remarks ?? existingProduct.remarks,
@@ -1299,6 +1305,7 @@ export const updateProduct = async (req, res) => {
       message: "✅ Product updated successfully",
       data: updatedProduct,
     });
+
   } catch (error) {
     console.error("❌ Update product error:", error);
     res.status(500).json({
@@ -1308,6 +1315,7 @@ export const updateProduct = async (req, res) => {
     });
   }
 };
+
 
 /**
  * 🔴 DELETE PRODUCT
@@ -1508,952 +1516,165 @@ export const getInventoryItemDetails = async (req, res) => {
   }
 };
 
-// export const getInventoryDetails = async (req, res) => {
-//  try {
-//     const { company_id, product_id } = req.params;
 
-//     // 1️⃣ Product Details
-//     const product = await prisma.products.findFirst({
-//       where: { id: Number(product_id), company_id: Number(company_id) },
-//       include: {
-//         item_category: true,
-//         unit_detail: true,
-//         product_warehouses: {
-//           include: { warehouse: true }
-//         }
-//       }
-//     });
-
-//     if (!product) {
-//       return res.status(404).json({ success: false, message: "Product not found" });
-//     }
-
-//     // 2️⃣ All Transactions (Merged Across All Modules)
-//     let allTransactions = [];
-
-//     // PURCHASE
-//     const purchase = await prisma.voucher_items.findMany({
-//       where: { item_name: product.item_name, vouchers: { company_id: Number(company_id), voucher_type: "Purchase" } },
-//       include: { vouchers: true }
-//     });
-
-//     purchase.forEach(p => {
-//       allTransactions.push({
-//         date: p.vouchers.date,
-//         vch_type: p.vouchers.voucher_type,
-//         particulars: p.vouchers.from_name || "", // vendor name stored in vouchers
-//         vch_no: p.vouchers.voucher_number,
-//         auto_voucher_no: p.vouchers.manual_voucher_no || p.vouchers.voucher_number,
-//         rate: p.rate,
-//         inwards_qty: p.quantity,
-//         inwards_value: p.amount,
-//         outwards_qty: 0,
-//         outwards_value: 0,
-//         description: p.description,
-//         narration: p.vouchers.notes
-//       });
-//     });
-
-//     // SALES
-//     const sales = await prisma.pos_invoice_products.findMany({
-//       where: { product_id: Number(product_id), invoice: { company_id: Number(company_id) } },
-//       include: { invoice: { include: { customer: true } } }
-//     });
-
-//     sales.forEach(s => {
-//       allTransactions.push({
-//         date: s.invoice.created_at,
-//         vch_type: "Sales Invoice",
-//         particulars: s.invoice.customer?.name_english || "",
-//         vch_no: s.invoice.id,
-//         auto_voucher_no: s.invoice.id,
-//         rate: s.price,
-//         inwards_qty: 0,
-//         inwards_value: 0,
-//         outwards_qty: s.quantity,
-//         outwards_value: (Number(s.quantity) * Number(s.price)),
-//         description: "",
-//         narration: ""
-//       });
-//     });
-
-//     // PURCHASE RETURN
-//     const purchaseReturn = await prisma.purchase_return_items.findMany({
-//       where: { product_id: Number(product_id), purchase_return: { company_id: Number(company_id) } },
-//       include: { purchase_return: true }
-//     });
-
-//     purchaseReturn.forEach(r => {
-//       allTransactions.push({
-//         date: r.purchase_return.return_date,
-//         vch_type: r.purchase_return.return_type,
-//         particulars: r.purchase_return.vendor_name || "",
-//         vch_no: r.purchase_return.return_no,
-//         auto_voucher_no: r.purchase_return.auto_voucher_no,
-//         rate: r.rate,
-//         inwards_qty: 0,
-//         inwards_value: 0,
-//         outwards_qty: r.quantity,
-//         outwards_value: r.amount,
-//         description: r.narration,
-//         narration: r.purchase_return.notes
-//       });
-//     });
-
-//     // SALES RETURN
-//     const salesReturn = await prisma.sales_return_items.findMany({
-//       where: { product_id: Number(product_id), sales_return: { company_id: Number(company_id) } },
-//       include: { sales_return: true }
-//     });
-
-//     salesReturn.forEach(r => {
-//       allTransactions.push({
-//         date: r.sales_return.return_date,
-//         vch_type: r.sales_return.return_type,
-//         particulars: r.sales_return.customer_id ? r.sales_return.customer_id : "",
-//         vch_no: r.sales_return.return_no,
-//         auto_voucher_no: r.sales_return.auto_voucher_no,
-//         rate: r.rate,
-//         inwards_qty: r.quantity,
-//         inwards_value: r.amount,
-//         outwards_qty: 0,
-//         outwards_value: 0,
-//         description: r.narration,
-//         narration: r.sales_return.notes
-//       });
-//     });
-
-//     // DELIVERY CHALLAN (sales order)
-//     const deliveryChallan = await prisma.salesorderitems.findMany({
-//       where: { item_name: product.item_name, salesorder: { company_id: Number(company_id) } },
-//       include: { salesorder: true }
-//     });
-
-//     deliveryChallan.forEach(dc => {
-//       allTransactions.push({
-//         date: dc.salesorder.quotation_date,
-//         vch_type: "Delivery Challan",
-//         particulars: dc.salesorder.bill_to_customer_name || dc.salesorder.bill_to_company_name || "",
-//         vch_no: dc.salesorder.Challan_no,
-//         auto_voucher_no: dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
-//         rate: dc.rate,
-//         inwards_qty: 0,
-//         inwards_value: 0,
-//         outwards_qty: dc.qty,
-//         outwards_value: Number(dc.qty) * Number(dc.rate),
-//         description: "",
-//         narration: dc.salesorder.notes
-//       });
-//     });
-
-//     // Sort by date
-//     allTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-//     // 3️⃣ Separate sections for Purchase / Sales / Return History
-//     const purchase_history = purchase;
-//     const sales_history = sales;
-//     const return_history = [...purchaseReturn, ...salesReturn];
-
-//     return res.status(200).json({
-//       success: true,
-//       product_info: product,
-//       all_transactions: allTransactions,
-//       purchase_history,
-//       sales_history,
-//       return_history
-//     });
-
-//   } catch (error) {
-//     console.error(error);
-//     return res.status(500).json({ success: false, message: "Server error", error });
-//   }
-// };
-
-// export const getInventoryDetails = async (req, res) => {
-//   try {
-//     const { company_id, product_id } = req.params;
-//     const companyId = Number(company_id);
-//     const productId = Number(product_id);
-
-//     // 1️⃣ Get Product Master Details
-//     const product = await prisma.products.findFirst({
-//       where: { id: productId, company_id: companyId },
-//       include: {
-//         item_category: true,
-//         unit_detail: true,
-//         product_warehouses: {
-//           include: { warehouse: true },
-//         },
-//       },
-//     });
-
-//     if (!product) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Product not found" });
-//     }
-
-//     // 2️⃣ Fetch All Raw Transaction Data Related to Product
-//     let allTransactionsForLedger = [];
-
-//     // Fallback warehouse for transactions that don't have one linked
-//     const fallbackWarehouse =
-//       product.product_warehouses[0]?.warehouse?.warehouse_name ||
-//       "Unknown Warehouse";
-
-//     // A. PURCHASES (from Vouchers)
-//     const purchaseItems = await prisma.voucher_items.findMany({
-//       where: {
-//         item_name: product.item_name,
-//         vouchers: { company_id: companyId, voucher_type: "Purchase" },
-//       },
-//       include: { vouchers: true },
-//     });
-//     purchaseItems.forEach((p) => {
-//       allTransactionsForLedger.push({
-//         date: p.vouchers.date,
-//         rawType: "PURCHASE",
-//         particulars: p.vouchers.from_name || "N/A",
-//         vchNo: p.vouchers.voucher_number,
-//         autoVoucherNo:
-//           p.vouchers.manual_voucher_no || p.vouchers.voucher_number,
-//         rate: Number(p.rate),
-//         quantity: Number(p.quantity), // Inflow
-//         warehouseName: fallbackWarehouse,
-//         description: p.description,
-//         narration: p.vouchers.notes || "",
-//       });
-//     });
-
-//     // B. SALES (from POS Invoices)
-//     const salesItems = await prisma.pos_invoice_products.findMany({
-//       where: { product_id: productId, invoice: { company_id: companyId } },
-//       include: { invoice: { include: { customer: true } }, warehouse: true },
-//     });
-//     salesItems.forEach((s) => {
-//       allTransactionsForLedger.push({
-//         date: s.invoice.created_at,
-//         rawType: "SALE",
-//         particulars: s.invoice.customer?.name_english || "N/A",
-//         vchNo: `INV-${s.invoice_id}`,
-//         autoVoucherNo: `INV-${s.invoice_id}`,
-//         rate: Number(s.price),
-//         quantity: -Number(s.quantity), // Outflow
-//         warehouseName: s.warehouse?.warehouse_name || "Unassigned Warehouse",
-//         description: product.item_name,
-//         narration: "",
-//       });
-//     });
-
-//     // C. PURCHASE RETURNS
-//     const purchaseReturnItems = await prisma.purchase_return_items.findMany({
-//       where: {
-//         product_id: productId,
-//         purchase_return: { company_id: companyId },
-//       },
-//       include: { purchase_return: true },
-//     });
-//     purchaseReturnItems.forEach((r) => {
-//       allTransactionsForLedger.push({
-//         date: r.purchase_return.return_date,
-//         rawType: "PURCHASE_RETURN",
-//         particulars: r.purchase_return.vendor_name || "N/A",
-//         vchNo: r.purchase_return.return_no,
-//         autoVoucherNo: r.purchase_return.auto_voucher_no,
-//         rate: Number(r.rate),
-//         quantity: -Number(r.quantity), // Outflow
-//         warehouseName: fallbackWarehouse,
-//         description: r.item_name,
-//         narration: r.purchase_return.notes || "",
-//       });
-//     });
-
-//     // D. SALES RETURNS
-//     const salesReturnItems = await prisma.sales_return_items.findMany({
-//       where: { product_id: productId, sales_return: { company_id: companyId } },
-//       include: { sales_return: true },
-//     });
-//     const customerIds = [
-//       ...new Set(
-//         salesReturnItems.map((r) => r.sales_return.customer_id).filter(Boolean)
-//       ),
-//     ];
-//     const customers = await prisma.vendorscustomer.findMany({
-//       where: { id: { in: customerIds } },
-//       select: { id: true, name_english: true },
-//     });
-//     const customerMap = new Map(customers.map((c) => [c.id, c.name_english]));
-
-//     salesReturnItems.forEach((r) => {
-//       allTransactionsForLedger.push({
-//         date: r.sales_return.return_date,
-//         rawType: "SALES_RETURN",
-//         particulars: customerMap.get(r.sales_return.customer_id) || "N/A",
-//         vchNo: r.sales_return.return_no,
-//         autoVoucherNo: r.sales_return.auto_voucher_no,
-//         rate: Number(r.rate),
-//         quantity: Number(r.quantity), // Inflow
-//         warehouseName: fallbackWarehouse,
-//         description: r.item_name,
-//         narration: r.sales_return.notes || "",
-//       });
-//     });
-
-//     // E. DELIVERY CHALLAN (from Sales Orders)
-//     const deliveryChallanItems = await prisma.salesorderitems.findMany({
-//       where: {
-//         item_name: product.item_name,
-//         salesorder: { company_id: companyId },
-//       },
-//       include: { salesorder: true, warehouse: true },
-//     });
-//     deliveryChallanItems.forEach((dc) => {
-//       allTransactionsForLedger.push({
-//         date: dc.salesorder.quotation_date || dc.salesorder.created_at,
-//         rawType: "DELIVERY_CHALLAN",
-//         particulars:
-//           dc.salesorder.qoutation_to_customer_name ||
-//           dc.salesorder.bill_to_customer_name ||
-//           "N/A",
-//         vchNo: dc.salesorder.Challan_no,
-//         autoVoucherNo:
-//           dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
-//         rate: Number(dc.rate),
-//         quantity: -Number(dc.qty), // Outflow
-//         warehouseName: dc.warehouse?.warehouse_name || "Unassigned Warehouse",
-//         description: dc.item_name,
-//         narration: dc.salesorder.notes || "",
-//       });
-//     });
-
-//     // F. STOCK TRANSFERS
-//     const transferItems = await prisma.transfer_items.findMany({
-//       where: { product_id: productId, transfers: { company_id: companyId } },
-//       include: { transfers: true, warehouses: true },
-//     });
-//     transferItems.forEach((t) => {
-//       allTransactionsForLedger.push({
-//         date: t.transfers.transfer_date,
-//         rawType: "TRANSFER",
-//         particulars: `Transfer to Destination`,
-//         vchNo: t.transfers.voucher_no,
-//         autoVoucherNo: t.transfers.manual_voucher_no || t.transfers.voucher_no,
-//         rate: Number(t.rate),
-//         quantity: -Number(t.qty), // Outflow from source warehouse
-//         warehouseName: t.warehouses.warehouse_name,
-//         description: product.item_name,
-//         narration: t.narration || "",
-//       });
-//     });
-
-//     // G. ADJUSTMENTS
-//     const adjustmentItems = await prisma.adjustment_items.findMany({
-//       where: { product_id: productId, adjustments: { company_id: companyId } },
-//       include: { adjustments: true },
-//     });
-//     adjustmentItems.forEach((a) => {
-//       allTransactionsForLedger.push({
-//         date: a.adjustments.voucher_date,
-//         rawType: "ADJUSTMENT",
-//         particulars: `Stock Adjustment (${a.adjustments.adjustment_type})`,
-//         vchNo: a.adjustments.voucher_no,
-//         autoVoucherNo:
-//           a.adjustments.manual_voucher_no || a.adjustments.voucher_no,
-//         rate: Number(a.rate),
-//         quantity: Number(a.quantity), // Can be positive or negative
-//         warehouseName: fallbackWarehouse,
-//         description: product.item_name,
-//         narration: a.narration || "",
-//       });
-//     });
-
-//     // H. OPENING STOCK
-//     if (product.initial_qty > 0) {
-//       allTransactionsForLedger.push({
-//         date: new Date(product.as_of_date || "2000-01-01"),
-//         rawType: "OPENING_STOCK",
-//         particulars: "Opening Balance",
-//         vchNo: null,
-//         autoVoucherNo: `OPEN-${product.id}`,
-//         rate: Number(product.initial_cost || 0),
-//         quantity: Number(product.initial_qty), // Inflow
-//         warehouseName: fallbackWarehouse,
-//         description: product.item_name,
-//         narration: "Initial stock entry.",
-//       });
-//     }
-
-//     // 3️⃣ Process Data for UI Views
-//     allTransactionsForLedger.sort(
-//       (a, b) => new Date(a.date) - new Date(b.date)
-//     );
-
-//     // A. Create "All Transactions" Ledger with Running Balance
-//     let runningQuantity = 0;
-//     const all_transactions = allTransactionsForLedger.map((tx) => {
-//       const value = Math.abs(tx.quantity * tx.rate);
-//       const formattedDate = new Date(tx.date).toISOString().split("T")[0];
-//       const vchType = tx.rawType
-//         .replace(/_/g, " ")
-//         .replace(/\b\w/g, (l) => l.toUpperCase());
-
-//       let inwardsQty = 0,
-//         inwardsValue = 0,
-//         outwardsQty = 0,
-//         outwardsValue = 0;
-
-//       if (tx.quantity > 0) {
-//         inwardsQty = tx.quantity;
-//         inwardsValue = value;
-//         runningQuantity += tx.quantity;
-//       } else {
-//         outwardsQty = Math.abs(tx.quantity);
-//         outwardsValue = value;
-//         runningQuantity -= Math.abs(tx.quantity);
-//       }
-
-//       return {
-//         DATE: formattedDate,
-//         "VCH TYPE": vchType,
-//         PARTICULARS: tx.particulars,
-//         "VCH NO": tx.vchNo,
-//         "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-//         WAREHOUSE: tx.warehouseName,
-//         "RATE/UNIT": tx.rate.toFixed(2),
-//         "INWARDS (QTY)": inwardsQty,
-//         "INWARDS (VALUE)": inwardsValue.toFixed(2),
-//         "OUTWARDS (QTY)": outwardsQty,
-//         "OUTWARDS (VALUE)": outwardsValue.toFixed(2),
-//         "CLOSING QUANTITY": runningQuantity,
-//         DESCRIPTION: tx.description,
-//         NARRATION: tx.narration,
-//       };
-//     });
-
-//     // B. Create "Sales History" View
-//     const sales_history_array = allTransactionsForLedger
-//       .filter((tx) => tx.rawType === "SALE")
-//       .map((tx) => ({
-//         DATE: new Date(tx.date).toISOString().split("T")[0],
-//         "VCH TYPE": "Sales Invoice",
-//         PARTICULARS: tx.particulars,
-//         "VCH NO": tx.vchNo,
-//         "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-//         WAREHOUSE: tx.warehouseName,
-//         "RATE/UNIT": tx.rate.toFixed(2),
-//         QTY: Math.abs(tx.quantity),
-//         VALUE: Math.abs(tx.quantity * tx.rate).toFixed(2),
-//         DESCRIPTION: tx.description,
-//         NARRATION: tx.narration,
-//       }));
-
-//     // C. Create "Purchase History" View
-//     const purchase_history_array = allTransactionsForLedger
-//       .filter((tx) => tx.rawType === "PURCHASE")
-//       .map((tx) => ({
-//         DATE: new Date(tx.date).toISOString().split("T")[0],
-//         "VCH TYPE": "Purchase",
-//         PARTICULARS: tx.particulars,
-//         "VCH NO": tx.vchNo,
-//         "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-//         WAREHOUSE: tx.warehouseName,
-//         "RATE/UNIT": tx.rate.toFixed(2),
-//         QTY: tx.quantity,
-//         VALUE: (tx.quantity * tx.rate).toFixed(2),
-//         DESCRIPTION: tx.description,
-//         NARRATION: tx.narration,
-//       }));
-
-//     // D. Create "Return History" View
-//     const return_history_array = allTransactionsForLedger
-//       .filter((tx) => tx.rawType.includes("RETURN"))
-//       .map((tx) => ({
-//         DATE: new Date(tx.date).toISOString().split("T")[0],
-//         "VCH TYPE": tx.rawType
-//           .replace(/_/g, " ")
-//           .replace(/\b\w/g, (l) => l.toUpperCase()),
-//         PARTICULARS: tx.particulars,
-//         "VCH NO": tx.vchNo,
-//         "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-//         WAREHOUSE: tx.warehouseName,
-//         "RATE/UNIT": tx.rate.toFixed(2),
-//         QTY: Math.abs(tx.quantity),
-//         VALUE: Math.abs(tx.quantity * tx.rate).toFixed(2),
-//         DESCRIPTION: tx.description,
-//         NARRATION: tx.narration,
-//       }));
-
-//     // 4️⃣ Calculate Totals and Inventory Values
-//     const total_sales = sales_history_array.reduce(
-//       (sum, item) => sum + parseFloat(item["VALUE"]),
-//       0
-//     );
-//     const total_purchase = purchase_history_array.reduce(
-//       (sum, item) => sum + parseFloat(item["VALUE"]),
-//       0
-//     );
-//     const total_return = return_history_array.reduce(
-//       (sum, item) => sum + parseFloat(item["VALUE"]),
-//       0
-//     );
-
-//     // Calculate total costs
-//     const total_sales_cost = sales_history_array.reduce(
-//       (sum, item) =>
-//         sum + parseFloat(item["QTY"]) * parseFloat(product.purchase_price || 0),
-//       0
-//     );
-//     const total_purchase_cost = total_purchase; // Cost is the same as total purchase value
-//     const total_return_cost = return_history_array.reduce((sum, item) => {
-//       if (item["VCH TYPE"] === "SALES RETURN") {
-//         return (
-//           sum +
-//           parseFloat(item["QTY"]) * parseFloat(product.purchase_price || 0)
-//         );
-//       } else {
-//         return sum + parseFloat(item["VALUE"]);
-//       }
-//     }, 0);
-
-//     const opening_inventory = Number(product.initial_qty || 0);
-//     const closing_inventory = Number(product.total_stock || 0);
-
-//     // 5️⃣ Assemble and Return Final Response
-//     return res.status(200).json({
-//       success: true,
-//       product_info: product,
-//       opening_inventory,
-//       closing_inventory,
-//       sales_history: {
-//         transactions: sales_history_array,
-//         total_sales: total_sales.toFixed(2),
-//         total_sales_cost: total_sales_cost.toFixed(2),
-//       },
-//       purchase_history: {
-//         transactions: purchase_history_array,
-//         total_purchase: total_purchase.toFixed(2),
-//         total_purchase_cost: total_purchase_cost.toFixed(2),
-//       },
-//       return_history: {
-//         transactions: return_history_array,
-//         total_return: total_return.toFixed(2),
-//         total_return_cost: total_return_cost.toFixed(2),
-//       },
-//       all_transactions,
-//     });
-//   } catch (error) {
-//     console.error("Inventory Details Error:", error);
-//     return res
-//       .status(500)
-//       .json({ success: false, message: "Server error", error: error.message });
-//   }
-// };
 export const getInventoryDetails = async (req, res) => {
-  try {
+ try {
     const { company_id, product_id } = req.params;
-    const companyId = Number(company_id);
-    const productId = Number(product_id);
 
-    // 1️⃣ Get Product Master Details
+    // 1️⃣ Product Details
     const product = await prisma.products.findFirst({
-      where: { id: productId, company_id: companyId },
+      where: { id: Number(product_id), company_id: Number(company_id) },
       include: {
         item_category: true,
         unit_detail: true,
         product_warehouses: {
-          include: { warehouse: true },
-        },
-      },
+          include: { warehouse: true }
+        }
+      }
     });
 
     if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    // Helper to find a suitable default warehouse
-    const getDefaultWarehouse = () => {
-      const mainWarehouse = product.product_warehouses.find(
-        (pw) =>
-          pw.warehouse.warehouse_name.toLowerCase().includes("main") ||
-          pw.warehouse.warehouse_name.toLowerCase().includes("default")
-      );
-      return (
-        mainWarehouse?.warehouse.warehouse_name ||
-        product.product_warehouses[0]?.warehouse.warehouse_name ||
-        "Unassigned Warehouse"
-      );
-    };
+    // 2️⃣ All Transactions (Merged Across All Modules)
+    let allTransactions = [];
 
-    let allTransactionsForLedger = [];
-
-    // A. PURCHASES (from Vouchers)
-    const purchaseItems = await prisma.voucher_items.findMany({
-      where: {
-        item_name: product.item_name,
-        vouchers: { company_id: companyId, voucher_type: "Purchase" },
-      },
-      include: { vouchers: true },
+    // PURCHASE
+    const purchase = await prisma.voucher_items.findMany({
+      where: { item_name: product.item_name, vouchers: { company_id: Number(company_id), voucher_type: "Purchase" } },
+      include: { vouchers: true }
     });
-    purchaseItems.forEach((p) => {
-      allTransactionsForLedger.push({
+
+    purchase.forEach(p => {
+      allTransactions.push({
         date: p.vouchers.date,
-        rawType: "PURCHASE",
-        // DYNAMIC: Use voucher type directly from the DB
-        vchType: p.vouchers.voucher_type,
-        particulars: p.vouchers.from_name || "N/A",
-        vchNo: p.vouchers.voucher_number,
-        autoVoucherNo:
-          p.vouchers.manual_voucher_no || p.vouchers.voucher_number,
-        rate: Number(p.rate),
-        quantity: Number(p.quantity), // Inflow
-        // DYNAMIC: Acknowledge schema limitation, use a smart fallback
-        warehouseName: getDefaultWarehouse(),
+        vch_type: p.vouchers.voucher_type,
+        particulars: p.vouchers.from_name || "", // vendor name stored in vouchers
+        vch_no: p.vouchers.voucher_number,
+        auto_voucher_no: p.vouchers.manual_voucher_no || p.vouchers.voucher_number,
+        rate: p.rate,
+        inwards_qty: p.quantity,
+        inwards_value: p.amount,
+        outwards_qty: 0,
+        outwards_value: 0,
         description: p.description,
-        narration: p.vouchers.notes || "",
+        narration: p.vouchers.notes
       });
     });
 
-    // B. SALES (from POS Invoices)
-    const salesItems = await prisma.pos_invoice_products.findMany({
-      where: { product_id: productId, invoice: { company_id: companyId } },
-      include: { invoice: { include: { customer: true } }, warehouse: true },
+    // SALES
+    const sales = await prisma.pos_invoice_products.findMany({
+      where: { product_id: Number(product_id), invoice: { company_id: Number(company_id) } },
+      include: { invoice: { include: { customer: true } } }
     });
-    salesItems.forEach((s) => {
-      allTransactionsForLedger.push({
+
+    sales.forEach(s => {
+      allTransactions.push({
         date: s.invoice.created_at,
-        rawType: "SALE",
-        // DYNAMIC: This is a reasonable label as the table doesn't have a type field
-        vchType: "Sales Invoice",
-        particulars: s.invoice.customer?.name_english || "N/A",
-        vchNo: `INV-${s.invoice_id}`,
-        autoVoucherNo: `INV-${s.invoice_id}`,
-        rate: Number(s.price),
-        quantity: -Number(s.quantity), // Outflow
-        // DYNAMIC: Use the actual linked warehouse
-        warehouseName: s.warehouse?.warehouse_name || "Unassigned Warehouse",
-        description: product.item_name,
-        narration: "",
+        vch_type: "Sales Invoice",
+        particulars: s.invoice.customer?.name_english || "",
+        vch_no: s.invoice.id,
+        auto_voucher_no: s.invoice.id,
+        rate: s.price,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: s.quantity,
+        outwards_value: (Number(s.quantity) * Number(s.price)),
+        description: "",
+        narration: ""
       });
     });
 
-    // C. PURCHASE RETURNS
-    const purchaseReturnItems = await prisma.purchase_return_items.findMany({
-      where: {
-        product_id: productId,
-        purchase_return: { company_id: companyId },
-      },
-      include: { purchase_return: true },
+    // PURCHASE RETURN
+    const purchaseReturn = await prisma.purchase_return_items.findMany({
+      where: { product_id: Number(product_id), purchase_return: { company_id: Number(company_id) } },
+      include: { purchase_return: true }
     });
-    purchaseReturnItems.forEach((r) => {
-      allTransactionsForLedger.push({
+
+    purchaseReturn.forEach(r => {
+      allTransactions.push({
         date: r.purchase_return.return_date,
-        rawType: "PURCHASE_RETURN",
-        // DYNAMIC: Use the return_type field from the database
-        vchType: r.purchase_return.return_type,
-        particulars: r.purchase_return.vendor_name || "N/A",
-        vchNo: r.purchase_return.return_no,
-        autoVoucherNo: r.purchase_return.auto_voucher_no,
-        rate: Number(r.rate),
-        quantity: -Number(r.quantity), // Outflow
-        // DYNAMIC: Acknowledge schema limitation
-        warehouseName: getDefaultWarehouse(),
-        description: r.item_name,
-        narration: r.purchase_return.notes || "",
+        vch_type: r.purchase_return.return_type,
+        particulars: r.purchase_return.vendor_name || "",
+        vch_no: r.purchase_return.return_no,
+        auto_voucher_no: r.purchase_return.auto_voucher_no,
+        rate: r.rate,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: r.quantity,
+        outwards_value: r.amount,
+        description: r.narration,
+        narration: r.purchase_return.notes
       });
     });
 
-    // D. SALES RETURNS
-    const salesReturnItems = await prisma.sales_return_items.findMany({
-      where: { product_id: productId, sales_return: { company_id: companyId } },
-      include: { sales_return: true },
+    // SALES RETURN
+    const salesReturn = await prisma.sales_return_items.findMany({
+      where: { product_id: Number(product_id), sales_return: { company_id: Number(company_id) } },
+      include: { sales_return: true }
     });
-    const customerIds = [
-      ...new Set(
-        salesReturnItems.map((r) => r.sales_return.customer_id).filter(Boolean)
-      ),
-    ];
-    const customers = await prisma.vendorscustomer.findMany({
-      where: { id: { in: customerIds } },
-      select: { id: true, name_english: true },
-    });
-    const customerMap = new Map(customers.map((c) => [c.id, c.name_english]));
 
-    salesReturnItems.forEach((r) => {
-      allTransactionsForLedger.push({
+    salesReturn.forEach(r => {
+      allTransactions.push({
         date: r.sales_return.return_date,
-        rawType: "SALES_RETURN",
-        // DYNAMIC: Use the return_type field from the database
-        vchType: r.sales_return.return_type,
-        particulars: customerMap.get(r.sales_return.customer_id) || "N/A",
-        vchNo: r.sales_return.return_no,
-        autoVoucherNo: r.sales_return.auto_voucher_no,
-        rate: Number(r.rate),
-        quantity: Number(r.quantity), // Inflow
-        // DYNAMIC: Acknowledge schema limitation
-        warehouseName: getDefaultWarehouse(),
-        description: r.item_name,
-        narration: r.sales_return.notes || "",
+        vch_type: r.sales_return.return_type,
+        particulars: r.sales_return.customer_id ? r.sales_return.customer_id : "",
+        vch_no: r.sales_return.return_no,
+        auto_voucher_no: r.sales_return.auto_voucher_no,
+        rate: r.rate,
+        inwards_qty: r.quantity,
+        inwards_value: r.amount,
+        outwards_qty: 0,
+        outwards_value: 0,
+        description: r.narration,
+        narration: r.sales_return.notes
       });
     });
 
-    // E. DELIVERY CHALLAN (from Sales Orders)
-    const deliveryChallanItems = await prisma.salesorderitems.findMany({
-      where: {
-        item_name: product.item_name,
-        salesorder: { company_id: companyId },
-      },
-      include: { salesorder: true, warehouse: true },
+    // DELIVERY CHALLAN (sales order)
+    const deliveryChallan = await prisma.salesorderitems.findMany({
+      where: { item_name: product.item_name, salesorder: { company_id: Number(company_id) } },
+      include: { salesorder: true }
     });
-    deliveryChallanItems.forEach((dc) => {
-      allTransactionsForLedger.push({
-        date: dc.salesorder.quotation_date || dc.salesorder.created_at,
-        rawType: "DELIVERY_CHALLAN",
-        // DYNAMIC: This is a reasonable label as the table doesn't have a type field
-        vchType: "Delivery Challan",
-        particulars:
-          dc.salesorder.qoutation_to_customer_name ||
-          dc.salesorder.bill_to_customer_name ||
-          "N/A",
-        vchNo: dc.salesorder.Challan_no,
-        autoVoucherNo:
-          dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
-        rate: Number(dc.rate),
-        quantity: -Number(dc.qty), // Outflow
-        // DYNAMIC: Use the actual linked warehouse
-        warehouseName: dc.warehouse?.warehouse_name || "Unassigned Warehouse",
-        description: dc.item_name,
-        narration: dc.salesorder.notes || "",
+
+    deliveryChallan.forEach(dc => {
+      allTransactions.push({
+        date: dc.salesorder.quotation_date,
+        vch_type: "Delivery Challan",
+        particulars: dc.salesorder.bill_to_customer_name || dc.salesorder.bill_to_company_name || "",
+        vch_no: dc.salesorder.Challan_no,
+        auto_voucher_no: dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
+        rate: dc.rate,
+        inwards_qty: 0,
+        inwards_value: 0,
+        outwards_qty: dc.qty,
+        outwards_value: Number(dc.qty) * Number(dc.rate),
+        description: "",
+        narration: dc.salesorder.notes
       });
     });
 
-    // F. STOCK TRANSFERS
-    const transferItems = await prisma.transfer_items.findMany({
-      where: { product_id: productId, transfers: { company_id: companyId } },
-      include: { transfers: true, warehouses: true },
-    });
-    transferItems.forEach((t) => {
-      allTransactionsForLedger.push({
-        date: t.transfers.transfer_date,
-        rawType: "TRANSFER",
-        // DYNAMIC: Create a more descriptive type
-        vchType: `Transfer from ${t.warehouses.warehouse_name}`,
-        particulars: `Transfer to Destination`, // This could be enhanced to get destination warehouse name
-        vchNo: t.transfers.voucher_no,
-        autoVoucherNo: t.transfers.manual_voucher_no || t.transfers.voucher_no,
-        rate: Number(t.rate),
-        quantity: -Number(t.qty), // Outflow from source warehouse
-        // DYNAMIC: Use the actual source warehouse
-        warehouseName: t.warehouses.warehouse_name,
-        description: product.item_name,
-        narration: t.narration || "",
-      });
-    });
+    // Sort by date
+    allTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // G. ADJUSTMENTS
-    const adjustmentItems = await prisma.adjustment_items.findMany({
-      where: { product_id: productId, adjustments: { company_id: companyId } },
-      include: { adjustments: true },
-    });
-    adjustmentItems.forEach((a) => {
-      allTransactionsForLedger.push({
-        date: a.adjustments.voucher_date,
-        rawType: "ADJUSTMENT",
-        // DYNAMIC: Create a more descriptive type
-        vchType: `Stock Adjustment (${a.adjustments.adjustment_type})`,
-        particulars: `Stock Adjustment`,
-        vchNo: a.adjustments.voucher_no,
-        autoVoucherNo:
-          a.adjustments.manual_voucher_no || a.adjustments.voucher_no,
-        rate: Number(a.rate),
-        quantity: Number(a.quantity), // Can be positive or negative
-        // DYNAMIC: Acknowledge schema limitation
-        warehouseName: getDefaultWarehouse(),
-        description: product.item_name,
-        narration: a.narration || "",
-      });
-    });
+    // 3️⃣ Separate sections for Purchase / Sales / Return History
+    const purchase_history = purchase;
+    const sales_history = sales;
+    const return_history = [...purchaseReturn, ...salesReturn];
 
-    // H. OPENING STOCK
-    if (product.initial_qty > 0) {
-      allTransactionsForLedger.push({
-        date: new Date(product.as_of_date || "2000-01-01"),
-        rawType: "OPENING_STOCK",
-        // DYNAMIC: This is a reasonable label
-        vchType: "Opening Balance",
-        particulars: "Opening Balance",
-        vchNo: null,
-        autoVoucherNo: `OPEN-${product.id}`,
-        rate: Number(product.initial_cost || 0),
-        quantity: Number(product.initial_qty), // Inflow
-        // DYNAMIC: Acknowledge schema limitation
-        warehouseName: getDefaultWarehouse(),
-        description: product.item_name,
-        narration: "Initial stock entry.",
-      });
-    }
-
-    // 3️⃣ Process Data for UI Views
-    allTransactionsForLedger.sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    );
-
-    // A. Create "All Transactions" Ledger with Running Balance
-    let runningQuantity = 0;
-    const all_transactions = allTransactionsForLedger.map((tx) => {
-      const value = Math.abs(tx.quantity * tx.rate);
-      const formattedDate = new Date(tx.date).toISOString().split("T")[0];
-      // DYNAMIC: Use the dynamic vchType created earlier
-      const vchType = tx.vchType;
-
-      let inwardsQty = 0,
-        inwardsValue = 0,
-        outwardsQty = 0,
-        outwardsValue = 0;
-
-      if (tx.quantity > 0) {
-        inwardsQty = tx.quantity;
-        inwardsValue = value;
-        runningQuantity += tx.quantity;
-      } else {
-        outwardsQty = Math.abs(tx.quantity);
-        outwardsValue = value;
-        runningQuantity -= Math.abs(tx.quantity);
-      }
-
-      return {
-        DATE: formattedDate,
-        "VCH TYPE": vchType,
-        PARTICULARS: tx.particulars,
-        "VCH NO": tx.vchNo,
-        "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-        WAREHOUSE: tx.warehouseName,
-        "RATE/UNIT": tx.rate.toFixed(2),
-        "INWARDS (QTY)": inwardsQty,
-        "INWARDS (VALUE)": inwardsValue.toFixed(2),
-        "OUTWARDS (QTY)": outwardsQty,
-        "OUTWARDS (VALUE)": outwardsValue.toFixed(2),
-        "CLOSING QUANTITY": runningQuantity,
-        DESCRIPTION: tx.description,
-        NARRATION: tx.narration,
-      };
-    });
-
-    // B. Create "Sales History" View
-    const sales_history_array = allTransactionsForLedger
-      .filter((tx) => tx.rawType === "SALE")
-      .map((tx) => ({
-        DATE: new Date(tx.date).toISOString().split("T")[0],
-        "VCH TYPE": tx.vchType, // Use dynamic type
-        PARTICULARS: tx.particulars,
-        "VCH NO": tx.vchNo,
-        "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-        WAREHOUSE: tx.warehouseName,
-        "RATE/UNIT": tx.rate.toFixed(2),
-        QTY: Math.abs(tx.quantity),
-        VALUE: Math.abs(tx.quantity * tx.rate).toFixed(2),
-        DESCRIPTION: tx.description,
-        NARRATION: tx.narration,
-      }));
-
-    // C. Create "Purchase History" View
-    const purchase_history_array = allTransactionsForLedger
-      .filter((tx) => tx.rawType === "PURCHASE")
-      .map((tx) => ({
-        DATE: new Date(tx.date).toISOString().split("T")[0],
-        "VCH TYPE": tx.vchType, // Use dynamic type
-        PARTICULARS: tx.particulars,
-        "VCH NO": tx.vchNo,
-        "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-        WAREHOUSE: tx.warehouseName,
-        "RATE/UNIT": tx.rate.toFixed(2),
-        QTY: tx.quantity,
-        VALUE: (tx.quantity * tx.rate).toFixed(2),
-        DESCRIPTION: tx.description,
-        NARRATION: tx.narration,
-      }));
-
-    // D. Create "Return History" View
-    const return_history_array = allTransactionsForLedger
-      .filter((tx) => tx.rawType.includes("RETURN"))
-      .map((tx) => ({
-        DATE: new Date(tx.date).toISOString().split("T")[0],
-        "VCH TYPE": tx.vchType, // Use dynamic type
-        PARTICULARS: tx.particulars,
-        "VCH NO": tx.vchNo,
-        "VOUCHER NO (AUTO)": tx.autoVoucherNo,
-        WAREHOUSE: tx.warehouseName,
-        "RATE/UNIT": tx.rate.toFixed(2),
-        QTY: Math.abs(tx.quantity),
-        VALUE: Math.abs(tx.quantity * tx.rate).toFixed(2),
-        DESCRIPTION: tx.description,
-        NARRATION: tx.narration,
-      }));
-
-    // 4️⃣ Calculate Totals and Inventory Values
-    const total_sales = sales_history_array.reduce(
-      (sum, item) => sum + parseFloat(item["VALUE"]),
-      0
-    );
-    const total_purchase = purchase_history_array.reduce(
-      (sum, item) => sum + parseFloat(item["VALUE"]),
-      0
-    );
-    const total_return = return_history_array.reduce(
-      (sum, item) => sum + parseFloat(item["VALUE"]),
-      0
-    );
-
-    const total_sales_cost = sales_history_array.reduce(
-      (sum, item) =>
-        sum + parseFloat(item["QTY"]) * parseFloat(product.purchase_price || 0),
-      0
-    );
-    const total_purchase_cost = total_purchase; // Cost is the same as total purchase value
-    const total_return_cost = return_history_array.reduce((sum, item) => {
-      // DYNAMIC: Check the VCH TYPE to apply the correct cost logic
-      if (item["VCH TYPE"] === "Sales Return") {
-        return (
-          sum +
-          parseFloat(item["QTY"]) * parseFloat(product.purchase_price || 0)
-        );
-      } else {
-        // "Purchase Return"
-        return sum + parseFloat(item["VALUE"]);
-      }
-    }, 0);
-
-    const opening_inventory = Number(product.initial_qty || 0);
-    const closing_inventory = Number(product.total_stock || 0);
-
-    // 5️⃣ Assemble and Return Final Response
     return res.status(200).json({
       success: true,
       product_info: product,
-      opening_inventory,
-      closing_inventory,
-      sales_history: {
-        transactions: sales_history_array,
-        total_sales: total_sales.toFixed(2),
-        total_sales_cost: total_sales_cost.toFixed(2),
-      },
-      purchase_history: {
-        transactions: purchase_history_array,
-        total_purchase: total_purchase.toFixed(2),
-        total_purchase_cost: total_purchase_cost.toFixed(2),
-      },
-      return_history: {
-        transactions: return_history_array,
-        total_return: total_return.toFixed(2),
-        total_return_cost: total_return_cost.toFixed(2),
-      },
-      all_transactions,
+      all_transactions: allTransactions,
+      purchase_history,
+      sales_history,
+      return_history
     });
+
   } catch (error) {
-    console.error("Inventory Details Error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
+
