@@ -119,6 +119,7 @@ export const createPasswordChangeRequest = async (req, res) => {
       data: {
         company_id: companyIdInt,
         reason,
+        updated_at: new Date(),
       },
     });
 
