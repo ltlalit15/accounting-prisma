@@ -80,7 +80,7 @@ export const getAllPasswordChangeRequests = async (req, res) => {
     // Find all requests and include the related user's details
     const requests = await prisma.password_change_requests.findMany({
       include: {
-        user: {
+        users: {
           select: {
             id: true,
             name: true, // This is the company's name
