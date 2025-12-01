@@ -7,6 +7,69 @@ import bcrypt from "bcryptjs";
  * @route   POST /api/password/request
  * @access  Public (or Company, depending on your auth middleware)
  */
+// export const createPasswordChangeRequest = async (req, res) => {
+//   try {
+//     const { company_id, reason } = req.body;
+
+//     // 1. Validate input
+//     if (!company_id || !reason) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Company ID and reason are required.",
+//       });
+//     }
+
+//     // 2. Check if the company (user) exists
+//     const company = await prisma.users.findUnique({
+//       where: { id: company_id },
+//     });
+
+//     if (!company) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Company not found.",
+//       });
+//     }
+
+//     // 3. Check if there's already a PENDING request for this company
+//     const existingRequest = await prisma.password_change_requests.findFirst({
+//       where: {
+//         company_id,
+//         status: "Pending",
+//       },
+//     });
+
+//     if (existingRequest) {
+//       return res.status(409).json({
+//         // 409 Conflict is appropriate here
+//         success: false,
+//         message:
+//           "A password change request is already pending for this company.",
+//       });
+//     }
+
+//     // 4. Create the new password change request
+//     const passwordChangeRequest = await prisma.password_change_requests.create({
+//       data: {
+//         company_id,
+//         reason,
+//       },
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Password change request submitted successfully.",
+//       data: passwordChangeRequest,
+//     });
+//   } catch (error) {
+//     console.error("Error creating password change request:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
 export const createPasswordChangeRequest = async (req, res) => {
   try {
     const { company_id, reason } = req.body;
@@ -19,9 +82,12 @@ export const createPasswordChangeRequest = async (req, res) => {
       });
     }
 
+    // Parse company_id to integer
+    const companyIdInt = parseInt(company_id);
+
     // 2. Check if the company (user) exists
     const company = await prisma.users.findUnique({
-      where: { id: company_id },
+      where: { id: companyIdInt },
     });
 
     if (!company) {
@@ -34,7 +100,7 @@ export const createPasswordChangeRequest = async (req, res) => {
     // 3. Check if there's already a PENDING request for this company
     const existingRequest = await prisma.password_change_requests.findFirst({
       where: {
-        company_id,
+        company_id: companyIdInt,
         status: "Pending",
       },
     });
@@ -51,7 +117,7 @@ export const createPasswordChangeRequest = async (req, res) => {
     // 4. Create the new password change request
     const passwordChangeRequest = await prisma.password_change_requests.create({
       data: {
-        company_id,
+        company_id: companyIdInt,
         reason,
       },
     });
@@ -69,7 +135,6 @@ export const createPasswordChangeRequest = async (req, res) => {
     });
   }
 };
-
 /**
  * @desc    Get all password change requests for the admin
  * @route   GET /api/password/requests
