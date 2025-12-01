@@ -1,226 +1,28 @@
-
-
-// // Utility: Convert to number safely (for Decimal/BigInt) - Not strictly needed for roles, but kept for consistency.
-// const toNumber = (val) => {
-//   if (val == null) return 0;
-//   if (typeof val === 'object' && typeof val.toNumber === 'function') {
-//     return val.toNumber();
-//   }
-//   return Number(val);
-// };
-
-
-// // ✅ Create Role
-// export const createRole = async (req, res) => {
-//   try {
-//     const { role_name, role_type_id, general_permissions = [] } = req.body;
-
-//     if (!role_name || !role_type_id) {
-//       return res.status(400).json({ status: false, message: "role_name and role_type_id are required" });
-//     }
-
-//     // Ensure general_permissions is an array
-//     const permissionsArray = Array.isArray(general_permissions) ? general_permissions : [];
-
-//     const newRole = await prisma.roles.create({
-//       data: {
-//         role_name,
-//         role_type_id: parseInt(role_type_id),
-//         general_permissions: JSON.stringify(permissionsArray), // Store as JSON string
-//       },
-//     });
-
-//     res.status(201).json({ status: true, message: "Role created successfully", data: newRole });
-//   } catch (error) {
-//     console.error("Error creating role:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-// // ✅ Get All Roles (without type_name)
-// export const getAllRoles = async (req, res) => {
-//   try {
-//     const roles = await prisma.roles.findMany();
-
-//     // Parse general_permissions from JSON string to array
-//     const cleanedRoles = roles.map(role => ({
-//       ...role,
-//       general_permissions: role.general_permissions
-//         ? JSON.parse(role.general_permissions)
-//         : [],
-//       type_name: null, // 👈 Since we can't join, set to null
-//     }));
-
-//     res.json({
-//       status: true,
-//       message: "Roles fetched successfully",
-//       data: cleanedRoles,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching roles:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-// // ✅ Get Role By ID (without type_name)
-// export const getRoleById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     const role = await prisma.roles.findUnique({
-//       where: { id: parseInt(id) },
-//     });
-
-//     if (!role) {
-//       return res.status(404).json({ status: false, message: "Role not found" });
-//     }
-
-//     // Parse general_permissions from JSON string to array
-//     const cleanedRole = {
-//       ...role,
-//       general_permissions: role.general_permissions
-//         ? JSON.parse(role.general_permissions)
-//         : [],
-//       type_name: null, // 👈 Since we can't join, set to null
-//     };
-
-//     res.json({
-//       status: true,
-//       message: "Role fetched successfully",
-//       data: cleanedRole,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching role by ID:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-// // ✅ Get Roles by Company ID (without type_name)
-// export const getRolesByCompanyId = async (req, res) => {
-//   try {
-//     const { company_id } = req.params;
-
-//     const roles = await prisma.roles.findMany({
-//       where: {
-//         company_id: parseInt(company_id),
-//       },
-//     });
-
-//     if (roles.length === 0) {
-//       return res.status(404).json({ status: false, message: "No roles found for this company" });
-//     }
-
-//     // Parse general_permissions from JSON string to array
-//     const cleanedRoles = roles.map(role => ({
-//       ...role,
-//       general_permissions: role.general_permissions
-//         ? JSON.parse(role.general_permissions)
-//         : [],
-//       type_name: null, // 👈 Since we can't join, set to null
-//     }));
-
-//     res.json({
-//       status: true,
-//       message: "Roles fetched successfully",
-//       data: cleanedRoles,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching roles by company ID:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-// // ✅ Update Role
-// export const updateRole = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { role_name, role_type_id, general_permissions } = req.body;
-
-//     // Find the existing role
-//     const existingRole = await prisma.roles.findUnique({
-//       where: { id: parseInt(id) },
-//     });
-
-//     if (!existingRole) {
-//       return res.status(404).json({ status: false, message: "Role not found" });
-//     }
-
-//     // Ensure general_permissions is an array
-//     const permissionsArray = Array.isArray(general_permissions) ? general_permissions : [];
-
-//     // Update the role
-//     const updatedRole = await prisma.roles.update({
-//       where: { id: parseInt(id) },
-//       data: {
-//         role_name: role_name || existingRole.role_name,
-//         role_type_id: role_type_id ? parseInt(role_type_id) : existingRole.role_type_id,
-//         general_permissions: JSON.stringify(permissionsArray), // Store as JSON string
-//       },
-//     });
-
-//     res.json({ status: true, message: "Role updated successfully", data: updatedRole });
-//   } catch (error) {
-//     console.error("Error updating role:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-// // ✅ Delete Role
-// export const deleteRole = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Find the role first to check existence (optional, but good for user feedback)
-//     const existingRole = await prisma.roles.findUnique({
-//       where: { id: parseInt(id) },
-//     });
-
-//     if (!existingRole) {
-//       return res.status(404).json({ status: false, message: "Role not found" });
-//     }
-
-//     // Delete the role
-//     const deletedRole = await prisma.roles.delete({
-//       where: { id: parseInt(id) },
-//     });
-
-//     res.json({ status: true, message: "Role deleted successfully", data: deletedRole });
-//   } catch (error) {
-//     // Check if the error is because the record doesn't exist (Prisma will throw an error)
-//     if (error.code === 'P2025') { // Record to delete does not exist
-//       return res.status(404).json({ status: false, message: "Role not found" });
-//     }
-//     console.error("Error deleting role:", error);
-//     res.status(500).json({ status: false, message: error.message });
-//   }
-// };
-
-
 import prisma from "../config/db.js";
 
 export const createRole = async (req, res) => {
   try {
     const { company_id, role_name, general_permissions, permissions } = req.body;
 
-    // ✅ Basic validation
     if (!role_name)
       return res.status(400).json({ success: false, message: "Role name is required" });
 
-    // ✅ Create Role with nested permissions
-    const role = await prisma.userRoles.create({
+    // Ensure stored as JSON string (or change as per your preference)
+    const role = await prisma.userroles.create({
       data: {
         company_id: company_id ? Number(company_id) : null,
         role_name,
         general_permissions: JSON.stringify(general_permissions || []),
         permissions: {
-          create: permissions?.map((p) => ({
-            module_name: p.module_name,
-            can_create: !!p.can_create,
-            can_view: !!p.can_view,
-            can_update: !!p.can_update,
-            can_delete: !!p.can_delete,
-            full_access: !!p.full_access,
-          })) || [],
+          create:
+            permissions?.map((p) => ({
+              module_name: p.module_name,
+              can_create: !!p.can_create,
+              can_view: !!p.can_view,
+              can_update: !!p.can_update,
+              can_delete: !!p.can_delete,
+              full_access: !!p.full_access,
+            })) || [],
         },
       },
       include: {
@@ -235,19 +37,14 @@ export const createRole = async (req, res) => {
   }
 };
 
-/**
- * 🔹 GET ALL ROLES
- */
 export const getAllRoles = async (req, res) => {
   try {
-    const { company_id } = req.query; // Get company_id from query params
+    const { company_id } = req.query;
 
-    let filter = {};
-    if (company_id) {
-      filter.company_id = parseInt(company_id); // Convert to Int
-    }
+    const filter = {};
+    if (company_id) filter.company_id = parseInt(company_id, 10);
 
-    const roles = await prisma.userRoles.findMany({
+    const roles = await prisma.userroles.findMany({
       where: filter,
       include: { permissions: true },
       orderBy: { created_at: "desc" },
@@ -255,9 +52,7 @@ export const getAllRoles = async (req, res) => {
 
     res.json({
       success: true,
-      message: company_id
-        ? `Roles for company_id ${company_id} fetched successfully`
-        : "All roles fetched successfully",
+      message: company_id ? `Roles for company_id ${company_id} fetched` : "All roles fetched",
       data: roles,
     });
   } catch (error) {
@@ -266,20 +61,15 @@ export const getAllRoles = async (req, res) => {
   }
 };
 
-/**
- * 🔹 GET ROLE BY ID
- */
 export const getRoleById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const role = await prisma.userRoles.findUnique({
+    const role = await prisma.userroles.findUnique({
       where: { id: Number(id) },
       include: { permissions: true },
     });
 
-    if (!role)
-      return res.status(404).json({ success: false, message: "Role not found" });
+    if (!role) return res.status(404).json({ success: false, message: "Role not found" });
 
     res.json({ success: true, data: role });
   } catch (error) {
@@ -288,41 +78,44 @@ export const getRoleById = async (req, res) => {
   }
 };
 
-/**
- * 🔹 UPDATE ROLE
- */
 export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { role_name, general_permissions, permissions } = req.body;
+    const roleId = Number(id);
 
-    // ✅ Update role details
-    const updatedRole = await prisma.userRoles.update({
-      where: { id: Number(id) },
-      data: {
-        role_name,
-        general_permissions: JSON.stringify(general_permissions || []),
-      },
-    });
+    // Check role exists
+    const existing = await prisma.userroles.findUnique({ where: { id: roleId } });
+    if (!existing) return res.status(404).json({ success: false, message: "Role not found" });
 
-    // ✅ Delete old permissions & recreate
-    await prisma.role_permissions.deleteMany({ where: { role_id: Number(id) } });
+    // Transactional update: update role, delete old perms, create new perms
+    await prisma.$transaction([
+      prisma.userroles.update({
+        where: { id: roleId },
+        data: {
+          role_name,
+          general_permissions: JSON.stringify(general_permissions || []),
+        },
+      }),
+      prisma.role_permissions.deleteMany({ where: { role_id: roleId } }),
+      // createMany might fail silently on empty array; ensure array exists
+      ...(permissions && permissions.length
+        ? [prisma.role_permissions.createMany({
+            data: permissions.map((p) => ({
+              role_id: roleId,
+              module_name: p.module_name,
+              can_create: !!p.can_create,
+              can_view: !!p.can_view,
+              can_update: !!p.can_update,
+              can_delete: !!p.can_delete,
+              full_access: !!p.full_access,
+            })),
+          })]
+        : []),
+    ]);
 
-    await prisma.role_permissions.createMany({
-      data:
-        permissions?.map((p) => ({
-          role_id: Number(id),
-          module_name: p.module_name,
-          can_create: !!p.can_create,
-          can_view: !!p.can_view,
-          can_update: !!p.can_update,
-          can_delete: !!p.can_delete,
-          full_access: !!p.full_access,
-        })) || [],
-    });
-
-    const roleWithPermissions = await prisma.userRoles.findUnique({
-      where: { id: Number(id) },
+    const roleWithPermissions = await prisma.userroles.findUnique({
+      where: { id: roleId },
       include: { permissions: true },
     });
 
@@ -333,23 +126,19 @@ export const updateRole = async (req, res) => {
   }
 };
 
-
 export const updateRoleStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    if (!status)
+      return res.status(400).json({ success: false, message: "Status is required" });
 
-    // 🧩 Validate input
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: "Status is required",
-      });
-    }
+    const roleId = Number(id);
+    const existing = await prisma.userroles.findUnique({ where: { id: roleId } });
+    if (!existing) return res.status(404).json({ success: false, message: "Role not found" });
 
-    // ✅ Update status only
-    const updatedRole = await prisma.userRoles.update({
-      where: { id: Number(id) },
+    const updatedRole = await prisma.userroles.update({
+      where: { id: roleId },
       data: { status },
     });
 
@@ -360,25 +149,19 @@ export const updateRoleStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Update role status error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update role status",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * 🔹 DELETE ROLE
- */
 export const deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
+    const roleId = Number(id);
 
-    await prisma.userRoles.delete({
-      where: { id: Number(id) },
-    });
+    const existing = await prisma.userroles.findUnique({ where: { id: roleId } });
+    if (!existing) return res.status(404).json({ success: false, message: "Role not found" });
 
+    await prisma.userroles.delete({ where: { id: roleId } });
     res.json({ success: true, message: "Role deleted successfully" });
   } catch (error) {
     console.error("Delete Role Error:", error);

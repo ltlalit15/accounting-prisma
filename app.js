@@ -37,8 +37,10 @@ import cashflowRoutes from "./src/routes/cashflow.routes.js";
 import dayBookRoutes from "./src/routes/dayBook.routes.js";
 import taxReportRoutes from "./src/routes/taxReport.routes.js";
 import getDashboardRoutes from "./src/routes/dashboard.routes.js";
-import passwordChangeRoutes from "./src/routes/passwordChange.routes.js";
+import journalRoutes from "./src/routes/journalEntries.routes.js";
+import profitLossRoutes from "./src/routes/profitLoss.Routes.js";
 import paymentRoutes from "./src/routes/payment.routes.js";
+import passwordChangeRoutes from "./src/routes/passwordChange.routes.js";
 
 const router = express.Router();
 
@@ -82,5 +84,7 @@ router.use("/payment", paymentRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/planreq", planRequestRoutes);
 router.use("/password", passwordChangeRoutes);
+router.use("/journals", journalRoutes);
+router.use("/Statement", profitLossRoutes);
 
 export default router;
