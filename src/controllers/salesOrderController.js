@@ -1,10 +1,11 @@
 // src/controllers/salesOrderController.js
-{/**
+{
+  /**
 import prisma from "../config/db.js";
 import { v2 as cloudinary } from 'cloudinary';
- */}
+ */
+}
 // Configure Cloudinary once (use .env in production)
-
 
 // ✅ Create Sales Order (dedicated POST endpoint)
 // export const createSalesOrder = async (req, res) => {
@@ -194,10 +195,6 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   }
 // };
-
-
-
-
 
 // export const createSalesOrder = async (req, res) => {
 //   try {
@@ -392,7 +389,6 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   }
 // };
-
 
 // export const createSalesOrder = async (req, res) => {
 //   try {
@@ -594,7 +590,6 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   }
 // };
-
 
 // export const createSalesOrder = async (req, res) => {
 //   try {
@@ -909,8 +904,11 @@ import { v2 as cloudinary } from 'cloudinary';
 //     });
 //   }
 // };
-{/*------------------------------------------------------------------------------- */ }
-{/*
+{
+  /*------------------------------------------------------------------------------- */
+}
+{
+  /*
 
 cloudinary.config({
   cloud_name: 'dkqcqrrbp',
@@ -1683,8 +1681,8 @@ export const updateSalesOrderStep = async (req, res) => {
   }
 };
 
- */}
-
+ */
+}
 
 import { uploadToCloudinary } from "../config/cloudinary.js";
 import prisma from "../config/db.js";
@@ -3457,7 +3455,6 @@ const handleFileUploads = async (data, fileFields) => {
 //     //   });
 //     // }
 
-
 //     // if (!orderId && (!Array.isArray(body.items) || body.items.length === 0)) {
 //     //   return res.status(400).json({
 //     //     success: false,
@@ -3842,14 +3839,10 @@ const handleFileUploads = async (data, fileFields) => {
 //   }
 // };
 
-
-
-
 export const createOrUpdateSalesOrder = async (req, res) => {
   try {
     const body = { ...req.body };
     const orderId = req.method === "PUT" ? Number(req.params.id) : null;
-
     if (!body.company_info) body.company_info = {};
     if (!body.additional_info) body.additional_info = {};
 
@@ -3896,7 +3889,6 @@ export const createOrUpdateSalesOrder = async (req, res) => {
     // }
 
     if (req.files) {
-
       // MULTIPLE IMAGES: files[]
       if (req.files.files) {
         const filesArr = Array.isArray(req.files.files)
@@ -3919,13 +3911,13 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       // }
 
       if (req.files.logo_url) {
-  const logoFile = Array.isArray(req.files.logo_url)
-    ? req.files.logo_url[0]
-    : req.files.logo_url;
+        const logoFile = Array.isArray(req.files.logo_url)
+          ? req.files.logo_url[0]
+          : req.files.logo_url;
 
-  const url = await uploadToCloudinary(logoFile, "sales_logo");
-  if (url) body.company_info.logo_url = url;
-}
+        const url = await uploadToCloudinary(logoFile, "sales_logo");
+        if (url) body.company_info.logo_url = url;
+      }
 
       // SINGLE FILE: signature_url
       // if (req.files.signature_url) {
@@ -3933,61 +3925,78 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       //   if (url) body.additional_info.signature_url = url;
       // }
       if (req.files.signature_url) {
-  const file = Array.isArray(req.files.signature_url)
-    ? req.files.signature_url[0]
-    : req.files.signature_url;
+        const file = Array.isArray(req.files.signature_url)
+          ? req.files.signature_url[0]
+          : req.files.signature_url;
 
-  const url = await uploadToCloudinary(file, "sales_signature");
-  if (url) body.additional_info.signature_url = url;
-}
+        const url = await uploadToCloudinary(file, "sales_signature");
+        if (url) body.additional_info.signature_url = url;
+      }
 
       // SINGLE FILE: photo_url
       // if (req.files.photo_url) {
       //   const url = await uploadToCloudinary(req.files.photo_url, "sales_photo");
       //   if (url) body.additional_info.photo_url = url;
       // }
-       if (req.files.photo_url) {
-  const file = Array.isArray(req.files.photo_url)
-    ? req.files.photo_url[0]
-    : req.files.photo_url;
+      if (req.files.photo_url) {
+        const file = Array.isArray(req.files.photo_url)
+          ? req.files.photo_url[0]
+          : req.files.photo_url;
 
-  const url = await uploadToCloudinary(file, "sales_photo");
-  if (url) body.additional_info.photo_url = url;
-}
-      
+        const url = await uploadToCloudinary(file, "sales_photo");
+        if (url) body.additional_info.photo_url = url;
+      }
 
       // SINGLE FILE: attachment_url
       // if (req.files.attachment_url) {
       //   const url = await uploadToCloudinary(req.files.attachment_url, "sales_attachment");
       //   if (url) body.additional_info.attachment_url = url;
       // }
-       if (req.files.attachment_url) {
-  const file = Array.isArray(req.files.attachment_url)
-    ? req.files.attachment_url[0]
-    : req.files.attachment_url;
+      //        if (req.files.attachment_url) {
+      //   const file = Array.isArray(req.files.attachment_url)
+      //     ? req.files.attachment_url[0]
+      //     : req.files.attachment_url;
 
-  const url = await uploadToCloudinary(file, "sales_attachment");
-  if (url) body.additional_info.attachment_url = url;
-}
+      //   const url = await uploadToCloudinary(file, "sales_attachment");
+      //   if (url) body.additional_info.attachment_url = url;
+      // }
+
+      if (req.files.attachment_url) {
+        // Ensure we are always working with an array
+        const attachmentFiles = Array.isArray(req.files.attachment_url)
+          ? req.files.attachment_url
+          : [req.files.attachment_url];
+
+        const attachmentUrls = [];
+        // Loop through each file, upload it, and collect the URL
+        for (const file of attachmentFiles) {
+          const url = await uploadToCloudinary(file, "sales_attachment");
+          if (url) {
+            attachmentUrls.push(url);
+          }
+        }
+
+        // Convert the array of URLs to a single JSON string to be stored in the DB
+        if (attachmentUrls.length > 0) {
+          body.additional_info.attachment_url = JSON.stringify(attachmentUrls);
+        }
+      }
     }
 
-   
     //Safe helper to preserve existing values
-      const safeMerge = (oldObj = {}, newObj = {}) => {
-  const merged = { ...oldObj };
-  for (const key in newObj) {
-    if (
-      newObj[key] !== undefined &&
-      newObj[key] !== null &&
-      newObj[key] !== ""
-    ) {
-      merged[key] = newObj[key];
-    }
-  }
-  return merged;
-};
-
-
+    const safeMerge = (oldObj = {}, newObj = {}) => {
+      const merged = { ...oldObj };
+      for (const key in newObj) {
+        if (
+          newObj[key] !== undefined &&
+          newObj[key] !== null &&
+          newObj[key] !== ""
+        ) {
+          merged[key] = newObj[key];
+        }
+      }
+      return merged;
+    };
 
     // ================= STEP COMPLETION RULES =================
     const stepRequired = {
@@ -4026,22 +4035,22 @@ export const createOrUpdateSalesOrder = async (req, res) => {
     // ================= SHIPPING =================
     const shipping = body.shipping_details
       ? {
-        bill_to_company_name: body.shipping_details.bill_to_name || "",
-        bill_to_company_address: body.shipping_details.bill_to_address || "",
-        bill_to_company_email: body.shipping_details.bill_to_email || "",
-        bill_to_company_phone: body.shipping_details.bill_to_phone || "",
-        bill_to_attention_name:
-          body.shipping_details.bill_to_attention_name || "",
+          bill_to_company_name: body.shipping_details.bill_to_name || "",
+          bill_to_company_address: body.shipping_details.bill_to_address || "",
+          bill_to_company_email: body.shipping_details.bill_to_email || "",
+          bill_to_company_phone: body.shipping_details.bill_to_phone || "",
+          bill_to_attention_name:
+            body.shipping_details.bill_to_attention_name || "",
 
-        ship_to_company_name: body.shipping_details.ship_to_name || "",
-        ship_to_company_address: body.shipping_details.ship_to_address || "",
-        ship_to_company_email: body.shipping_details.ship_to_email || "",
-        ship_to_company_phone: body.shipping_details.ship_to_phone || "",
-        ship_to_attention_name:
-          body.shipping_details.ship_to_attention_name || "",
-      }
+          ship_to_company_name: body.shipping_details.ship_to_name || "",
+          ship_to_company_address: body.shipping_details.ship_to_address || "",
+          ship_to_company_email: body.shipping_details.ship_to_email || "",
+          ship_to_company_phone: body.shipping_details.ship_to_phone || "",
+          ship_to_attention_name:
+            body.shipping_details.ship_to_attention_name || "",
+        }
       : orderId
-        ? {
+      ? {
           bill_to_company_name: existingOrder.bill_to_company_name,
           bill_to_company_address: existingOrder.bill_to_company_address,
           bill_to_company_email: existingOrder.bill_to_company_email,
@@ -4054,38 +4063,38 @@ export const createOrUpdateSalesOrder = async (req, res) => {
           ship_to_company_phone: existingOrder.ship_to_company_phone,
           ship_to_attention_name: existingOrder.ship_to_attention_name,
         }
-        : {};
+      : {};
 
     // ================= COMPANY INFO =================
     const companyData = body.company_info
       ? {
-        company_id: Number(body.company_info.company_id),
-        company_name: body.company_info.company_name,
-        company_address: body.company_info.company_address,
-        company_email: body.company_info.company_email,
-        company_phone: body.company_info.company_phone,
-        logo_url: body.company_info.logo_url || "",
-        bank_name: body.company_info.bank_name || "",
-        account_no: body.company_info.account_no || "",
-        account_holder: body.company_info.account_holder || "",
-        ifsc_code: body.company_info.ifsc_code || "",
-        terms: body.company_info.terms || "",
-      }
+          company_id: Number(body.company_info.company_id),
+          company_name: body.company_info.company_name,
+          company_address: body.company_info.company_address,
+          company_email: body.company_info.company_email,
+          company_phone: body.company_info.company_phone,
+          logo_url: body.company_info.logo_url || "",
+          bank_name: body.company_info.bank_name || "",
+          account_no: body.company_info.account_no || "",
+          account_holder: body.company_info.account_holder || "",
+          ifsc_code: body.company_info.ifsc_code || "",
+          terms: body.company_info.terms || "",
+        }
       : orderId
-        ? existingOrder
-        : {};
+      ? existingOrder
+      : {};
 
     // ================= ITEMS =================
     const itemsData = body.items
       ? body.items.map((i) => ({
-        item_name: i.item_name,
-        qty: Number(i.qty),
-        rate: Number(i.rate),
-        tax_percent: Number(i.tax_percent),
-        discount: Number(i.discount),
-        amount: Number(i.amount),
-        warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
-      }))
+          item_name: i.item_name,
+          qty: Number(i.qty),
+          rate: Number(i.rate),
+          tax_percent: Number(i.tax_percent),
+          discount: Number(i.discount),
+          amount: Number(i.amount),
+          warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
+        }))
       : existingItems;
 
     // ================= DB DATA =================
@@ -4105,26 +4114,24 @@ export const createOrUpdateSalesOrder = async (req, res) => {
       qoutation_to_customer_name: steps.quotation.qoutation_to_customer_name,
       qoutation_to_customer_address:
         steps.quotation.qoutation_to_customer_address,
-      qoutation_to_customer_email:
-        steps.quotation.qoutation_to_customer_email,
-      qoutation_to_customer_phone:
-        steps.quotation.qoutation_to_customer_phone,
+      qoutation_to_customer_email: steps.quotation.qoutation_to_customer_email,
+      qoutation_to_customer_phone: steps.quotation.qoutation_to_customer_phone,
       notes: steps.quotation.notes,
       customer_ref: steps.quotation.customer_ref,
 
-      SO_no: steps.sales_order.SO_no ,
-      Manual_SO_ref: steps.sales_order.manual_ref_no ,
-      manual_quo_no: steps.sales_order.manual_quo_no ,
+      SO_no: steps.sales_order.SO_no,
+      Manual_SO_ref: steps.sales_order.manual_ref_no,
+      manual_quo_no: steps.sales_order.manual_quo_no,
       sales_order_status: steps.sales_order.status,
 
-      Challan_no: steps.delivery_challan.challan_no ,
-      Manual_challan_no: steps.delivery_challan.manual_challan_no ,
+      Challan_no: steps.delivery_challan.challan_no,
+      Manual_challan_no: steps.delivery_challan.manual_challan_no,
       delivery_challan_status: steps.delivery_challan.status,
       driver_name: steps.delivery_challan.driver_name,
       driver_phone: steps.delivery_challan.driver_phone,
 
-      invoice_no: steps.invoice.invoice_no ,
-      Manual_invoice_no: steps.invoice.manual_invoice_no ,
+      invoice_no: steps.invoice.invoice_no,
+      Manual_invoice_no: steps.invoice.manual_invoice_no,
       invoice_date: steps.invoice.invoice_date
         ? new Date(steps.invoice.invoice_date)
         : null,
@@ -4158,45 +4165,135 @@ export const createOrUpdateSalesOrder = async (req, res) => {
         : existingOrder?.subtotal || 0,
       total: body.total ? Number(body.total) : existingOrder?.total || 0,
       updated_at: new Date(),
-      total_invoice: steps.payment.total_invoice !== undefined 
-  ? Number(steps.payment.total_invoice)
-  : existingOrder?.total_invoice || 0,
+      total_invoice:
+        steps.payment.total_invoice !== undefined
+          ? Number(steps.payment.total_invoice)
+          : existingOrder?.total_invoice || 0,
 
-balance: steps.payment.balance !== undefined
-  ? Number(steps.payment.balance)
-  : existingOrder?.balance || 0,
+      balance:
+        steps.payment.balance !== undefined
+          ? Number(steps.payment.balance)
+          : existingOrder?.balance || 0,
     };
 
     // ================= CREATE OR UPDATE =================
     let savedOrder;
 
+    // if (orderId) {
+    //   if (body.items) {
+    //     await prisma.salesorderitems.deleteMany({
+    //       where: { sales_order_id: orderId },
+    //     });
+    //   }
+
+    // savedOrder = await prisma.salesorder.update({
+    //   where: { id: orderId },
+    //   data: {
+    //     ...dbData,
+    //     ...(body.items && { salesorderitems: { create: itemsData } }),
+    //   },
+    //   include: { salesorderitems: true },
+    // });
+    //       savedOrder = await prisma.salesorder.update({
+    //   where: { id: orderId },
+    //   data: {
+    //     ...safeMerge(existingOrder, dbData),
+    //     ...(body.items && { salesorderitems: { create: itemsData } }),
+    //   },
+    //   include: { salesorderitems: true },
+    // });
+    //     }
+    //     else {
+    //       savedOrder = await prisma.salesorder.create({
+    //         data: {
+    //           ...dbData,
+    //           created_at: new Date(),
+    //           salesorderitems: { create: itemsData },
+    //         },
+    //         include: { salesorderitems: true },
+    //       });
+    //     }
+
     if (orderId) {
-      if (body.items) {
-        await prisma.salesorderitems.deleteMany({
-          where: { sales_order_id: orderId },
+      // Check if the request includes items to be updated
+      if (body.items && Array.isArray(body.items)) {
+        // Use a transaction to ensure all item operations and the main update succeed or fail together.
+        savedOrder = await prisma.$transaction(async (tx) => {
+          // --- Step 1: Sync the salesorderitems ---
+
+          // a) Identify items to be deleted (present in DB but not in the request)
+          const incomingItemIds = body.items
+            .filter((item) => item.id) // Filter out items that don't have an ID (they are new)
+            .map((item) => item.id);
+
+          // Delete any items associated with the order that are NOT in the incoming list.
+          await tx.salesorderitems.deleteMany({
+            where: {
+              sales_order_id: orderId,
+              ...(incomingItemIds.length > 0 && {
+                id: { notIn: incomingItemIds },
+              }),
+            },
+          });
+
+          // b) Update or create each item from the request
+          for (const item of body.items) {
+            const itemData = {
+              item_name: item.item_name,
+              qty: Number(item.qty),
+              rate: Number(item.rate),
+              tax_percent: Number(item.tax_percent),
+              discount: Number(item.discount),
+              amount: Number(item.amount),
+              warehouse_id: item.warehouse_id
+                ? Number(item.warehouse_id)
+                : null,
+            };
+
+            if (item.id) {
+              // Update existing item
+              await tx.salesorderitems.update({
+                where: { id: item.id },
+                data: itemData,
+              });
+            } else {
+              // Create new item
+              await tx.salesorderitems.create({
+                data: {
+                  ...itemData,
+                  sales_order_id: orderId,
+                },
+              });
+            }
+          }
+
+          // --- Step 2: Update the main salesorder record ---
+          // Use safeMerge for scalar fields, then filter out the relation.
+          const mergedData = safeMerge(existingOrder, dbData);
+          const { salesorderitems, ...dataForUpdate } = mergedData;
+
+          const updatedOrder = await tx.salesorder.update({
+            where: { id: orderId },
+            data: dataForUpdate,
+            include: { salesorderitems: true },
+          });
+
+          return updatedOrder;
+        });
+      } else {
+        // --- If no items are sent, just update the main order fields ---
+        // This is your original partial update logic, now cleaned up.
+        const mergedData = safeMerge(existingOrder, dbData);
+        const { salesorderitems, ...dataForUpdate } = mergedData;
+
+        savedOrder = await prisma.salesorder.update({
+          where: { id: orderId },
+          data: dataForUpdate,
+          include: { salesorderitems: true },
         });
       }
-
-      
-
-
-      // savedOrder = await prisma.salesorder.update({
-      //   where: { id: orderId },
-      //   data: {
-      //     ...dbData,
-      //     ...(body.items && { salesorderitems: { create: itemsData } }),
-      //   },
-      //   include: { salesorderitems: true },
-      // });
-      savedOrder = await prisma.salesorder.update({
-  where: { id: orderId },
-  data: {
-    ...safeMerge(existingOrder, dbData),
-    ...(body.items && { salesorderitems: { create: itemsData } }),
-  },
-  include: { salesorderitems: true },
-});
     } else {
+      // The CREATE logic remains the same
       savedOrder = await prisma.salesorder.create({
         data: {
           ...dbData,
@@ -4223,7 +4320,7 @@ balance: steps.payment.balance !== undefined
           account_no: savedOrder.account_no,
           account_holder: savedOrder.account_holder,
           ifsc_code: savedOrder.ifsc_code,
-          terms: savedOrder.terms
+          terms: savedOrder.terms,
         },
 
         shipping_details: {
@@ -4237,57 +4334,58 @@ balance: steps.payment.balance !== undefined
           ship_to_address: savedOrder.ship_to_company_address,
           ship_to_email: savedOrder.ship_to_company_email,
           ship_to_phone: savedOrder.ship_to_company_phone,
-          ship_to_attention_name: savedOrder.ship_to_attention_name
+          ship_to_attention_name: savedOrder.ship_to_attention_name,
         },
 
         steps: {
           quotation: {
-            status: savedOrder.quotation_status,    // ← status added
+            status: savedOrder.quotation_status, // ← status added
             quotation_no: savedOrder.quotation_no,
             manual_quo_no: savedOrder.manual_quo_no,
             quotation_date: savedOrder.quotation_date,
             valid_till: savedOrder.valid_till,
             qoutation_to_customer_name: savedOrder.qoutation_to_customer_name,
-            qoutation_to_customer_address: savedOrder.qoutation_to_customer_address,
+            qoutation_to_customer_address:
+              savedOrder.qoutation_to_customer_address,
             qoutation_to_customer_email: savedOrder.qoutation_to_customer_email,
             qoutation_to_customer_phone: savedOrder.qoutation_to_customer_phone,
             notes: savedOrder.notes,
-            customer_ref: savedOrder.customer_ref
+            customer_ref: savedOrder.customer_ref,
           },
 
           sales_order: {
-            status: savedOrder.sales_order_status,   // ← added
+            status: savedOrder.sales_order_status, // ← added
             SO_no: savedOrder.SO_no,
             manual_ref_no: savedOrder.Manual_SO_ref,
-            manual_quo_no: savedOrder.manual_quo_no
+            manual_quo_no: savedOrder.manual_quo_no,
           },
 
           delivery_challan: {
-            status: savedOrder.delivery_challan_status,  // ← added
+            status: savedOrder.delivery_challan_status, // ← added
             challan_no: savedOrder.Challan_no,
             manual_challan_no: savedOrder.Manual_challan_no,
             driver_name: savedOrder.driver_name,
-            driver_phone: savedOrder.driver_phone
+            driver_phone: savedOrder.driver_phone,
           },
 
           invoice: {
-            status: savedOrder.invoice_status,     // ← added
+            status: savedOrder.invoice_status, // ← added
             invoice_no: savedOrder.invoice_no,
             manual_invoice_no: savedOrder.Manual_invoice_no,
             invoice_date: savedOrder.invoice_date,
-            due_date: savedOrder.due_date
+            due_date: savedOrder.due_date,
           },
 
           payment: {
-            status: savedOrder.payment_status,    // ← added
+            status: savedOrder.payment_status, // ← added
             payment_no: savedOrder.Payment_no,
             manual_payment_no: savedOrder.Manual_payment_no,
             payment_date: savedOrder.payment_date,
             amount_received: savedOrder.amount_received,
-            balance:savedOrder.balance,
+            balance: savedOrder.balance,
             payment_note: savedOrder.payment_note,
-            total_invoice: savedOrder.total_invoice 
-          }
+            total_invoice: savedOrder.total_invoice,
+          },
         },
 
         items: savedOrder.salesorderitems,
@@ -4296,12 +4394,28 @@ balance: steps.payment.balance !== undefined
           files: body.additional_info.files || existingOrder?.files || [],
           signature_url: savedOrder.signature_url,
           photo_url: savedOrder.photo_url,
-          attachment_url: savedOrder.attachment_url
+          attachment_url: (() => {
+            // If there's no attachment URL, return an empty array.
+            if (!savedOrder.attachment_url) {
+              return [];
+            }
+
+            try {
+              // Try to parse it as a JSON array (the new format).
+              const parsed = JSON.parse(savedOrder.attachment_url);
+              // Ensure the result is an array, even if it was a single JSON string like '"url"'
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              // If parsing fails, it's the old format (a single URL string).
+              // Wrap it in an array to maintain consistency for the frontend.
+              return [savedOrder.attachment_url];
+            }
+          })(),
         },
 
         sub_total: savedOrder.subtotal,
-        total: savedOrder.total
-      }
+        total: savedOrder.total,
+      },
     });
   } catch (err) {
     console.error("Error:", err);
@@ -4313,12 +4427,9 @@ balance: steps.payment.balance !== undefined
   }
 };
 
-
-
-
 const toNumber = (val) => {
   if (val == null) return 0;
-  if (typeof val === 'object' && typeof val.toNumber === 'function') {
+  if (typeof val === "object" && typeof val.toNumber === "function") {
     return val.toNumber();
   }
   return Number(val);
@@ -4326,16 +4437,24 @@ const toNumber = (val) => {
 const isStepCompleted1 = (stepData) => {
   // Check if essential fields for the step are filled
   switch (stepData.step) {
-    case 'quotation':
-      return stepData.quotation_no && stepData.quotation_date && stepData.qoutation_to_customer_name;
-    case 'sales_order':
+    case "quotation":
+      return (
+        stepData.quotation_no &&
+        stepData.quotation_date &&
+        stepData.qoutation_to_customer_name
+      );
+    case "sales_order":
       return stepData.SO_no || stepData.Manual_SO_ref;
-    case 'delivery_challan':
+    case "delivery_challan":
       return stepData.Challan_no || stepData.Manual_challan_no;
-    case 'invoice':
+    case "invoice":
       return stepData.invoice_no || stepData.Manual_invoice_no;
-    case 'payment':
-      return stepData.Payment_no || stepData.Manual_payment_no || stepData.amount_received > 0;
+    case "payment":
+      return (
+        stepData.Payment_no ||
+        stepData.Manual_payment_no ||
+        stepData.amount_received > 0
+      );
     default:
       return false;
   }
@@ -4357,20 +4476,20 @@ const structureSalesOrderBySteps = (salesOrder) => {
     account_holder: salesOrder.account_holder,
     ifsc_code: salesOrder.ifsc_code,
     created_at: salesOrder.created_at,
-    updated_at: salesOrder.updated_at
+    updated_at: salesOrder.updated_at,
   };
 
   // Process items data - ensure it's always an array
   let itemsData = [];
   if (salesOrder.salesorderitems && Array.isArray(salesOrder.salesorderitems)) {
-    itemsData = salesOrder.salesorderitems.map(item => ({
+    itemsData = salesOrder.salesorderitems.map((item) => ({
       id: item.id,
       item_name: item.item_name || "",
       qty: toNumber(item.qty || 0),
       rate: toNumber(item.rate || 0),
       tax_percent: toNumber(item.tax_percent || 0),
       discount: toNumber(item.discount || 0),
-      amount: toNumber(item.amount || 0)
+      amount: toNumber(item.amount || 0),
     }));
   }
 
@@ -4384,7 +4503,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
     customer_name: salesOrder.bill_to_customer_name || "",
     customer_address: salesOrder.bill_to_customer_address || "",
     customer_email: salesOrder.bill_to_customer_email || "",
-    customer_phone: salesOrder.bill_to_customer_phone || ""
+    customer_phone: salesOrder.bill_to_customer_phone || "",
   };
 
   // Common SHIP TO details
@@ -4397,18 +4516,20 @@ const structureSalesOrderBySteps = (salesOrder) => {
     customer_name: salesOrder.ship_to_customer_name || "",
     customer_address: salesOrder.ship_to_customer_address || "",
     customer_email: salesOrder.ship_to_customer_email || "",
-    customer_phone: salesOrder.ship_to_customer_phone || ""
+    customer_phone: salesOrder.ship_to_customer_phone || "",
   };
 
   // Quotation step
   const quotationStep = {
-    step: 'quotation',
+    step: "quotation",
     status: isStepCompleted1({
-      step: 'quotation',
+      step: "quotation",
       quotation_no: salesOrder.quotation_no,
       quotation_date: salesOrder.quotation_date,
-      qoutation_to_customer_name: salesOrder.qoutation_to_customer_name
-    }) ? 'completed' : 'pending',
+      qoutation_to_customer_name: salesOrder.qoutation_to_customer_name,
+    })
+      ? "completed"
+      : "pending",
     data: {
       ref_no: salesOrder.ref_no || "",
       Manual_ref_ro: salesOrder.Manual_ref_ro || "",
@@ -4417,7 +4538,8 @@ const structureSalesOrderBySteps = (salesOrder) => {
       quotation_date: salesOrder.quotation_date,
       valid_till: salesOrder.valid_till,
       qoutation_to_customer_name: salesOrder.qoutation_to_customer_name || "",
-      qoutation_to_customer_address: salesOrder.qoutation_to_customer_address || "",
+      qoutation_to_customer_address:
+        salesOrder.qoutation_to_customer_address || "",
       qoutation_to_customer_email: salesOrder.qoutation_to_customer_email || "",
       qoutation_to_customer_phone: salesOrder.qoutation_to_customer_phone || "",
       // BILL TO details
@@ -4429,18 +4551,20 @@ const structureSalesOrderBySteps = (salesOrder) => {
       discount: toNumber(salesOrder.discount || 0),
       total: toNumber(salesOrder.total || 0),
       quotation_status: salesOrder.quotation_status || "Pending",
-      draft_status: salesOrder.draft_status || "Draft"
-    }
+      draft_status: salesOrder.draft_status || "Draft",
+    },
   };
 
   // Sales Order step
   const salesOrderStep = {
-    step: 'sales_order',
+    step: "sales_order",
     status: isStepCompleted1({
-      step: 'sales_order',
+      step: "sales_order",
       SO_no: salesOrder.SO_no,
-      Manual_SO_ref: salesOrder.Manual_SO_ref
-    }) ? 'completed' : 'pending',
+      Manual_SO_ref: salesOrder.Manual_SO_ref,
+    })
+      ? "completed"
+      : "pending",
     data: {
       SO_no: salesOrder.SO_no || "",
       Manual_SO_ref: salesOrder.Manual_SO_ref || "",
@@ -4448,18 +4572,20 @@ const structureSalesOrderBySteps = (salesOrder) => {
       bill_to: billToDetails,
       // SHIP TO details
       ship_to: shipToDetails,
-      sales_order_status: salesOrder.sales_order_status || "Pending"
-    }
+      sales_order_status: salesOrder.sales_order_status || "Pending",
+    },
   };
 
   // Delivery Challan step
   const deliveryChallanStep = {
-    step: 'delivery_challan',
+    step: "delivery_challan",
     status: isStepCompleted1({
-      step: 'delivery_challan',
+      step: "delivery_challan",
       Challan_no: salesOrder.Challan_no,
-      Manual_challan_no: salesOrder.Manual_challan_no
-    }) ? 'completed' : 'pending',
+      Manual_challan_no: salesOrder.Manual_challan_no,
+    })
+      ? "completed"
+      : "pending",
     data: {
       Challan_no: salesOrder.Challan_no || "",
       Manual_challan_no: salesOrder.Manual_challan_no || "",
@@ -4470,18 +4596,20 @@ const structureSalesOrderBySteps = (salesOrder) => {
       ship_to: shipToDetails,
       driver_name: salesOrder.driver_name || "",
       driver_phone: salesOrder.driver_phone || "",
-      delivery_challan_status: salesOrder.delivery_challan_status || "Pending"
-    }
+      delivery_challan_status: salesOrder.delivery_challan_status || "Pending",
+    },
   };
 
   // Invoice step
   const invoiceStep = {
-    step: 'invoice',
+    step: "invoice",
     status: isStepCompleted1({
-      step: 'invoice',
+      step: "invoice",
       invoice_no: salesOrder.invoice_no,
-      Manual_invoice_no: salesOrder.Manual_invoice_no
-    }) ? 'completed' : 'pending',
+      Manual_invoice_no: salesOrder.Manual_invoice_no,
+    })
+      ? "completed"
+      : "pending",
     data: {
       invoice_no: salesOrder.invoice_no || "",
       Manual_invoice_no: salesOrder.Manual_invoice_no || "",
@@ -4490,28 +4618,42 @@ const structureSalesOrderBySteps = (salesOrder) => {
       bill_to: billToDetails,
       // SHIP TO details (carried forward from previous steps)
       ship_to: shipToDetails,
-      invoice_status: salesOrder.invoice_status || "Pending"
-    }
+      invoice_status: salesOrder.invoice_status || "Pending",
+    },
   };
 
   // Payment step
   const paymentStep = {
-    step: 'payment',
+    step: "payment",
     status: isStepCompleted1({
-      step: 'payment',
+      step: "payment",
       Payment_no: salesOrder.Payment_no,
       Manual_payment_no: salesOrder.Manual_payment_no,
-      amount_received: salesOrder.amount_received
-    }) ? 'completed' : 'pending',
+      amount_received: salesOrder.amount_received,
+    })
+      ? "completed"
+      : "pending",
     data: {
       Payment_no: salesOrder.Payment_no || "",
       Manual_payment_no: salesOrder.Manual_payment_no || "",
       // RECEIVED FROM details
       received_from: {
-        customer_name: salesOrder.payment_received_customer_name || salesOrder.qoutation_to_customer_name || "",
-        customer_address: salesOrder.payment_received_customer_address || salesOrder.qoutation_to_customer_address || "",
-        customer_email: salesOrder.payment_received_customer_email || salesOrder.qoutation_to_customer_email || "",
-        customer_phone: salesOrder.payment_received_customer_phone || salesOrder.qoutation_to_customer_phone || ""
+        customer_name:
+          salesOrder.payment_received_customer_name ||
+          salesOrder.qoutation_to_customer_name ||
+          "",
+        customer_address:
+          salesOrder.payment_received_customer_address ||
+          salesOrder.qoutation_to_customer_address ||
+          "",
+        customer_email:
+          salesOrder.payment_received_customer_email ||
+          salesOrder.qoutation_to_customer_email ||
+          "",
+        customer_phone:
+          salesOrder.payment_received_customer_phone ||
+          salesOrder.qoutation_to_customer_phone ||
+          "",
       },
       // PAYMENT DETAILS
       payment_details: {
@@ -4519,9 +4661,9 @@ const structureSalesOrderBySteps = (salesOrder) => {
         total_amount: toNumber(salesOrder.total_amount || 0),
         payment_status: salesOrder.payment_status || "Pending",
         balance: toNumber(salesOrder.balance || 0),
-        payment_note: salesOrder.payment_note || ""
-      }
-    }
+        payment_note: salesOrder.payment_note || "",
+      },
+    },
   };
 
   // Additional information
@@ -4529,7 +4671,7 @@ const structureSalesOrderBySteps = (salesOrder) => {
     customer_ref: salesOrder.customer_ref || "",
     signature_url: salesOrder.signature_url || "",
     photo_url: salesOrder.photo_url || "",
-    attachment_url: salesOrder.attachment_url || ""
+    attachment_url: salesOrder.attachment_url || "",
   };
 
   return {
@@ -4540,12 +4682,11 @@ const structureSalesOrderBySteps = (salesOrder) => {
       salesOrderStep,
       deliveryChallanStep,
       invoiceStep,
-      paymentStep
+      paymentStep,
     ],
-    additional_info: additionalInfo
+    additional_info: additionalInfo,
   };
 };
-
 
 // export const getSalesOrdersByCompanyId = async (req, res) => {
 //   try {
@@ -4596,16 +4737,18 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 
     const salesOrders = await prisma.salesorder.findMany({
       where: { company_id: Number(companyId) },
-      include: { salesorderitems: {
-        include: {
-      warehouse: true
-    }
-      } },
+      include: {
+        salesorderitems: {
+          include: {
+            warehouse: true,
+          },
+        },
+      },
       orderBy: { created_at: "desc" },
     });
-    const formattedOrders = salesOrders.map(order => {
-
-      const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
+    const formattedOrders = salesOrders.map((order) => {
+      const stepStatus = (value) =>
+        value && value !== "" ? "completed" : "pending";
 
       return {
         company_info: {
@@ -4622,11 +4765,10 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
           terms: order.terms,
           id: order.id,
           created_at: order.created_at,
-          updated_at: order.updated_at
+          updated_at: order.updated_at,
         },
 
         shipping_details: {
-
           bill_to_name: order.bill_to_company_name,
           bill_to_address: order.bill_to_company_address,
           bill_to_email: order.bill_to_company_email,
@@ -4637,8 +4779,7 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
           ship_to_address: order.ship_to_company_address,
           ship_to_email: order.ship_to_company_email,
           ship_to_phone: order.ship_to_company_phone,
-          ship_to_attention_name: order.ship_to_attention_name
-
+          ship_to_attention_name: order.ship_to_attention_name,
         },
 
         steps: {
@@ -4653,7 +4794,7 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             qoutation_to_customer_email: order.qoutation_to_customer_email,
             qoutation_to_customer_phone: order.qoutation_to_customer_phone,
             notes: order.notes,
-            customer_ref: order.customer_ref
+            customer_ref: order.customer_ref,
           },
 
           sales_order: {
@@ -4667,7 +4808,7 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             challan_no: order.Challan_no,
             manual_challan_no: order.Manual_challan_no,
             driver_name: order.driver_name,
-            driver_phone: order.driver_phone
+            driver_phone: order.driver_phone,
           },
 
           invoice: {
@@ -4675,7 +4816,7 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             invoice_no: order.invoice_no,
             manual_invoice_no: order.Manual_invoice_no,
             invoice_date: order.invoice_date,
-            due_date: order.due_date
+            due_date: order.due_date,
           },
 
           payment: {
@@ -4684,10 +4825,10 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
             manual_payment_no: order.Manual_payment_no,
             payment_date: order.payment_date,
             amount_received: order.amount_received,
-            balance:order.balance,
+            balance: order.balance,
             total_invoice: order.total_invoice,
-            payment_note: order.payment_note
-          }
+            payment_note: order.payment_note,
+          },
         },
 
         items: order.salesorderitems,
@@ -4696,26 +4837,19 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
           files: order.files || [],
           signature_url: order.signature_url,
           photo_url: order.photo_url,
-          attachment_url: order.attachment_url
-
+          attachment_url: order.attachment_url,
         },
 
         sub_total: order.subtotal,
-        total: order.total
+        total: order.total,
       };
     });
-
-
-
-
-
 
     return res.status(200).json({
       success: true,
       message: `Sales orders for company ID ${companyId} fetched successfully`,
       data: formattedOrders,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -4726,7 +4860,6 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 };
 
 // export const getSalesOrderById = async (req, res) => {
-
 
 //   try {
 //     const { id } = req.params;
@@ -4769,7 +4902,6 @@ export const getSalesOrdersByCompanyId = async (req, res) => {
 //     });
 //   }
 // };
-
 
 // export const getSalesOrderById = async (req, res) => {
 //   try {
@@ -4918,11 +5050,13 @@ export const getSalesOrderById = async (req, res) => {
     // Fetch only 1 sales order
     const order = await prisma.salesorder.findUnique({
       where: { id: Number(id) },
-      include: { salesorderitems: {
-        include: {
-      warehouse: true
-    }
-      } },
+      include: {
+        salesorderitems: {
+          include: {
+            warehouse: true,
+          },
+        },
+      },
     });
 
     if (!order) {
@@ -4933,7 +5067,8 @@ export const getSalesOrderById = async (req, res) => {
     }
 
     // same logic used in getSalesOrdersByCompanyId
-    const stepStatus = (value) => value && value !== "" ? "completed" : "pending";
+    const stepStatus = (value) =>
+      value && value !== "" ? "completed" : "pending";
 
     const formattedOrder = {
       company_info: {
@@ -4950,7 +5085,7 @@ export const getSalesOrderById = async (req, res) => {
         terms: order.terms,
         id: order.id,
         created_at: order.created_at,
-        updated_at: order.updated_at
+        updated_at: order.updated_at,
       },
 
       shipping_details: {
@@ -4964,7 +5099,7 @@ export const getSalesOrderById = async (req, res) => {
         ship_to_address: order.ship_to_company_address,
         ship_to_email: order.ship_to_company_email,
         ship_to_phone: order.ship_to_company_phone,
-        ship_to_attention_name: order.ship_to_attention_name
+        ship_to_attention_name: order.ship_to_attention_name,
       },
 
       steps: {
@@ -4979,7 +5114,7 @@ export const getSalesOrderById = async (req, res) => {
           qoutation_to_customer_email: order.qoutation_to_customer_email,
           qoutation_to_customer_phone: order.qoutation_to_customer_phone,
           notes: order.notes,
-          customer_ref: order.customer_ref
+          customer_ref: order.customer_ref,
         },
 
         sales_order: {
@@ -4993,7 +5128,7 @@ export const getSalesOrderById = async (req, res) => {
           challan_no: order.Challan_no,
           manual_challan_no: order.Manual_challan_no,
           driver_name: order.driver_name,
-          driver_phone: order.driver_phone
+          driver_phone: order.driver_phone,
         },
 
         invoice: {
@@ -5001,7 +5136,7 @@ export const getSalesOrderById = async (req, res) => {
           invoice_no: order.invoice_no,
           manual_invoice_no: order.Manual_invoice_no,
           invoice_date: order.invoice_date,
-          due_date: order.due_date
+          due_date: order.due_date,
         },
 
         payment: {
@@ -5012,8 +5147,8 @@ export const getSalesOrderById = async (req, res) => {
           amount_received: order.amount_received,
           balance: order.balance,
           total_invoice: order.total_invoice,
-          payment_note: order.payment_note
-        }
+          payment_note: order.payment_note,
+        },
       },
 
       items: order.salesorderitems,
@@ -5022,19 +5157,18 @@ export const getSalesOrderById = async (req, res) => {
         files: order.files || [],
         signature_url: order.signature_url,
         photo_url: order.photo_url,
-        attachment_url: order.attachment_url
+        attachment_url: order.attachment_url,
       },
 
       sub_total: order.subtotal,
-      total: order.total
+      total: order.total,
     };
 
     return res.status(200).json({
       success: true,
       message: `Sales Order with ID ${id} fetched successfully`,
-      data: formattedOrder
+      data: formattedOrder,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -5044,13 +5178,12 @@ export const getSalesOrderById = async (req, res) => {
   }
 };
 
-
 export const deleteSalesOrder = async (req, res) => {
   try {
     const { id } = req.params;
 
     const salesOrder = await prisma.salesorder.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
     });
 
     if (!salesOrder) {
@@ -5062,25 +5195,24 @@ export const deleteSalesOrder = async (req, res) => {
 
     // Delete child items first
     await prisma.salesorderitems.deleteMany({
-      where: { sales_order_id: Number(id) }
+      where: { sales_order_id: Number(id) },
     });
 
     // Delete parent order
     await prisma.salesorder.delete({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
     });
 
     return res.status(200).json({
       success: true,
-      message: "Sales order deleted successfully"
+      message: "Sales order deleted successfully",
     });
-
   } catch (error) {
     console.error(error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete sales order",
-      error: error.message
+      error: error.message,
     });
   }
 };

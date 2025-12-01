@@ -26,18 +26,19 @@ import salesReport from "./src/routes/salesReport.routes.js";
 import purchaseReport from "./src/routes/purchaseReport.routes.js";
 import company from "./src/routes/companies.Routes.js";
 import purchaseOrder from "./src/routes/purchaseOrderRoutes.js";
-import inventoryRoutes from "./src/routes/inventory.routes.js"
-import planRequestRoutes from "./src/routes/requestforplan.Routes.js"
-import posReportRoutes from "./src/routes/posReport.routes.js"
-import vatReportRoutes from "./src/routes/vatReport.routes.js"
-import ledgerReport from "./src/routes/ledgerReport.routes.js"
-import balanceSheetRoutes from "./src/routes/balncesheet.routes.js"
-import getTrialBalanceRoutes from "./src/routes/getTrialBalance.routes.js"
-import cashflowRoutes from "./src/routes/cashflow.routes.js"
-import dayBookRoutes from "./src/routes/dayBook.routes.js"
-import taxReportRoutes from "./src/routes/taxReport.routes.js"
-import getDashboardRoutes from "./src/routes/dashboard.routes.js"
-
+import inventoryRoutes from "./src/routes/inventory.routes.js";
+import planRequestRoutes from "./src/routes/requestforplan.Routes.js";
+import posReportRoutes from "./src/routes/posReport.routes.js";
+import vatReportRoutes from "./src/routes/vatReport.routes.js";
+import ledgerReport from "./src/routes/ledgerReport.routes.js";
+import balanceSheetRoutes from "./src/routes/balncesheet.routes.js";
+import getTrialBalanceRoutes from "./src/routes/getTrialBalance.routes.js";
+import cashflowRoutes from "./src/routes/cashflow.routes.js";
+import dayBookRoutes from "./src/routes/dayBook.routes.js";
+import taxReportRoutes from "./src/routes/taxReport.routes.js";
+import getDashboardRoutes from "./src/routes/dashboard.routes.js";
+import passwordChangeRoutes from "./src/routes/passwordChange.routes.js";
+import paymentRoutes from "./src/routes/payment.routes.js";
 
 const router = express.Router();
 
@@ -62,7 +63,7 @@ router.use("/contravouchers", contravouchersRoutes);
 router.use("/taxclasses", taxClassRoutes);
 router.use("/posinvoice", posinvoiceRoutes);
 router.use("/pos-report", posReportRoutes);
-router.use("/vat-report",vatReportRoutes);
+router.use("/vat-report", vatReportRoutes);
 router.use("/", purchase);
 router.use("/sales-return", salesreturn);
 router.use("/sales-order", salesorder);
@@ -70,14 +71,16 @@ router.use("/sales-reports", salesReport);
 router.use("/ledger-report", ledgerReport);
 router.use("/purchase-reports", purchaseReport);
 router.use("/cashflow-reports", cashflowRoutes);
-router.use("/tax-report",taxReportRoutes);
-router.use("/dashboard",getDashboardRoutes);
+router.use("/tax-report", taxReportRoutes);
+router.use("/dashboard", getDashboardRoutes);
 router.use("/daybook", dayBookRoutes);
 router.use("/balance-sheet", balanceSheetRoutes);
 router.use("/trial-balance", getTrialBalanceRoutes);
 router.use("/companies", company);
 router.use("/purchase-orders", purchaseOrder);
+router.use("/payment", paymentRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/planreq", planRequestRoutes);
+router.use("/password", passwordChangeRoutes);
 
 export default router;
