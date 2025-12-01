@@ -2,11 +2,7 @@
 
 import prisma from "../config/db.js";
 import bcrypt from "bcryptjs";
-/**
- * @desc    Create a new password change request
- * @route   POST /api/password/request
- * @access  Public (or Company, depending on your auth middleware)
- */
+
 // export const createPasswordChangeRequest = async (req, res) => {
 //   try {
 //     const { company_id, reason } = req.body;
@@ -136,11 +132,7 @@ export const createPasswordChangeRequest = async (req, res) => {
     });
   }
 };
-/**
- * @desc    Get all password change requests for the admin
- * @route   GET /api/password/requests
- * @access  SuperAdmin
- */
+
 export const getAllPasswordChangeRequests = async (req, res) => {
   try {
     // Find all requests and include the related user's details
@@ -174,11 +166,6 @@ export const getAllPasswordChangeRequests = async (req, res) => {
   }
 };
 
-/**
- * @desc    Approve a password change request and set a new password
- * @route   PUT /api/password/requests/:requestId/approve
- * @access  SuperAdmin
- */
 export const approvePasswordChangeRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -245,11 +232,6 @@ export const approvePasswordChangeRequest = async (req, res) => {
   }
 };
 
-/**
- * @desc    Reject a password change request
- * @route   PUT /api/password/requests/:requestId/reject
- * @access  SuperAdmin
- */
 export const rejectPasswordChangeRequest = async (req, res) => {
   try {
     const { requestId } = req.params;

@@ -203,7 +203,6 @@ export const login = async (req, res) => {
 
     // Find user
     const user = await prisma.users.findUnique({ where: { email } });
-    
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -480,29 +479,48 @@ export const createCompany = async (req, res) => {
       !plan_id ||
       !planType
     ) {
-      return res.status(400).json({ message: "All required fields must be provided" });
+      return res
+        .status(400)
+        .json({ message: "All required fields must be provided" });
     }
 
     const existingUser = await prisma.users.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ message: "Company with this email already exists" });
+      return res
+        .status(409)
+        .json({ message: "Company with this email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let company_icon_url = null, favicon_url = null, company_logo_url = null, company_dark_logo_url = null;
+    let company_icon_url = null,
+      favicon_url = null,
+      company_logo_url = null,
+      company_dark_logo_url = null;
     if (req.files) {
       if (req.files.company_icon) {
-        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+        company_icon_url = await uploadToCloudinary(
+          req.files.company_icon[0].buffer,
+          "company_icons"
+        );
       }
       if (req.files.favicon) {
-        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+        favicon_url = await uploadToCloudinary(
+          req.files.favicon[0].buffer,
+          "company_favicons"
+        );
       }
       if (req.files.company_logo) {
-        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+        company_logo_url = await uploadToCloudinary(
+          req.files.company_logo[0].buffer,
+          "company_logos"
+        );
       }
       if (req.files.company_dark_logo) {
-        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+        company_dark_logo_url = await uploadToCloudinary(
+          req.files.company_dark_logo[0].buffer,
+          "company_dark_logos"
+        );
       }
     }
 
@@ -576,7 +594,6 @@ export const createCompany = async (req, res) => {
     });
   }
 };
-
 
 // export const updateCompany = async (req, res) => {
 //   try {
@@ -868,7 +885,7 @@ export const updateCompany = async (req, res) => {
       account_holder,
       ifsc_code,
       notes,
-      terms_and_conditions
+      terms_and_conditions,
     } = req.body;
 
     const companyId = parseInt(id);
@@ -940,7 +957,8 @@ export const updateCompany = async (req, res) => {
       account_holder: account_holder ?? existingCompany.account_holder,
       ifsc_code: ifsc_code ?? existingCompany.ifsc_code,
       notes: notes ?? existingCompany.notes,
-      terms_and_conditions: terms_and_conditions ?? existingCompany.terms_and_conditions,
+      terms_and_conditions:
+        terms_and_conditions ?? existingCompany.terms_and_conditions,
     };
 
     // ✅ 5. Update or create plan
@@ -1097,7 +1115,6 @@ export const updateCompany = async (req, res) => {
 //   }
 // };
 
-
 export const getCompanyById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1114,7 +1131,7 @@ export const getCompanyById = async (req, res) => {
       where: { id: Number(id) },
       include: {
         user_plans: true,
-        created_users: {
+        createdUsers: {
           select: {
             id: true,
             name: true,
@@ -1170,7 +1187,7 @@ export const getCompanyById = async (req, res) => {
       },
 
       user_plans: company.user_plans,
-      team_members: company.created_users, // 👈 users created under this company
+      team_members: company.createdUsers, // 👈 users created under this company
     };
 
     return res.status(200).json({
@@ -1187,7 +1204,6 @@ export const getCompanyById = async (req, res) => {
     });
   }
 };
-
 
 // export const getAllCompanies = async (req, res) => {
 //   try {
@@ -1278,7 +1294,6 @@ export const getCompanyById = async (req, res) => {
 //   }
 // };
 
-
 // export const getAllCompanies = async (req, res) => {
 //   try {
 //     // 🔹 Fetch all companies (role = COMPANY)
@@ -1361,7 +1376,7 @@ export const getCompanyById = async (req, res) => {
 //             }
 //           : null,
 //       })),
-      
+
 //       // Team members associated with the company
 //       team_members: company.created_users,
 //     }));
@@ -1485,7 +1500,6 @@ export const getAllCompanies = async (req, res) => {
   }
 };
 
-
 export const deleteCompany = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1592,7 +1606,7 @@ export const createUser = async (req, res) => {
         UserStatus: true,
         user_role: true,
         created_at: true,
-        company: {
+        createdByUser: {
           select: { id: true, name: true, email: true }, // show which company created them
         },
       },
@@ -1675,7 +1689,7 @@ export const updateUser = async (req, res) => {
         UserStatus: true,
         user_role: true,
         created_at: true,
-        company: {
+        createdByUser: {
           select: { id: true, name: true, email: true },
         },
       },
@@ -1752,7 +1766,7 @@ export const getUserById = async (req, res) => {
         UserStatus: true,
         user_role: true,
         created_at: true,
-        company: {
+        createdByUser: {
           select: { id: true, name: true, email: true, role: true },
         },
       },

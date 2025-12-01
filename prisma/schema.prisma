@@ -869,7 +869,7 @@ model password_change_requests {
   status     String   @default("Pending")
   email_sent Boolean  @default(false)
   created_at DateTime @default(now())
-  updated_at DateTime
+  updated_at DateTime @updatedAt
   users      users    @relation(fields: [company_id], references: [id], onDelete: Cascade)
 
   @@index([company_id])
