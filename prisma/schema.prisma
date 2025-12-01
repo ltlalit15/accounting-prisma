@@ -20,12 +20,9 @@ model plans {
   status                   PlanStatus        @default(Active)
   description              String?           @db.Text
   created_at               DateTime          @default(now())
-
-  // 🔗 Relation
-  plan_modules plan_modules[]
-  user_plans   user_plans[]
-  plan_requests plan_requests[]
-
+  plan_modules             plan_modules[]
+  plan_requests            plan_requests[]
+  user_plans               user_plans[]
 }
 
 model plan_modules {
@@ -33,136 +30,94 @@ model plan_modules {
   plan_id      Int
   module_name  String  @db.VarChar(100)
   module_price Decimal @default(0.00) @db.Decimal(10, 2)
+  plan         plans   @relation(fields: [plan_id], references: [id], onDelete: Cascade)
 
-  // 🔗 Relation to plans
-  plan plans @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  @@index([plan_id], map: "plan_modules_plan_id_fkey")
 }
-
-enum PlansBillingCycle {
-  Monthly
-  Yearly
-}
-
-enum PlanStatus {
-  Active
-  Inactive
-  Expired
-}
-
-//------------- planRequest ---------------//
 
 model plan_requests {
-  id            Int      @id @default(autoincrement())
- company_name  String   @db.VarChar(255)   
-  company_email String   @db.VarChar(255)   
+  id            Int               @id @default(autoincrement())
   plan_id       Int
   billing_cycle PlansBillingCycle @default(Monthly)
-  request_date  DateTime @default(now())
-  status        String   @default("Pending")
-
-  // Relations
-  plan    plans @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  request_date  DateTime          @default(now())
+  status        String            @default("Pending")
+  company_email String            @db.VarChar(255)
+  company_name  String            @db.VarChar(255)
+  plan          plans             @relation(fields: [plan_id], references: [id], onDelete: Cascade)
 
   @@index([plan_id])
 }
 
-
-// ------------ userroles permissions ----------- //
-model userRoles {
-  id                  Int      @id @default(autoincrement())
-  company_id          Int?
-  role_name           String
-  status              String   @default("Active")
-  general_permissions String?  @db.Text // stores JSON array like ["view","create","edit","full access"]
-  created_at          DateTime @default(now())
-
-  // 🔗 Relations
-  permissions role_permissions[]
-}
-
 model role_permissions {
-  id          Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   role_id     Int
-  module_name String // e.g., "Account", "Inventory", "POS"
-  can_create  Boolean @default(false)
-  can_view    Boolean @default(false)
-  can_update  Boolean @default(false)
-  can_delete  Boolean @default(false)
-  full_access Boolean @default(false)
+  module_name String
+  can_create  Boolean   @default(false)
+  can_view    Boolean   @default(false)
+  can_update  Boolean   @default(false)
+  can_delete  Boolean   @default(false)
+  full_access Boolean   @default(false)
+  role        userroles @relation(fields: [role_id], references: [id], onDelete: Cascade)
 
-  // Relation
-  role userRoles @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  @@index([role_id], map: "role_permissions_role_id_fkey")
 }
 
-
-
-// ----user models---- //
 model users {
-  id         Int       @id @default(autoincrement())
-  name       String
-  phone      String?
-  email      String    @unique
-  password   String
-  role       Role
-  profile    String?
-  startDate  DateTime?
-  expireDate DateTime?
-  UserStatus String?
-  user_role  String?
-  created_at DateTime  @default(now())
+  id                       Int      @id @default(autoincrement())
+  name                     String
+  phone                    String?
+  email                    String   @unique
+  password                 String
+  role                     Role
+  profile                  String?
+  startDate                DateTime?
+  expireDate               DateTime?
+  UserStatus               String?
+  created_at               DateTime @default(now())
+  created_by               Int?
+  user_role                String?
+  address                  String?  @db.VarChar(500)
+  city                     String?  @db.VarChar(100)
+  company_dark_logo_url    String?  @db.VarChar(500)
+  company_icon_url         String?  @db.VarChar(500)
+  company_logo_url         String?  @db.VarChar(500)
+  country                  String?  @db.VarChar(100)
+  currency                 String?  @db.VarChar(50)
+  favicon_url              String?  @db.VarChar(500)
+  postal_code              String?  @db.VarChar(20)
+  state                    String?  @db.VarChar(100)
+  account_holder           String?  @db.VarChar(150)
+  account_number           String?  @db.VarChar(50)
+  bank_name                String?  @db.VarChar(150)
+  ifsc_code                String?  @db.VarChar(50)
+  notes                    String?  @db.VarChar(1000)
+  terms_and_conditions     String?  @db.VarChar(1000)
 
-  created_by Int? // references users.id of role COMPANY
-  company    users? @relation("CompanyCreatedUsers", fields: [created_by], references: [id])
+  accounts                 accounts[]
+  adjustments              adjustments[]
+  password_change_requests password_change_requests[]
+  transactions             transactions[]
+  user_plans               user_plans[]
+  vendorscustomer          vendorscustomer[]
 
-  // 👇 Reverse relation (for COMPANY users)
-  created_users   users[]           @relation("CompanyCreatedUsers")
-  // 🔗 Relations
-  user_plans      user_plans[]
-  accounts        accounts[]
-  vendorscustomer vendorscustomer[]
-  transactions    transactions[]
-  adjustments     adjustments[]
+  // Company owning journal entries
+  journal_company_entries  journal_entries[] @relation("CompanyJournalEntries")
 
-  // 🏠 Address Information (new fields)
+  // CreatedBy for journal entries
+  journal_created_entries  journal_entries[] @relation("JournalCreatedBy")
 
-  address      String?   @db.VarChar(500)
-  country      String?   @db.VarChar(100)
-  state        String?   @db.VarChar(100)
-  city         String?   @db.VarChar(100)
-  postal_code  String?   @db.VarChar(20)
-  currency     String?   @db.VarChar(50)
-
-    // 🖼️ New Image Fields
-  company_icon_url      String? @db.VarChar(500)
-  favicon_url           String? @db.VarChar(500)
-  company_logo_url      String? @db.VarChar(500)
-  company_dark_logo_url String? @db.VarChar(500)
-
-   bank_name            String? @db.VarChar(150)
-  account_number       String? @db.VarChar(50)
-  account_holder       String? @db.VarChar(150)
-  ifsc_code            String? @db.VarChar(50)
-  notes                String? @db.VarChar(1000)
-  terms_and_conditions String? @db.VarChar(1000)
- 
-
-
+  // * Only ONE relation for created_by (no duplicate)
+  createdByUser            users?  @relation("CreatedUsersRelation", fields: [created_by], references: [id])
+  createdUsers             users[] @relation("CreatedUsersRelation")
 }
 
-enum Role {
-  SUPERADMIN
-  COMPANY
-  USER
 
-  
-}
 
 model roles {
-  id                  Int     @id @default(autoincrement())
-  role_name           String? @db.VarChar(100)
-  general_permissions String? @db.VarChar(500)
-
-  created_at DateTime @default(now()) @db.Timestamp(0)
+  id                  Int      @id @default(autoincrement())
+  role_name           String?  @db.VarChar(100)
+  general_permissions String?  @db.VarChar(500)
+  created_at          DateTime @default(now()) @db.Timestamp(0)
 }
 
 model user_plans {
@@ -172,120 +127,96 @@ model user_plans {
   planType   PlanType       @default(Monthly)
   status     UserPlanStatus @default(Active)
   created_at DateTime       @default(now())
-
-  // 🔗 Relations
-  plan plans @relation(fields: [plan_id], references: [id], onDelete: Cascade)
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan       plans          @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  user       users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([plan_id])
 }
 
-enum PlanType {
-  Monthly
-  Yearly
-}
-
-enum UserPlanStatus {
-  Active
-  Inactive
-  Expired
-}
-
-// ------ perent-account model -------- //
 model parent_accounts {
-  id            Int      @id @default(autoincrement())
-  main_category String
-  subgroup_name String
-  company_id    Int // 👈 the COMPANY user's id
-  created_at    DateTime @default(now())
-
-  // 👇 Relation to Sub of Subgroup
-  sub_of_subgroups sub_of_subgroups[]
+  id               Int                @id @default(autoincrement())
+  main_category    String
+  subgroup_name    String
+  company_id       Int
+  created_at       DateTime           @default(now())
   accounts         accounts[]
+  sub_of_subgroups sub_of_subgroups[]
 }
 
 model sub_of_subgroups {
-  id          Int      @id @default(autoincrement())
-  name        String
-  subgroup_id Int
-  created_at  DateTime @default(now())
-
-  // 👇 Relation to Parent Account
-  parent_account parent_accounts @relation(fields: [subgroup_id], references: [id])
+  id             Int             @id @default(autoincrement())
+  name           String
+  subgroup_id    Int
+  created_at     DateTime        @default(now())
   accounts       accounts[]
+  parent_account parent_accounts @relation(fields: [subgroup_id], references: [id])
+
+  @@index([subgroup_id], map: "sub_of_subgroups_subgroup_id_fkey")
 }
 
 model accounts {
-  id                 Int  @id @default(autoincrement())
-  company_id         Int
-  subgroup_id        Int
-  sub_of_subgroup_id Int?
+  id                   Int               @id @default(autoincrement())
+  company_id           Int
+  subgroup_id          Int
+  sub_of_subgroup_id   Int?
+  account_number       String?
+  ifsc_code            String?
+  bank_name_branch     String?
+  created_at           DateTime          @default(now())
+  accountBalance       Decimal           @default(0.00) @db.Decimal(10, 2)
 
-  account_number   String?
-  ifsc_code        String?
-  bank_name_branch String?
-  accountBalance   Decimal  @default(0.00) @db.Decimal(10, 2)
-  created_at       DateTime @default(now())
+  company              users             @relation(fields: [company_id], references: [id])
+  sub_of_subgroup      sub_of_subgroups? @relation(fields: [sub_of_subgroup_id], references: [id])
+  parent_account       parent_accounts   @relation(fields: [subgroup_id], references: [id])
 
-  // 🔗 Relations
-  company         users             @relation(fields: [company_id], references: [id])
-  parent_account  parent_accounts   @relation(fields: [subgroup_id], references: [id])
-  sub_of_subgroup sub_of_subgroups? @relation(fields: [sub_of_subgroup_id], references: [id])
+  // inverse for journal_lines.account
+  journal_lines        journal_lines[]   @relation("AccountJournalLines")
 
-  // ✅ Reverse relations for contra_vouchers
   from_contra_vouchers contra_vouchers[] @relation("from_contra_vouchers")
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
+
+  @@index([company_id])
+  @@index([sub_of_subgroup_id])
+  @@index([subgroup_id])
 }
 
-// ----- vendorscustomer model -------- //
 
 model vendorscustomer {
-  id         Int @id @default(autoincrement())
-  company_id Int // 🔗 Company (relation)
-
-  name_english    String
-  name_arabic     String?
-  company_name    String?
-  google_location String?
-  id_card_image   String?
-  any_file        String?
-
+  id                  Int                @id @default(autoincrement())
+  company_id          Int
+  name_english        String
+  name_arabic         String?
+  company_name        String?
+  google_location     String?
+  id_card_image       String?
+  any_file            String?
   account_type        String?
   balance_type        String?
   account_name        String?
-  account_balance     Float?    @default(0.0)
+  account_balance     Float?             @default(0)
   creation_date       DateTime?
   bank_account_number String?
   bank_ifsc           String?
   bank_name_branch    String?
+  country             String?
+  state               String?
+  pincode             String?
+  address             String?
+  state_code          String?
+  shipping_address    String?
+  phone               String?
+  email               String?
+  credit_period_days  Int?               @default(0)
+  enable_gst          Boolean?           @default(false)
+  gstIn               String?
+  type                venderCustomertype
+  created_at          DateTime           @default(now())
+  invoices            pos_invoices[]
+  company             users              @relation(fields: [company_id], references: [id])
 
-  country          String?
-  state            String?
-  pincode          String?
-  address          String?
-  state_code       String?
-  shipping_address String?
-
-  phone              String?
-  email              String?
-  credit_period_days Int?               @default(0)
-  enable_gst         Boolean?           @default(false)
-  gstIn              String?
-  type               venderCustomertype
-  created_at         DateTime           @default(now())
-
-  // 🔗 Relation to company
-  company  users          @relation(fields: [company_id], references: [id])
-  invoices pos_invoices[]
+  @@index([company_id], map: "vendorscustomer_company_id_fkey")
 }
-
-enum venderCustomertype {
-  vender
-  customer
-}
-
-// --------- transactions ---------- //
 
 model transactions {
   id             Int      @id @default(autoincrement())
@@ -301,78 +232,68 @@ model transactions {
   account_type   String?  @db.VarChar(255)
   note           String?  @db.Text
   created_at     DateTime @default(now()) @db.Timestamp(0)
+  company        users?   @relation(fields: [company_id], references: [id])
 
-  // ✅ Relation to users (company)
-  company users? @relation(fields: [company_id], references: [id])
+  @@index([company_id], map: "transactions_company_id_fkey")
 }
 
-// ------ warehouses ---------- //
 model warehouses {
-  id             Int      @id @default(autoincrement())
-  company_id     Int?
-  warehouse_name String?  @db.VarChar(255)
-  location       String?  @db.VarChar(255)
-  address_line1  String?  @db.VarChar(255)
-  address_line2  String?  @db.VarChar(255)
-  city           String?  @db.VarChar(100)
-  state          String?  @db.VarChar(100)
-  pincode        String?  @db.VarChar(20)
-  country        String?  @db.VarChar(100)
-  created_at     DateTime @default(now()) @db.Timestamp(0)
-
-  // ✅ New Many-to-Many Relation
-  product_warehouses product_warehouses[]
-  transfer_items     transfer_items[]
-   pos_invoice_products pos_invoice_products[] 
-   salesorderitems salesorderitems[] @relation("SOI_Warehouse")
+  id                   Int                    @id @default(autoincrement())
+  company_id           Int?
+  warehouse_name       String?                @db.VarChar(255)
+  location             String?                @db.VarChar(255)
+  created_at           DateTime               @default(now()) @db.Timestamp(0)
+  address_line1        String?                @db.VarChar(255)
+  address_line2        String?                @db.VarChar(255)
+  city                 String?                @db.VarChar(100)
+  country              String?                @db.VarChar(100)
+  pincode              String?                @db.VarChar(20)
+  state                String?                @db.VarChar(100)
+  pos_invoice_products pos_invoice_products[]
+  product_warehouses   product_warehouses[]
+  salesorderitems      salesorderitems[]      @relation("SOI_Warehouse")
+  transfer_items       transfer_items[]
 }
-
-//-------- item_category ---------- //
 
 model item_category {
-  id                 Int      @id @default(autoincrement())
+  id                 Int        @id @default(autoincrement())
   company_id         Int?
-  item_category_name String?  @db.VarChar(255)
-  created_at         DateTime @default(now()) @db.Timestamp(0)
-
-  products products[]
+  item_category_name String?    @db.VarChar(255)
+  created_at         DateTime   @default(now()) @db.Timestamp(0)
+  products           products[]
 }
 
-// ------------- products --------------- //
 model products {
-  id               Int       @id @default(autoincrement())
-  company_id       Int?
-  item_category_id Int?
-  unit_detail_id   Int?
-  item_name        String?   @db.VarChar(255)
-  hsn              String?   @db.VarChar(100)
-  barcode          String?   @db.VarChar(100)
-  sku              String?   @db.VarChar(100)
-  description      String?   @db.Text
-  initial_qty      Int?
-   total_stock      Int?      @default(0)
-  min_order_qty    Int?
-  as_of_date       String?   @db.VarChar(255)
-  initial_cost     Decimal?  @db.Decimal(15, 2)
-  sale_price       Decimal?  @db.Decimal(15, 2)
-  purchase_price   Decimal?  @db.Decimal(15, 2)
-  discount         Decimal?  @db.Decimal(5, 2)
-  tax_account      String?   @db.VarChar(255)
-  remarks          String?   @db.Text
-  image            String?   @db.VarChar(500)
-  created_at       DateTime  @default(now()) @db.Timestamp(0)
-  updated_at       DateTime? @updatedAt
-
-
-  // ✅ Existing relations
-  item_category    item_category?  @relation(fields: [item_category_id], references: [id])
-  unit_detail      unit_details?   @relation(fields: [unit_detail_id], references: [id])
-
-  // ✅ New Many-to-Many Relation
+  id                 Int                    @id @default(autoincrement())
+  company_id         Int?
+  item_category_id   Int?
+  item_name          String?                @db.VarChar(255)
+  hsn                String?                @db.VarChar(100)
+  barcode            String?                @db.VarChar(100)
+  sku                String?                @db.VarChar(100)
+  description        String?                @db.Text
+  initial_qty        Int?
+  min_order_qty      Int?
+  as_of_date         String?                @db.VarChar(255)
+  initial_cost       Decimal?               @db.Decimal(15, 2)
+  sale_price         Decimal?               @db.Decimal(15, 2)
+  purchase_price     Decimal?               @db.Decimal(15, 2)
+  discount           Decimal?               @db.Decimal(5, 2)
+  tax_account        String?                @db.VarChar(255)
+  remarks            String?                @db.Text
+  image              String?                @db.VarChar(500)
+  created_at         DateTime               @default(now()) @db.Timestamp(0)
+  unit_detail_id     Int?
+  total_stock        Int?                   @default(0)
+  updated_at         DateTime?              @updatedAt
+  invoice_products   pos_invoice_products[]
   product_warehouses product_warehouses[]
+  item_category      item_category?         @relation(fields: [item_category_id], references: [id])
+  unit_detail        unit_details?          @relation(fields: [unit_detail_id], references: [id])
+  transfer_items     transfer_items[]
 
-  transfer_items   transfer_items[]
-  invoice_products pos_invoice_products[]
+  @@index([item_category_id], map: "products_item_category_id_fkey")
+  @@index([unit_detail_id], map: "products_unit_detail_id_fkey")
 }
 
 model product_warehouses {
@@ -381,16 +302,13 @@ model product_warehouses {
   warehouse_id Int
   stock_qty    Int?       @default(0)
   created_at   DateTime   @default(now())
+  product      products   @relation(fields: [product_id], references: [id])
+  warehouse    warehouses @relation(fields: [warehouse_id], references: [id])
 
-  // ✅ Relations
-  product   products   @relation(fields: [product_id], references: [id])
-  warehouse warehouses @relation(fields: [warehouse_id], references: [id])
-
-  // ✅ Ensure unique pair
   @@unique([product_id, warehouse_id])
+  @@index([warehouse_id], map: "product_warehouses_warehouse_id_fkey")
 }
 
-// ----------------- uoms -------------------- //
 model uoms {
   id         Int      @id @default(autoincrement())
   company_id Int?
@@ -398,18 +316,16 @@ model uoms {
   created_at DateTime @default(now()) @db.Timestamp(0)
 }
 
-// -------------- unit_details -------------- //
 model unit_details {
-  id              Int      @id @default(autoincrement())
+  id              Int        @id @default(autoincrement())
   company_id      Int?
-  uom_name        String?   @db.VarChar(100) 
+  uom_name        String?    @db.VarChar(100)
+  weight_per_unit Float?
+  created_at      DateTime   @default(now()) @db.Timestamp(0)
   category        String
-  weight_per_unit Float? // ✅ No @db.VarChar — let Prisma choose REAL/DOUBLE
-  created_at      DateTime @default(now()) @db.Timestamp(0)
   products        products[]
 }
 
-// ---------- services ------------//
 model services {
   id               Int      @id @default(autoincrement())
   company_id       Int?
@@ -424,7 +340,6 @@ model services {
   created_at       DateTime @default(now()) @db.Timestamp(0)
 }
 
-//----------- vouchers --------------- //
 model vouchers {
   id                  Int                   @id @default(autoincrement())
   company_id          Int
@@ -481,7 +396,6 @@ model voucher_items {
   @@index([voucher_id], map: "voucher_id")
 }
 
-// --------------- transfers ------------- //
 model transfer_items {
   id                  Int        @id @default(autoincrement())
   transfer_id         Int
@@ -491,9 +405,9 @@ model transfer_items {
   rate                Decimal?   @default(0.00) @db.Decimal(15, 2)
   narration           String?    @db.VarChar(255)
   created_at          DateTime   @default(now()) @db.Timestamp(0)
-  transfers           transfers  @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
-  products            products   @relation(fields: [product_id], references: [id] ,  onDelete: Cascade , onUpdate: Cascade)
+  products            products   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   warehouses          warehouses @relation(fields: [source_warehouse_id], references: [id], onDelete: Cascade)
+  transfers           transfers  @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
 
   @@index([product_id])
   @@index([source_warehouse_id])
@@ -512,41 +426,34 @@ model transfers {
   transfer_items           transfer_items[]
 }
 
-// --------------- adjustment -------------- //
 model adjustment_items {
-  id            Int      @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   adjustment_id Int
   product_id    Int
   warehouse_id  Int
-  quantity      Decimal  @db.Decimal(10, 2)
-  rate          Decimal? @default(0.00) @db.Decimal(10, 2)
-  narration     String?  @db.Text
-
-  // 🔗 Relation to parent adjustment
-  adjustments adjustments @relation(fields: [adjustment_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "adjustment_items_ibfk_1")
+  quantity      Decimal     @db.Decimal(10, 2)
+  rate          Decimal?    @default(0.00) @db.Decimal(10, 2)
+  narration     String?     @db.Text
+  adjustments   adjustments @relation(fields: [adjustment_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "adjustment_items_ibfk_1")
 
   @@index([adjustment_id], map: "adjustment_id")
 }
 
 model adjustments {
-  id                Int      @id @default(autoincrement())
+  id                Int                @id @default(autoincrement())
   company_id        Int
-  voucher_no        String   @db.VarChar(50)
-  manual_voucher_no String?  @db.VarChar(50)
-  adjustment_type   String?  @db.VarChar(50)
-  voucher_date      DateTime @db.Date
-  notes             String?  @db.Text
-  total_value       Decimal? @default(0.00) @db.Decimal(15, 2)
-  created_at        DateTime @default(now()) @db.Timestamp(0)
-
-  // 🔗 Relations
-  adjustment_items adjustment_items[]
-  companies        users              @relation(fields: [company_id], references: [id], onUpdate: Restrict, map: "adjustments_ibfk_1")
+  voucher_no        String             @db.VarChar(50)
+  manual_voucher_no String?            @db.VarChar(50)
+  adjustment_type   String?            @db.VarChar(50)
+  voucher_date      DateTime           @db.Date
+  notes             String?            @db.Text
+  total_value       Decimal?           @default(0.00) @db.Decimal(15, 2)
+  created_at        DateTime           @default(now()) @db.Timestamp(0)
+  adjustment_items  adjustment_items[]
+  companies         users              @relation(fields: [company_id], references: [id], onUpdate: Restrict, map: "adjustments_ibfk_1")
 
   @@index([company_id], map: "company_id")
 }
-
-// --------------- expensevouchers ------------------ //
 
 model expensevoucher_items {
   id              Int             @id @default(autoincrement())
@@ -573,8 +480,6 @@ model expensevouchers {
   updated_at           DateTime               @default(now()) @db.Timestamp(0)
   expensevoucher_items expensevoucher_items[]
 }
-
-// ----------------- income_voucher_entries ------------------- //
 
 model income_vouchers {
   id                     Int                      @id @default(autoincrement())
@@ -603,199 +508,198 @@ model income_voucher_entries {
   @@index([voucher_id], map: "voucher_id")
 }
 
-// -------------- contra_vouchers --------------- //
-
 model contra_vouchers {
   id              Int      @id @default(autoincrement())
-  voucher_number  String
   voucher_date    DateTime
   account_from_id Int
   account_to_id   Int
   amount          Decimal  @db.Decimal(10, 2)
+  document        String?
   narration       String?
   created_at      DateTime @default(now())
+  voucher_number  String
   company_id      Int?
-  document        String?
   voucher_no_auto String?
+  account_from    accounts @relation("from_contra_vouchers", fields: [account_from_id], references: [id], map: "fk_contra_from_account")
+  account_to      accounts @relation("to_contra_vouchers", fields: [account_to_id], references: [id], map: "fk_contra_to_account")
 
-  // ✅ Relations
-  account_from accounts @relation("from_contra_vouchers", fields: [account_from_id], references: [id], map: "fk_contra_from_account")
-  account_to   accounts @relation("to_contra_vouchers", fields: [account_to_id], references: [id], map: "fk_contra_to_account")
+  @@index([account_from_id], map: "fk_contra_from_account")
+  @@index([account_to_id], map: "fk_contra_to_account")
 }
 
 model pos_invoices {
-  id             Int      @id @default(autoincrement())
+  id             Int                    @id @default(autoincrement())
   company_id     Int
   customer_id    Int
   tax_id         Int?
-  subtotal       Decimal  @db.Decimal(10, 2)
-  total          Decimal  @db.Decimal(10, 2)
-  payment_status String   @db.VarChar(50)
-  symbol         String?  @db.VarChar(10)
-  currency       String?  @db.VarChar(50)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  subtotal       Decimal                @db.Decimal(10, 2)
+  total          Decimal                @db.Decimal(10, 2)
+  payment_status String                 @db.VarChar(50)
+  created_at     DateTime               @default(now())
+  updated_at     DateTime               @updatedAt
+  currency       String?                @db.VarChar(50)
+  symbol         String?                @db.VarChar(10)
+  products       pos_invoice_products[]
+  customer       vendorscustomer        @relation(fields: [customer_id], references: [id])
+  tax_class      tax_classes?           @relation(fields: [tax_id], references: [id], onDelete: Cascade)
 
-  products pos_invoice_products[]
-  customer vendorscustomer        @relation(fields: [customer_id], references: [id])
-  tax_class tax_classes? @relation(fields: [tax_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
+  @@index([customer_id], map: "pos_invoices_customer_id_fkey")
+  @@index([tax_id], map: "pos_invoices_tax_id_fkey")
 }
 
 model tax_classes {
   company_id Int?
-  id         Int      @id @default(autoincrement())
-  tax_class  String   @db.VarChar(255)
-  tax_value  Decimal  @db.Decimal(10, 2)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id         Int            @id @default(autoincrement())
+  tax_class  String         @db.VarChar(255)
+  tax_value  Decimal        @db.Decimal(10, 2)
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
   invoices   pos_invoices[]
 }
 
 model pos_invoice_products {
-  id         Int     @id @default(autoincrement())
-  invoice_id Int
-  product_id Int
-  quantity   Int
-  price      Decimal @db.Decimal(10, 2)
-  warehouse_id  Int?
+  id           Int          @id @default(autoincrement())
+  invoice_id   Int
+  product_id   Int
+  quantity     Int
+  price        Decimal      @db.Decimal(10, 2)
+  warehouse_id Int?
+  invoice      pos_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  product      products     @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  warehouse    warehouses?  @relation(fields: [warehouse_id], references: [id])
 
-  
-  invoice pos_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  product products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  warehouse     warehouses?  @relation(fields: [warehouse_id], references: [id], onDelete: SetNull)
+  @@index([invoice_id], map: "pos_invoice_products_invoice_id_fkey")
+  @@index([product_id], map: "pos_invoice_products_product_id_fkey")
+  @@index([warehouse_id], map: "pos_invoice_products_warehouse_id_fkey")
 }
 
-
-
-
 model salesorder {
-  id                                Int                        @id @default(autoincrement())
+  id                                Int               @id @default(autoincrement())
   company_id                        Int?
-  company_name                      String?                    @db.VarChar(255)
-  company_address                   String?                    @db.Text
-  company_email                     String?                    @db.VarChar(255)
-  company_phone                     String?                    @db.VarChar(50)
-  logo_url                          String?                    @db.Text
-  qoutation_to_customer_name        String?                    @db.VarChar(255)
-  qoutation_to_customer_address     String?                    @db.Text
-  qoutation_to_customer_email       String?                    @db.VarChar(255)
-  qoutation_to_customer_phone       String?                    @db.VarChar(50)
-  ref_no                            String?                    @db.VarChar(100)
-  Manual_ref_ro                     String?                    @db.VarChar(100)
-  Payment_no                        String?                    @db.VarChar(100)
-  Manual_payment_no                 String?                    @db.VarChar(100)
-  invoice_no                        String?                    @db.VarChar(100)
-  Manual_invoice_no                 String?                    @db.VarChar(100)
-  Manual_SO_ref                     String?                    @db.VarChar(100)
-  Challan_no                        String?                    @db.VarChar(100)
-  Manual_challan_no                 String?                    @db.VarChar(100)
-  Manual_DC_no                      String?                    @db.VarChar(100)
-  status                        String?   @default("pending")
-  invoice_date      DateTime?   @db.Date
-  payment_date                       DateTime?   @db.Date
-  SO_no                             String?                    @db.VarChar(100)
-  customer_ref                      String?                    @db.VarChar(100)
-  quotation_no                      String?                    @db.VarChar(100)
-  manual_quo_no                     String?                    @db.VarChar(100)
-  quotation_date                    DateTime?                  @db.Date
-  valid_till                        DateTime?                  @db.Date
-  due_date                          DateTime?                  @db.Date
-  subtotal                          Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  tax                               Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  discount                          Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  total                             Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  bank_name                         String?                    @db.VarChar(255)
-  account_no                        String?                    @db.VarChar(100)
-  account_holder                    String?                    @db.VarChar(255)
-  ifsc_code                         String?                    @db.VarChar(50)
-  notes                             String?                    @db.Text
-  terms                             String?                    @db.Text
-  signature_url                     String?                    @db.Text
-  photo_url                         String?                    @db.Text
-  attachment_url                   String?                    @db.Text
-  bill_to_attention_name            String?                    @db.VarChar(255)
-  bill_to_company_name              String?                    @db.VarChar(255)
-  bill_to_company_address           String?                    @db.Text
-  bill_to_company_phone             String?                    @db.VarChar(50)
-  bill_to_company_email             String?                    @db.VarChar(255)
-  bill_to_customer_name             String?                    @db.VarChar(255)
-  bill_to_customer_address          String?                    @db.Text
-  bill_to_customer_email            String?                    @db.VarChar(255)
-  bill_to_customer_phone            String?                    @db.VarChar(50)
-  ship_to_attention_name            String?                    @db.VarChar(255)
-  ship_to_company_name              String?                    @db.VarChar(255)
-  ship_to_company_address           String?                    @db.Text
-  ship_to_company_phone             String?                    @db.VarChar(50)
-  ship_to_company_email             String?                    @db.VarChar(255)
-  ship_to_customer_name             String?                    @db.VarChar(255)
-  ship_to_customer_address          String?                    @db.Text
-  ship_to_customer_email            String?                    @db.VarChar(255)
-  ship_to_customer_phone            String?                    @db.VarChar(50)
-  payment_received_customer_name    String?                    @db.VarChar(255)
-  payment_received_customer_address String?                    @db.Text
-  payment_received_customer_email   String?                    @db.VarChar(255)
-  payment_received_customer_phone   String?                    @db.VarChar(50)
-  driver_name                       String?                    @db.VarChar(255)
-  driver_phone                      String?                    @db.VarChar(50)
-  amount_received                   Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  total_amount                      Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  payment_status                    String?                    @default("Pending") @db.VarChar(50)
-  total_invoice                     Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  balance                           Decimal?                   @default(0.00) @db.Decimal(15, 2)
-  payment_note                      String?                    @db.Text
-  quotation_status                  String?                    @default("Pending") @db.VarChar(50)
-  sales_order_status                String?                    @default("Pending") @db.VarChar(50)
-  delivery_challan_status           String?                    @default("Pending") @db.VarChar(50)
-  invoice_status                    String?                    @default("Pending") @db.VarChar(50)
-  draft_status                      String?                    @default("Draft") @db.VarChar(50)
-  created_at                        DateTime                   @default(now()) @db.Timestamp(0)
-  updated_at                        DateTime                   @default(now()) @db.Timestamp(0)
+  company_name                      String?           @db.VarChar(255)
+  company_address                   String?           @db.Text
+  company_email                     String?           @db.VarChar(255)
+  company_phone                     String?           @db.VarChar(50)
+  logo_url                          String?           @db.Text
+  qoutation_to_customer_name        String?           @db.VarChar(255)
+  qoutation_to_customer_address     String?           @db.Text
+  qoutation_to_customer_email       String?           @db.VarChar(255)
+  qoutation_to_customer_phone       String?           @db.VarChar(50)
+  ref_no                            String?           @db.VarChar(100)
+  Manual_ref_ro                     String?           @db.VarChar(100)
+  Payment_no                        String?           @db.VarChar(100)
+  payment_date                      DateTime?         @db.Date
+  Manual_payment_no                 String?           @db.VarChar(100)
+  invoice_no                        String?           @db.VarChar(100)
+  invoice_date                      DateTime?         @db.Date
+  Manual_invoice_no                 String?           @db.VarChar(100)
+  Manual_SO_ref                     String?           @db.VarChar(100)
+  Challan_no                        String?           @db.VarChar(100)
+  Manual_challan_no                 String?           @db.VarChar(100)
+  Manual_DC_no                      String?           @db.VarChar(100)
+  SO_no                             String?           @db.VarChar(100)
+  customer_ref                      String?           @db.VarChar(100)
+  quotation_no                      String?           @db.VarChar(100)
+  manual_quo_no                     String?           @db.VarChar(100)
+  quotation_date                    DateTime?         @db.Date
+  valid_till                        DateTime?         @db.Date
+  due_date                          DateTime?         @db.Date
+  subtotal                          Decimal?          @default(0.00) @db.Decimal(15, 2)
+  tax                               Decimal?          @default(0.00) @db.Decimal(15, 2)
+  discount                          Decimal?          @default(0.00) @db.Decimal(15, 2)
+  total                             Decimal?          @default(0.00) @db.Decimal(15, 2)
+  bank_name                         String?           @db.VarChar(255)
+  account_no                        String?           @db.VarChar(100)
+  account_holder                    String?           @db.VarChar(255)
+  ifsc_code                         String?           @db.VarChar(50)
+  notes                             String?           @db.Text
+  terms                             String?           @db.Text
+  signature_url                     String?           @db.Text
+  photo_url                         String?           @db.Text
+  attachment_url                    String?           @db.Text
+  bill_to_attention_name            String?           @db.VarChar(255)
+  bill_to_company_name              String?           @db.VarChar(255)
+  bill_to_company_address           String?           @db.Text
+  bill_to_company_phone             String?           @db.VarChar(50)
+  bill_to_company_email             String?           @db.VarChar(255)
+  bill_to_customer_name             String?           @db.VarChar(255)
+  bill_to_customer_address          String?           @db.Text
+  bill_to_customer_email            String?           @db.VarChar(255)
+  bill_to_customer_phone            String?           @db.VarChar(50)
+  ship_to_attention_name            String?           @db.VarChar(255)
+  ship_to_company_name              String?           @db.VarChar(255)
+  ship_to_company_address           String?           @db.Text
+  ship_to_company_phone             String?           @db.VarChar(50)
+  ship_to_company_email             String?           @db.VarChar(255)
+  ship_to_customer_name             String?           @db.VarChar(255)
+  ship_to_customer_address          String?           @db.Text
+  ship_to_customer_email            String?           @db.VarChar(255)
+  ship_to_customer_phone            String?           @db.VarChar(50)
+  payment_received_customer_name    String?           @db.VarChar(255)
+  payment_received_customer_address String?           @db.Text
+  payment_received_customer_email   String?           @db.VarChar(255)
+  payment_received_customer_phone   String?           @db.VarChar(50)
+  driver_name                       String?           @db.VarChar(255)
+  driver_phone                      String?           @db.VarChar(50)
+  amount_received                   Decimal?          @default(0.00) @db.Decimal(15, 2)
+  total_amount                      Decimal?          @default(0.00) @db.Decimal(15, 2)
+  payment_status                    String?           @default("Pending") @db.VarChar(50)
+  total_invoice                     Decimal?          @default(0.00) @db.Decimal(15, 2)
+  balance                           Decimal?          @default(0.00) @db.Decimal(15, 2)
+  payment_note                      String?           @db.Text
+  quotation_status                  String?           @default("Pending") @db.VarChar(50)
+  sales_order_status                String?           @default("Pending") @db.VarChar(50)
+  delivery_challan_status           String?           @default("Pending") @db.VarChar(50)
+  invoice_status                    String?           @default("Pending") @db.VarChar(50)
+  draft_status                      String?           @default("Draft") @db.VarChar(50)
+  status                            String?           @default("pending")
+  created_at                        DateTime          @default(now()) @db.Timestamp(0)
+  updated_at                        DateTime          @default(now()) @db.Timestamp(0)
   salesorderitems                   salesorderitems[]
 }
 
 model salesorderitems {
-  id             Int        @id @default(autoincrement())
+  id             Int         @id @default(autoincrement())
   sales_order_id Int
-  item_name      String     @db.VarChar(255)
-  qty            Decimal?   @default(0.00) @db.Decimal(10, 2)
-  rate           Decimal?   @default(0.00) @db.Decimal(15, 2)
-  tax_percent    Decimal?   @default(0.00) @db.Decimal(5, 2)
-  discount       Decimal?   @default(0.00) @db.Decimal(15, 2)
-  amount         Decimal?   @default(0.00) @db.Decimal(15, 2)
-  created_at     DateTime   @default(now()) @db.Timestamp(0)
-  updated_at     DateTime   @default(now()) @db.Timestamp(0)
-  salesorder     salesorder @relation(fields: [sales_order_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesOrderItems")
- warehouse_id   Int? 
+  item_name      String      @db.VarChar(255)
+  qty            Decimal?    @default(0.00) @db.Decimal(10, 2)
+  rate           Decimal?    @default(0.00) @db.Decimal(15, 2)
+  tax_percent    Decimal?    @default(0.00) @db.Decimal(5, 2)
+  discount       Decimal?    @default(0.00) @db.Decimal(15, 2)
+  amount         Decimal?    @default(0.00) @db.Decimal(15, 2)
+  created_at     DateTime    @default(now()) @db.Timestamp(0)
+  updated_at     DateTime    @default(now()) @db.Timestamp(0)
+  warehouse_id   Int?
+  salesorder     salesorder  @relation(fields: [sales_order_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesOrderItems")
+  warehouse      warehouses? @relation("SOI_Warehouse", fields: [warehouse_id], references: [id])
 
- warehouse      warehouses? @relation("SOI_Warehouse", fields: [warehouse_id], references: [id])
   @@index([sales_order_id], map: "fk_salesOrderItems")
+  @@index([warehouse_id], map: "salesorderitems_warehouse_id_fkey")
 }
 
-
 model sales_return {
-  id                  Int                @id @default(autoincrement())
-  company_id          Int
-  reference_id         String?            @db.VarChar(100)
-  manual_voucher_no   String?            @db.VarChar(100)
-  auto_voucher_no      String?            @db.VarChar(100)
-  customer_id         Int?
-  return_no           String              @db.VarChar(100)
-  invoice_no          String              @db.VarChar(100)
-  return_date         DateTime            @db.Date
-  return_type         String?            @default("Sales Return") @db.VarChar(50)
-  warehouse_id        Int?
-  narration           String?             @db.VarChar(255)
-  reason_for_return    String?            @db.Text
-  sub_total           Decimal?            @default(0.00) @db.Decimal(15, 2)
-  tax_total           Decimal?            @default(0.00) @db.Decimal(15, 2)
-  discount_total      Decimal?            @default(0.00) @db.Decimal(15, 2)
-  grand_total         Decimal?            @default(0.00) @db.Decimal(15, 2)
-  status              String?             @default("pending") @db.VarChar(50)
-  notes               String?             @db.Text
-  created_at          DateTime            @default(now()) @db.Timestamp(0)
-  updated_at          DateTime            @default(now()) @db.Timestamp(0)
-  sales_return_items  sales_return_items[]
+  id                 Int                  @id @default(autoincrement())
+  company_id         Int
+  reference_id       String?              @db.VarChar(100)
+  manual_voucher_no  String?              @db.VarChar(100)
+  auto_voucher_no    String?              @db.VarChar(100)
+  customer_id        Int?
+  return_no          String               @db.VarChar(100)
+  invoice_no         String               @db.VarChar(100)
+  return_date        DateTime             @db.Date
+  return_type        String?              @default("Sales Return") @db.VarChar(50)
+  warehouse_id       Int?
+  reason_for_return  String?              @db.Text
+  sub_total          Decimal?             @default(0.00) @db.Decimal(15, 2)
+  tax_total          Decimal?             @default(0.00) @db.Decimal(15, 2)
+  discount_total     Decimal?             @default(0.00) @db.Decimal(15, 2)
+  grand_total        Decimal?             @default(0.00) @db.Decimal(15, 2)
+  status             String?              @default("pending") @db.VarChar(50)
+  notes              String?              @db.Text
+  created_at         DateTime             @default(now()) @db.Timestamp(0)
+  updated_at         DateTime             @default(now()) @db.Timestamp(0)
+  narration          String?              @db.VarChar(255)
+  sales_return_items sales_return_items[]
 
   @@index([company_id])
   @@index([customer_id])
@@ -803,7 +707,7 @@ model sales_return {
 }
 
 model sales_return_items {
-  id             Int          @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   sales_return_id Int
   product_id      Int?
   item_name       String       @db.VarChar(255)
@@ -812,176 +716,268 @@ model sales_return_items {
   tax_percent     Decimal?     @default(0.00) @db.Decimal(5, 2)
   discount        Decimal?     @default(0.00) @db.Decimal(15, 2)
   amount          Decimal?     @default(0.00) @db.Decimal(15, 2)
-   narration      String?             @db.VarChar(255)
   created_at      DateTime     @default(now()) @db.Timestamp(0)
   updated_at      DateTime     @default(now()) @db.Timestamp(0)
+  narration       String?      @db.VarChar(255)
   sales_return    sales_return @relation(fields: [sales_return_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesReturnItems")
 
   @@index([sales_return_id], map: "fk_salesReturnItems")
 }
 
-
 model purchaseorder {
-  id                              Int      @id @default(autoincrement())
-  company_id                      Int
-  company_name                    String?
-  company_address                 String?  @db.Text
-  company_email                   String?
-  company_phone                   String?
-  logo_url                        String?
-  
-  quotation_from_vendor_name      String?
-  quotation_from_vendor_address   String?  @db.Text
-  quotation_from_vendor_email     String?
-  quotation_from_vendor_phone     String?
-  
-  ref_no                          String?
-  Manual_ref_ro                   String?
-  quotation_no                    String?
-  manual_quo_no                   String?
-  quotation_date                  DateTime?
-  valid_till                      DateTime?
-  due_date                        DateTime?
-  
-  subtotal                        Decimal  @default(0.00) @db.Decimal(15, 2)
-  tax                             Decimal  @default(0.00) @db.Decimal(15, 2)
-  discount                        Decimal  @default(0.00) @db.Decimal(15, 2)
-  total                           Decimal  @default(0.00) @db.Decimal(15, 2)
-  
-  bank_name                       String?
-  account_no                      String?
-  account_holder                  String?
-  ifsc_code                       String?
-  bank_details                    String?  @db.Text
-  
-  notes                           String?  @db.Text
-  terms                           String?  @db.Text
-  
-  signature_url                   String?
-  photo_url                       String?
-  attachment_url                  String?
-  
-  bill_to_attention_name          String?
-  bill_to_company_name            String?
-  bill_to_company_address         String?  @db.Text
-  bill_to_company_phone           String?
-  bill_to_company_email           String?
-  
-  bill_to_vendor_name             String?
-  bill_to_vendor_address          String?  @db.Text
-  bill_to_vendor_email            String?
-  bill_to_vendor_phone            String?
-  
-  ship_to_attention_name          String?
-  ship_to_company_name            String?
-  ship_to_company_address         String?  @db.Text
-  ship_to_company_phone           String?
-  ship_to_company_email           String?
-  
-  ship_to_vendor_name             String?
-  ship_to_vendor_address          String?  @db.Text
-  ship_to_vendor_email            String?
-  ship_to_vendor_phone            String?
-  
-  payment_made_vendor_name        String?
-  payment_made_vendor_address     String?  @db.Text
-  payment_made_vendor_email       String?
-  payment_made_vendor_phone       String?
-  
-  driver_name                     String?
-  driver_phone                    String?
-  driver_details                  String?  @db.Text
-  
-  amount_paid                     Decimal  @default(0.00) @db.Decimal(15, 2)
-  total_amount                    Decimal  @default(0.00) @db.Decimal(15, 2)
-  payment_status                  String?  @default("Pending")
-  total_bill                      Decimal  @default(0.00) @db.Decimal(15, 2)
-  balance                         Decimal  @default(0.00) @db.Decimal(15, 2)
-  payment_note                    String?  @db.Text
-  
-  quotation_status                String?  @default("Pending")
-  purchase_order_status           String?  @default("Pending")
-  goods_receipt_status            String?  @default("Pending")
-  bill_status                     String?  @default("Pending")
-  draft_status                    String?  @default("Draft")
-  
-  PO_no                           String?
-  Manual_PO_ref                   String?
-  GR_no                           String?
-  Manual_GR_no                    String?
-  Bill_no                         String?
-  Manual_Bill_no                  String?
-  Payment_no                      String?
-  Manual_payment_no               String?
-  vendor_ref                      String?
-  
-  created_at                      DateTime @default(now())
-  updated_at                      DateTime @default(now())
-  
-  purchaseorderitems              purchaseorderitems[]
+  id                            Int                  @id @default(autoincrement())
+  company_id                    Int
+  company_name                  String?
+  company_address               String?              @db.Text
+  company_email                 String?
+  company_phone                 String?
+  logo_url                      String?
+  quotation_from_vendor_name    String?
+  quotation_from_vendor_address String?              @db.Text
+  quotation_from_vendor_email   String?
+  quotation_from_vendor_phone   String?
+  ref_no                        String?
+  Manual_ref_ro                 String?
+  quotation_no                  String?
+  manual_quo_no                 String?
+  quotation_date                DateTime?
+  valid_till                    DateTime?
+  due_date                      DateTime?
+  subtotal                      Decimal              @default(0.00) @db.Decimal(15, 2)
+  tax                           Decimal              @default(0.00) @db.Decimal(15, 2)
+  discount                      Decimal              @default(0.00) @db.Decimal(15, 2)
+  total                         Decimal              @default(0.00) @db.Decimal(15, 2)
+  bank_name                     String?
+  account_no                    String?
+  account_holder                String?
+  ifsc_code                     String?
+  bank_details                  String?              @db.Text
+  notes                         String?              @db.Text
+  terms                         String?              @db.Text
+  signature_url                 String?
+  photo_url                     String?
+  attachment_url                String?
+  bill_to_attention_name        String?
+  bill_to_company_name          String?
+  bill_to_company_address       String?              @db.Text
+  bill_to_company_phone         String?
+  bill_to_company_email         String?
+  bill_to_vendor_name           String?
+  bill_to_vendor_address        String?              @db.Text
+  bill_to_vendor_email          String?
+  bill_to_vendor_phone          String?
+  ship_to_attention_name        String?
+  ship_to_company_name          String?
+  ship_to_company_address       String?              @db.Text
+  ship_to_company_phone         String?
+  ship_to_company_email         String?
+  ship_to_vendor_name           String?
+  ship_to_vendor_address        String?              @db.Text
+  ship_to_vendor_email          String?
+  ship_to_vendor_phone          String?
+  payment_made_vendor_name      String?
+  payment_made_vendor_address   String?              @db.Text
+  payment_made_vendor_email     String?
+  payment_made_vendor_phone     String?
+  driver_name                   String?
+  driver_phone                  String?
+  driver_details                String?              @db.Text
+  amount_paid                   Decimal              @default(0.00) @db.Decimal(15, 2)
+  total_amount                  Decimal              @default(0.00) @db.Decimal(15, 2)
+  payment_status                String?              @default("Pending")
+  total_bill                    Decimal              @default(0.00) @db.Decimal(15, 2)
+  balance                       Decimal              @default(0.00) @db.Decimal(15, 2)
+  payment_note                  String?              @db.Text
+  quotation_status              String?              @default("Pending")
+  purchase_order_status         String?              @default("Pending")
+  goods_receipt_status          String?              @default("Pending")
+  bill_status                   String?              @default("Pending")
+  draft_status                  String?              @default("Draft")
+  PO_no                         String?
+  Manual_PO_ref                 String?
+  GR_no                         String?
+  Manual_GR_no                  String?
+  Bill_no                       String?
+  Manual_Bill_no                String?
+  Payment_no                    String?
+  Manual_payment_no             String?
+  vendor_ref                    String?
+  created_at                    DateTime             @default(now())
+  updated_at                    DateTime             @default(now())
+  purchaseorderitems            purchaseorderitems[]
 }
 
 model purchaseorderitems {
-  id                Int            @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   purchase_order_id Int
   item_name         String
-  qty               Decimal        @db.Decimal(10, 2)
-  rate              Decimal        @db.Decimal(15, 2)
-  tax_percent       Decimal        @default(0.00) @db.Decimal(5, 2)
-  discount          Decimal        @default(0.00) @db.Decimal(15, 2)
-  amount            Decimal        @db.Decimal(15, 2)
-  
-  purchaseorder     purchaseorder  @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
-  
+  qty               Decimal       @db.Decimal(10, 2)
+  rate              Decimal       @db.Decimal(15, 2)
+  tax_percent       Decimal       @default(0.00) @db.Decimal(5, 2)
+  discount          Decimal       @default(0.00) @db.Decimal(15, 2)
+  amount            Decimal       @db.Decimal(15, 2)
+  purchaseorder     purchaseorder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+
   @@index([purchase_order_id])
 }
 
-
 model purchase_return {
-  id                   Int       @id @default(autoincrement())
-  company_id           Int
-  reference_id         String    @unique
-  manual_voucher_no    String?
-  auto_voucher_no      String    @unique
-  vendor_id            Int?
-  vendor_name          String?
-  return_no            String
-  invoice_no           String
-  return_date          DateTime
-  return_type          String    @default("Purchase Return")
-  warehouse_id         Int
-  reason_for_return    String?   @db.Text
-  
-  bank_name            String?
-  account_no           String?
-  account_holder       String?
-  ifsc_code            String?
-  
-  sub_total            Decimal   @default(0.00) @db.Decimal(15, 2)
-  tax_total            Decimal   @default(0.00) @db.Decimal(15, 2)
-  discount_total       Decimal   @default(0.00) @db.Decimal(15, 2)
-  grand_total          Decimal   @default(0.00) @db.Decimal(15, 2)
-  status               String    @default("pending")
-  notes                String?   @db.Text
-  created_at           DateTime  @default(now())
-  updated_at           DateTime  @default(now())
-  
+  id                    Int                     @id @default(autoincrement())
+  company_id            Int
+  reference_id          String                  @unique
+  manual_voucher_no     String?
+  auto_voucher_no       String                  @unique
+  vendor_id             Int?
+  vendor_name           String?
+  return_no             String
+  invoice_no            String
+  return_date           DateTime
+  return_type           String                  @default("Purchase Return")
+  warehouse_id          Int
+  reason_for_return     String?                 @db.Text
+  bank_name             String?
+  account_no            String?
+  account_holder        String?
+  ifsc_code             String?
+  sub_total             Decimal                 @default(0.00) @db.Decimal(15, 2)
+  tax_total             Decimal                 @default(0.00) @db.Decimal(15, 2)
+  discount_total        Decimal                 @default(0.00) @db.Decimal(15, 2)
+  grand_total           Decimal                 @default(0.00) @db.Decimal(15, 2)
+  status                String                  @default("pending")
+  notes                 String?                 @db.Text
+  created_at            DateTime                @default(now())
+  updated_at            DateTime                @default(now())
   purchase_return_items purchase_return_items[]
 }
 
 model purchase_return_items {
-  id                 Int              @id @default(autoincrement())
+  id                 Int             @id @default(autoincrement())
   purchase_return_id Int
   product_id         Int?
   item_name          String
-  quantity           Decimal          @db.Decimal(10, 2)
-  rate               Decimal          @db.Decimal(15, 2)
-  tax_percent        Decimal          @default(0.00) @db.Decimal(5, 2)
-  discount           Decimal          @default(0.00) @db.Decimal(15, 2)
-  amount             Decimal          @db.Decimal(15, 2)
-  
-  purchase_return    purchase_return  @relation(fields: [purchase_return_id], references: [id], onDelete: Cascade)
-  
+  quantity           Decimal         @db.Decimal(10, 2)
+  rate               Decimal         @db.Decimal(15, 2)
+  tax_percent        Decimal         @default(0.00) @db.Decimal(5, 2)
+  discount           Decimal         @default(0.00) @db.Decimal(15, 2)
+  amount             Decimal         @db.Decimal(15, 2)
+  purchase_return    purchase_return @relation(fields: [purchase_return_id], references: [id], onDelete: Cascade)
+
   @@index([purchase_return_id])
 }
 
+model password_change_requests {
+  id         Int      @id @default(autoincrement())
+  company_id Int
+  reason     String   @db.Text
+  status     String   @default("Pending")
+  email_sent Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime
+  users      users    @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+}
+
+model userroles {
+  id                  Int                @id @default(autoincrement())
+  company_id          Int?
+  role_name           String
+  general_permissions String?            @db.Text
+  created_at          DateTime           @default(now())
+  status              String             @default("Active")
+  permissions         role_permissions[]
+}
+
+model journal_entries {
+  id                Int                  @id @default(autoincrement())
+  company_id        Int
+  voucher_no_auto   String               @db.VarChar(100)
+  manual_voucher_no String?              @db.VarChar(100)
+  voucher_type      String?              @db.VarChar(50)
+  voucher_date      DateTime
+  narration         String?              @db.Text
+  total_debit       Decimal?             @default(0.00) @db.Decimal(18, 2)
+  total_credit      Decimal?             @default(0.00) @db.Decimal(18, 2)
+  created_by        Int?
+  created_at        DateTime             @default(now())
+  updated_at        DateTime?            @default(now())
+
+  // relations (named)
+  company           users                @relation("CompanyJournalEntries", fields: [company_id], references: [id], map: "fk_journal_company")
+  lines             journal_lines[]
+  attachments       journal_attachments[]
+
+  created_by_user   users?               @relation("JournalCreatedBy", fields: [created_by], references: [id])
+
+  @@unique([company_id, voucher_no_auto], map: "unique_company_voucher")
+  @@index([company_id], map: "idx_journal_company")
+}
+
+
+model journal_lines {
+  id               Int              @id @default(autoincrement())
+  journal_entry_id Int
+  account_id       Int
+  seq              Int              @default(0)                     // UI order
+  debit_amount     Decimal?         @default(0.00) @db.Decimal(18, 2)
+  credit_amount    Decimal?         @default(0.00) @db.Decimal(18, 2)
+  narration        String?          @db.VarChar(500)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime?
+
+  // relations
+  journal_entry    journal_entries  @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade, map: "journal_lines_journal_entry_id_fkey")
+  account          accounts         @relation("AccountJournalLines", fields: [account_id], references: [id], map: "journal_lines_account_id_fkey")
+
+  @@index([journal_entry_id], map: "journal_lines_journal_entry_id_idx")
+  @@index([account_id], map: "journal_lines_account_id_idx")
+}
+
+
+model journal_attachments {
+  id               Int     @id @default(autoincrement())
+  journal_entry_id Int
+  file_name        String  @db.VarChar(255)
+  file_url         String  @db.VarChar(500)
+  file_type        String? @db.VarChar(100)
+  size             Int?
+  public_id        String? @db.VarChar(255)
+  uploaded_at      DateTime @default(now())
+
+  journal_entry    journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+
+  @@index([journal_entry_id])
+}
+
+enum PlansBillingCycle {
+  Monthly
+  Yearly
+}
+
+enum PlanStatus {
+  Active
+  Inactive
+  Expired
+}
+
+enum Role {
+  SUPERADMIN
+  COMPANY
+  USER
+}
+
+enum PlanType {
+  Monthly
+  Yearly
+}
+
+enum UserPlanStatus {
+  Active
+  Inactive
+  Expired
+}
+
+enum venderCustomertype {
+  vender
+  customer
+}
