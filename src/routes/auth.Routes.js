@@ -37,8 +37,8 @@ router.get("/Company", getAllCompanies);
 router.delete("/Company/:id", deleteCompany);
 
 //-------User routes-------//
-router.post("/User", upload.single("profile"), createUser);
-router.put("/User/:id", upload.single("profile"), updateUser);
+router.post("/User", createUser);
+router.put("/User/:id", updateUser);
 router.delete("/User/:id", deleteUser);
 router.get("/User/company/:company_id", getUsersByCompanyId);
 router.get("/User/:id", getUserById);

@@ -1546,6 +1546,99 @@ export const deleteCompany = async (req, res) => {
 // user creaete under company
 //all Controler functions related to USER management
 
+// export const createUser = async (req, res) => {
+//   try {
+//     const { name, email, password, phone, UserStatus, company_id, user_role } =
+//       req.body;
+
+//     // 🧾 Validate required fields
+//     if (!email || !password || !name || !user_role) {
+//       return res
+//         .status(400)
+//         .json({ message: "Name, email, user_role and password are required" });
+//     }
+
+//     // 🧍‍♂️ Validate company_id (the user who creates others)
+//     if (!company_id) {
+//       return res
+//         .status(400)
+//         .json({ message: "company_id (creator user) is required" });
+//     }
+
+//     // Check if the creator user actually exists and is a COMPANY
+//     const creator = await prisma.users.findUnique({
+//       where: { id: parseInt(company_id) },
+//     });
+
+//     if (!creator || creator.role !== "COMPANY") {
+//       return res
+//         .status(403)
+//         .json({ message: "Invalid company_id or user is not a COMPANY role" });
+//     }
+
+//     // 🧍 Check if user already exists
+//     const existingUser = await prisma.users.findUnique({
+//       where: { email },
+//     });
+//     if (existingUser) {
+//       return res
+//         .status(409)
+//         .json({ message: "User with this email already exists" });
+//     }
+
+//     // 🔐 Hash password
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // ☁️ Upload profile image if provided
+//     let profileUrl = null;
+//     if (req.file) {
+//       profileUrl = await uploadToCloudinary(req.file.buffer, "users");
+//     }
+
+//     // 🏗️ Create USER under the COMPANY
+//     const newUser = await prisma.users.create({
+//       data: {
+//         name,
+//         email,
+//         password: hashedPassword,
+//         role: "USER",
+//         profile: profileUrl,
+//         phone,
+//         UserStatus,
+//         user_role,
+//         created_by: parseInt(company_id), // 👈 link to COMPANY user
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         role: true,
+//         profile: true,
+//         phone: true,
+//         UserStatus: true,
+//         user_role: true,
+//         created_at: true,
+//         createdByUser: {
+//           select: { id: true, name: true, email: true }, // show which company created them
+//         },
+//       },
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "User created successfully under the company",
+//       data: newUser,
+//     });
+//   } catch (error) {
+//     console.error("Create user error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const createUser = async (req, res) => {
   try {
     const { name, email, password, phone, UserStatus, company_id, user_role } =
@@ -1558,14 +1651,14 @@ export const createUser = async (req, res) => {
         .json({ message: "Name, email, user_role and password are required" });
     }
 
-    // 🧍‍♂️ Validate company_id (the user who creates others)
+    // 🧾 Validate company_id (the user who creates others)
     if (!company_id) {
       return res
         .status(400)
         .json({ message: "company_id (creator user) is required" });
     }
 
-    // Check if the creator user actually exists and is a COMPANY
+    // Check if creator user actually exists and is a COMPANY
     const creator = await prisma.users.findUnique({
       where: { id: parseInt(company_id) },
     });
@@ -1587,12 +1680,22 @@ export const createUser = async (req, res) => {
     }
 
     // 🔐 Hash password
+    const bcrypt = await import("bcryptjs");
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ☁️ Upload profile image if provided
+    // ☁️ Upload profile image if provided using express-fileupload
     let profileUrl = null;
-    if (req.file) {
-      profileUrl = await uploadToCloudinary(req.file.buffer, "users");
+    if (req.files?.profile) {
+      const profileFile = req.files.profile; // This object has the tempFilePath
+      profileUrl = await uploadToCloudinary(profileFile, "users");
+
+      // Since your function returns null on error, let's handle that.
+      if (profileUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Profile image upload failed. Please try again.",
+        });
+      }
     }
 
     // 🏗️ Create USER under the COMPANY
@@ -1626,7 +1729,7 @@ export const createUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully under the company",
+      message: "User created successfully under company",
       data: newUser,
     });
   } catch (error) {
@@ -1638,6 +1741,89 @@ export const createUser = async (req, res) => {
     });
   }
 };
+
+// export const updateUser = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { name, phone, UserStatus, password, user_role } = req.body;
+
+//     // 🔍 Find existing user
+//     const existingUser = await prisma.users.findUnique({
+//       where: { id: parseInt(id) },
+//     });
+
+//     if (!existingUser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // ☁️ Handle profile image update
+//     let profileUrl = existingUser.profile;
+
+//     if (req.file) {
+//       // If old image exists, delete it first
+//       if (existingUser.profile) {
+//         try {
+//           const publicId = existingUser.profile.split("/").pop().split(".")[0];
+//           await deleteFromCloudinary(publicId);
+//         } catch (err) {
+//           console.warn("Failed to delete old image:", err.message);
+//         }
+//       }
+//       // Upload new image
+//       profileUrl = await uploadToCloudinary(req.file.buffer, "users");
+//     }
+
+//     // 🔐 If password provided → hash it
+//     let hashedPassword = existingUser.password;
+//     if (password) {
+//       const bcrypt = await import("bcryptjs");
+//       hashedPassword = await bcrypt.hash(password, 10);
+//     }
+
+//     // 🧩 Prepare update data
+//     const updateData = {
+//       name: name ?? existingUser.name,
+//       phone: phone ?? existingUser.phone,
+//       profile: profileUrl,
+//       UserStatus: UserStatus ?? existingUser.UserStatus,
+//       user_role: user_role ?? existingUser.user_role,
+//       password: hashedPassword,
+//     };
+
+//     // 🛠️ Update user
+//     const updatedUser = await prisma.users.update({
+//       where: { id: parseInt(id) },
+//       data: updateData,
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         phone: true,
+//         role: true,
+//         profile: true,
+//         UserStatus: true,
+//         user_role: true,
+//         created_at: true,
+//         createdByUser: {
+//           select: { id: true, name: true, email: true },
+//         },
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "User updated successfully",
+//       data: updatedUser,
+//     });
+//   } catch (error) {
+//     console.error("Update user error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
 
 export const updateUser = async (req, res) => {
   try {
@@ -1653,21 +1839,36 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ☁️ Handle profile image update
+    // ☁️ Handle profile image update using express-fileupload
     let profileUrl = existingUser.profile;
 
-    if (req.file) {
+    if (req.files?.profile) {
       // If old image exists, delete it first
       if (existingUser.profile) {
         try {
-          const publicId = existingUser.profile.split("/").pop().split(".")[0];
+          // Extract public ID from the URL
+          // For a URL like: https://res.cloudinary.com/your_cloud_name/image/upload/v1234567890/users/abc123.jpg
+          // The public ID would be: users/abc123
+          const urlParts = existingUser.profile.split("/");
+          const publicIdWithExtension = urlParts[urlParts.length - 1];
+          const publicId = `users/${publicIdWithExtension.split(".")[0]}`;
           await deleteFromCloudinary(publicId);
         } catch (err) {
           console.warn("Failed to delete old image:", err.message);
         }
       }
+
       // Upload new image
-      profileUrl = await uploadToCloudinary(req.file.buffer, "users");
+      const profileFile = req.files.profile; // This object has the tempFilePath
+      profileUrl = await uploadToCloudinary(profileFile, "users");
+
+      // Since your function returns null on error, let's handle that.
+      if (profileUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Profile image upload failed. Please try again.",
+        });
+      }
     }
 
     // 🔐 If password provided → hash it
