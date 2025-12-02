@@ -28,6 +28,7 @@ export const getAllPayments = async (req, res) => {
     });
 
     // Get all purchase orders with payment information
+
     const purchaseOrders = await prisma.purchaseorder.findMany({
       where: {
         OR: [{ payment_status: { not: null } }, { Payment_no: { not: null } }],

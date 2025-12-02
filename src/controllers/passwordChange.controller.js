@@ -66,6 +66,8 @@ import bcrypt from "bcryptjs";
 //   }
 // };
 
+//all routes
+
 export const createPasswordChangeRequest = async (req, res) => {
   try {
     const { company_id, reason } = req.body;
