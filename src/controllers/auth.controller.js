@@ -1405,7 +1405,7 @@ export const getAllCompanies = async (req, res) => {
         user_plans: {
           include: { plan: true },
         },
-        created_users: {
+        createdUsers: {
           select: {
             id: true,
             name: true,
@@ -1481,7 +1481,7 @@ export const getAllCompanies = async (req, res) => {
       })),
 
       // 👥 Team members
-      team_members: c.created_users || [],
+      team_members: c.createdUsers || [],
     }));
 
     return res.status(200).json({
