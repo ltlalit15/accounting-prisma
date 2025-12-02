@@ -500,25 +500,25 @@ export const createCompany = async (req, res) => {
     if (req.files) {
       if (req.files.company_icon) {
         company_icon_url = await uploadToCloudinary(
-          req.files.company_icon[0].buffer,
+          req.files.company_icon,
           "company_icons"
         );
       }
       if (req.files.favicon) {
         favicon_url = await uploadToCloudinary(
-          req.files.favicon[0].buffer,
+          req.files.favicon,
           "company_favicons"
         );
       }
       if (req.files.company_logo) {
         company_logo_url = await uploadToCloudinary(
-          req.files.company_logo[0].buffer,
+          req.files.company_logo,
           "company_logos"
         );
       }
       if (req.files.company_dark_logo) {
         company_dark_logo_url = await uploadToCloudinary(
-          req.files.company_dark_logo[0].buffer,
+          req.files.company_dark_logo,
           "company_dark_logos"
         );
       }
@@ -889,6 +889,8 @@ export const updateCompany = async (req, res) => {
     } = req.body;
 
     const companyId = parseInt(id);
+    console.log("Request Body:", req.body);
+    console.log("Request Files:", req.files);
 
     // ✅ 1. Find existing company
     const existingCompany = await prisma.users.findUnique({
@@ -915,20 +917,32 @@ export const updateCompany = async (req, res) => {
     if (req.files) {
       console.log("🟢 Incoming files:", Object.keys(req.files));
 
-      if (req.files.companyIcon) {
-        company_icon_url = req.files.companyIcon[0].path; // Cloudinary URL
+      if (req.files.company_icon) {
+        company_icon_url = await uploadToCloudinary(
+          req.files.company_icon,
+          "company_icons"
+        );
       }
 
       if (req.files.favicon) {
-        favicon_url = req.files.favicon[0].path;
+        favicon_url = await uploadToCloudinary(
+          req.files.favicon,
+          "company_favicons"
+        );
       }
 
-      if (req.files.companyLogo) {
-        company_logo_url = req.files.companyLogo[0].path;
+      if (req.files.company_logo) {
+        company_logo_url = await uploadToCloudinary(
+          req.files.company_logo,
+          "company_logos"
+        );
       }
 
-      if (req.files.companyDarkLogo) {
-        company_dark_logo_url = req.files.companyDarkLogo[0].path;
+      if (req.files.company_dark_logo) {
+        company_dark_logo_url = await uploadToCloudinary(
+          req.files.company_dark_logo,
+          "company_dark_logos"
+        );
       }
     }
 

@@ -30,17 +30,8 @@ router.post("/login", login);
 router.post("/Super-admin", upload.single("profile"), createSuperAdmin);
 
 //-------Company routes-------//
-router.post("/Company", upload.single("profile"), createCompany);
-router.put(
-  "/Company/:id",
-  upload.fields([
-    { name: "companyIcon", maxCount: 1 },
-    { name: "favicon", maxCount: 1 },
-    { name: "companyLogo", maxCount: 1 },
-    { name: "companyDarkLogo", maxCount: 1 },
-  ]),
-  updateCompany
-);
+router.post("/Company", createCompany);
+router.put("/Company/:id", updateCompany);
 router.get("/Company/:id", getCompanyById);
 router.get("/Company", getAllCompanies);
 router.delete("/Company/:id", deleteCompany);
