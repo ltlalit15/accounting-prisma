@@ -889,8 +889,6 @@ export const updateCompany = async (req, res) => {
     } = req.body;
 
     const companyId = parseInt(id);
-    console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
 
     // ✅ 1. Find existing company
     const existingCompany = await prisma.users.findUnique({
