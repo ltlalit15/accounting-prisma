@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../config/db.js";
-import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../config/cloudinary.js";
 // import { PrismaClient, Prisma } from "@prisma/client";
-
 
 // import cloudinary from "cloudinary";
 // import fs from "fs";
@@ -152,6 +154,129 @@ import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.j
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
+// export const createVoucher = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       voucher_type,
+//       voucher_number,
+//       manual_voucher_no,
+//       date,
+//       from_name,
+//       from_email,
+//       from_phone,
+//       from_address,
+//       to_name,
+//       from_account,
+//       to_account,
+//       customer_id,
+//       vendor_id,
+//       notes,
+//       transfer_amount,
+//       items,
+//     } = req.body;
+
+//     // 🧩 Parse items safely
+//     let parsedItems = [];
+//     if (items) {
+//       parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+//     }
+
+//     // 🖼️ Upload logo and signature (if provided)
+//     const logoBuffer = req.files?.logo?.[0]?.buffer;
+//     const signatureBuffer = req.files?.signature?.[0]?.buffer;
+
+//     const logoUrl = logoBuffer
+//       ? await uploadToCloudinary(logoBuffer, "vouchers/logo")
+//       : null;
+//     const signatureUrl = signatureBuffer
+//       ? await uploadToCloudinary(signatureBuffer, "vouchers/signature")
+//       : null;
+
+//     // Create voucher (without uploading attachments first)
+//     const createdVoucher = await prisma.vouchers.create({
+//       data: {
+//         company_id: Number(company_id),
+//         voucher_type,
+//         voucher_number,
+//         manual_voucher_no,
+//         date: new Date(date),
+//         from_name,
+//         from_email,
+//         from_phone,
+//         from_address,
+//         to_name,
+//         from_account: from_account ? Number(from_account) : null,
+//         to_account: to_account ? Number(to_account) : null,
+//         customer_id: customer_id ? Number(customer_id) : null,
+//         vendor_id: vendor_id ? Number(vendor_id) : null,
+//         notes,
+//         transfer_amount: transfer_amount
+//           ? new Prisma.Decimal(transfer_amount)
+//           : null,
+//         logo_url: logoUrl,
+//         signature_url: signatureUrl,
+//         status: "Pending",
+//       },
+//     });
+
+//     // 🧾 Insert voucher items (in a separate transaction)
+//     if (parsedItems.length > 0) {
+//       await prisma.voucher_items.createMany({
+//         data: parsedItems.map((i) => ({
+//           voucher_id: createdVoucher.id,
+//           item_name: i.item_name,
+//           description: i.description || null,
+//           hsn_code: i.hsn_code || null,
+//           quantity: new Prisma.Decimal(i.quantity || 0),
+//           rate: new Prisma.Decimal(i.rate || 0),
+//           amount: new Prisma.Decimal(i.amount || 0),
+//           tax_type: i.tax_type || "None",
+//           tax_rate: new Prisma.Decimal(i.tax_rate || 0),
+//           tax_amount: new Prisma.Decimal(i.tax_amount || 0),
+//         })),
+//       });
+//     }
+
+//     // 📎 Upload attachments (photos & references) — OUTSIDE of the main transaction
+//     const handleUploads = async (type, voucherId) => {
+//       const uploadedFiles = [];
+//       const files = req.files?.[type] || [];
+//       for (const file of files) {
+//         const url = await uploadToCloudinary(file.buffer, `vouchers/${type}`);
+//         uploadedFiles.push({
+//           voucher_id: voucherId,
+//           file_name: file.originalname,
+//           file_type: file.mimetype,
+//           file_url: url,
+//           attachment_type: type,
+//         });
+//       }
+//       if (uploadedFiles.length > 0) {
+//         await prisma.voucher_attachments.createMany({ data: uploadedFiles });
+//       }
+//     };
+
+//     // Handle file uploads outside the main transaction
+//     await handleUploads("photos", createdVoucher.id);
+//     await handleUploads("references", createdVoucher.id);
+
+//     // ✅ Success Response
+//     res.status(201).json({
+//       success: true,
+//       message: "Voucher created successfully",
+//       data: createdVoucher,
+//     });
+//   } catch (error) {
+//     console.error("❌ Voucher Creation Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to create voucher",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const createVoucher = async (req, res) => {
   try {
     const {
@@ -180,16 +305,38 @@ export const createVoucher = async (req, res) => {
       parsedItems = typeof items === "string" ? JSON.parse(items) : items;
     }
 
-    // 🖼️ Upload logo and signature (if provided)
-    const logoBuffer = req.files?.logo?.[0]?.buffer;
-    const signatureBuffer = req.files?.signature?.[0]?.buffer;
+    // 🖼️ Upload logo and signature (if provided) using express-fileupload
+    let logoUrl = null;
+    let signatureUrl = null;
 
-    const logoUrl = logoBuffer
-      ? await uploadToCloudinary(logoBuffer, "vouchers/logo")
-      : null;
-    const signatureUrl = signatureBuffer
-      ? await uploadToCloudinary(signatureBuffer, "vouchers/signature")
-      : null;
+    if (req.files?.logo) {
+      const logoFile = req.files.logo; // This object has the tempFilePath
+      logoUrl = await uploadToCloudinary(logoFile, "vouchers/logo");
+
+      // Since your function returns null on error, let's handle that.
+      if (logoUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Logo upload failed. Please try again.",
+        });
+      }
+    }
+
+    if (req.files?.signature) {
+      const signatureFile = req.files.signature; // This object has the tempFilePath
+      signatureUrl = await uploadToCloudinary(
+        signatureFile,
+        "vouchers/signature"
+      );
+
+      // Since your function returns null on error, let's handle that.
+      if (signatureUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Signature upload failed. Please try again.",
+        });
+      }
+    }
 
     // Create voucher (without uploading attachments first)
     const createdVoucher = await prisma.vouchers.create({
@@ -240,16 +387,27 @@ export const createVoucher = async (req, res) => {
     const handleUploads = async (type, voucherId) => {
       const uploadedFiles = [];
       const files = req.files?.[type] || [];
-      for (const file of files) {
-        const url = await uploadToCloudinary(file.buffer, `vouchers/${type}`);
-        uploadedFiles.push({
-          voucher_id: voucherId,
-          file_name: file.originalname,
-          file_type: file.mimetype,
-          file_url: url,
-          attachment_type: type,
-        });
+
+      // Handle single file or array of files
+      const filesArray = Array.isArray(files) ? files : [files];
+
+      for (const file of filesArray) {
+        if (file) {
+          // Check if file exists
+          const url = await uploadToCloudinary(file, `vouchers/${type}`);
+          if (url) {
+            // Check if upload was successful
+            uploadedFiles.push({
+              voucher_id: voucherId,
+              file_name: file.name,
+              file_type: file.mimetype,
+              file_url: url,
+              attachment_type: type,
+            });
+          }
+        }
       }
+
       if (uploadedFiles.length > 0) {
         await prisma.voucher_attachments.createMany({ data: uploadedFiles });
       }
@@ -311,7 +469,9 @@ export const getVoucherById = async (req, res) => {
     });
 
     if (!voucher)
-      return res.status(404).json({ success: false, message: "Voucher not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Voucher not found" });
 
     res.json({ success: true, data: voucher });
   } catch (error) {
@@ -412,6 +572,165 @@ export const getVoucherById = async (req, res) => {
 //   }
 // };
 
+// export const updateVoucher = async (req, res) => {
+//   const { id } = req.params;
+//   const {
+//     company_id,
+//     voucher_type,
+//     voucher_number,
+//     manual_voucher_no,
+//     date,
+//     from_name,
+//     from_email,
+//     from_phone,
+//     from_address,
+//     to_name,
+//     from_account,
+//     to_account,
+//     customer_id,
+//     vendor_id,
+//     notes,
+//     transfer_amount,
+//     status,
+//     items,
+//   } = req.body;
+
+//   // 🧩 Parse items safely, outside the transaction so it can be used later
+//   let parsedItems = [];
+//   if (items)
+//     parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+
+//   try {
+//     const updatedVoucher = await prisma.$transaction(async (tx) => {
+//       // 🧾 Find existing voucher
+//       const existingVoucher = await tx.vouchers.findUnique({
+//         where: { id: Number(id) },
+//       });
+
+//       if (!existingVoucher) throw new Error("Voucher not found");
+
+//       // 🖼️ Upload new logo and signature if provided
+//       let logoUrl = existingVoucher.logo_url;
+//       let signatureUrl = existingVoucher.signature_url;
+
+//       // ✅ Handle logo update
+//       if (req.files?.logo?.[0]) {
+//         if (existingVoucher.logo_url) {
+//           const publicId = existingVoucher.logo_url
+//             .split("/")
+//             .pop()
+//             .split(".")[0];
+//           await deleteFromCloudinary(`vouchers/logo/${publicId}`);
+//         }
+//         logoUrl = await uploadToCloudinary(
+//           req.files.logo[0].buffer,
+//           "vouchers/logo"
+//         );
+//       }
+
+//       // ✅ Handle signature update
+//       if (req.files?.signature?.[0]) {
+//         if (existingVoucher.signature_url) {
+//           const publicId = existingVoucher.signature_url
+//             .split("/")
+//             .pop()
+//             .split(".")[0];
+//           await deleteFromCloudinary(`vouchers/signature/${publicId}`);
+//         }
+//         signatureUrl = await uploadToCloudinary(
+//           req.files.signature[0].buffer,
+//           "vouchers/signature"
+//         );
+//       }
+
+//       // ✅ Update voucher main data
+//       const voucher = await tx.vouchers.update({
+//         where: { id: Number(id) },
+//         data: {
+//           company_id: Number(company_id),
+//           voucher_type,
+//           voucher_number,
+//           manual_voucher_no,
+//           date: new Date(date),
+//           from_name,
+//           from_email,
+//           from_phone,
+//           from_address,
+//           to_name,
+//           from_account: from_account ? Number(from_account) : null,
+//           to_account: to_account ? Number(to_account) : null,
+//           customer_id: customer_id ? Number(customer_id) : null,
+//           vendor_id: vendor_id ? Number(vendor_id) : null,
+//           notes,
+//           transfer_amount: transfer_amount
+//             ? new Prisma.Decimal(transfer_amount)
+//             : null,
+//           status: status || "Pending",
+//           logo_url: logoUrl,
+//           signature_url: signatureUrl,
+//           updated_at: new Date(),
+//         },
+//       });
+
+//       return voucher;
+//     });
+
+//     // 🧾 Separate deletion of voucher items from transaction
+//     await prisma.voucher_items.deleteMany({
+//       where: { voucher_id: Number(id) },
+//     });
+
+//     // 🧾 Insert new voucher items
+//     if (parsedItems.length > 0) {
+//       await prisma.voucher_items.createMany({
+//         data: parsedItems.map((i) => ({
+//           voucher_id: Number(id),
+//           item_name: i.item_name,
+//           description: i.description || null,
+//           hsn_code: i.hsn_code || null,
+//           quantity: new Prisma.Decimal(i.quantity || 0),
+//           rate: new Prisma.Decimal(i.rate || 0),
+//           amount: new Prisma.Decimal(i.amount || 0),
+//           tax_type: i.tax_type || "None",
+//           tax_rate: new Prisma.Decimal(i.tax_rate || 0),
+//           tax_amount: new Prisma.Decimal(i.tax_amount || 0),
+//         })),
+//       });
+//     }
+
+//     // 📎 Handle new attachments (photos/references)
+//     const handleUploads = async (type, voucherId) => {
+//       const uploadedFiles = [];
+//       const files = req.files?.[type] || [];
+//       for (const file of files) {
+//         const url = await uploadToCloudinary(file.buffer, `vouchers/${type}`);
+//         uploadedFiles.push({
+//           voucher_id: voucherId,
+//           file_name: file.originalname,
+//           file_type: file.mimetype,
+//           file_url: url,
+//           attachment_type: type,
+//         });
+//       }
+//       if (uploadedFiles.length > 0) {
+//         await prisma.voucher_attachments.createMany({ data: uploadedFiles });
+//       }
+//     };
+
+//     await handleUploads("photos", updatedVoucher.id);
+//     await handleUploads("references", updatedVoucher.id);
+
+//     // ✅ Success Response
+//     res.json({
+//       success: true,
+//       message: "Voucher updated successfully",
+//       data: updatedVoucher,
+//     });
+//   } catch (error) {
+//     console.error("❌ Update Voucher Error:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
 export const updateVoucher = async (req, res) => {
   const { id } = req.params;
@@ -438,7 +757,8 @@ export const updateVoucher = async (req, res) => {
 
   // 🧩 Parse items safely, outside the transaction so it can be used later
   let parsedItems = [];
-  if (items) parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+  if (items)
+    parsedItems = typeof items === "string" ? JSON.parse(items) : items;
 
   try {
     const updatedVoucher = await prisma.$transaction(async (tx) => {
@@ -449,26 +769,47 @@ export const updateVoucher = async (req, res) => {
 
       if (!existingVoucher) throw new Error("Voucher not found");
 
-      // 🖼️ Upload new logo and signature if provided
+      // 🖼️ Upload new logo and signature if provided using express-fileupload
       let logoUrl = existingVoucher.logo_url;
       let signatureUrl = existingVoucher.signature_url;
 
       // ✅ Handle logo update
-      if (req.files?.logo?.[0]) {
+      if (req.files?.logo) {
         if (existingVoucher.logo_url) {
-          const publicId = existingVoucher.logo_url.split("/").pop().split(".")[0];
+          const publicId = existingVoucher.logo_url
+            .split("/")
+            .pop()
+            .split(".")[0];
           await deleteFromCloudinary(`vouchers/logo/${publicId}`);
         }
-        logoUrl = await uploadToCloudinary(req.files.logo[0].buffer, "vouchers/logo");
+        const logoFile = req.files.logo; // This object has the tempFilePath
+        logoUrl = await uploadToCloudinary(logoFile, "vouchers/logo");
+
+        // Since your function returns null on error, let's handle that.
+        if (logoUrl === null) {
+          throw new Error("Logo upload failed. Please try again.");
+        }
       }
 
       // ✅ Handle signature update
-      if (req.files?.signature?.[0]) {
+      if (req.files?.signature) {
         if (existingVoucher.signature_url) {
-          const publicId = existingVoucher.signature_url.split("/").pop().split(".")[0];
+          const publicId = existingVoucher.signature_url
+            .split("/")
+            .pop()
+            .split(".")[0];
           await deleteFromCloudinary(`vouchers/signature/${publicId}`);
         }
-        signatureUrl = await uploadToCloudinary(req.files.signature[0].buffer, "vouchers/signature");
+        const signatureFile = req.files.signature; // This object has the tempFilePath
+        signatureUrl = await uploadToCloudinary(
+          signatureFile,
+          "vouchers/signature"
+        );
+
+        // Since your function returns null on error, let's handle that.
+        if (signatureUrl === null) {
+          throw new Error("Signature upload failed. Please try again.");
+        }
       }
 
       // ✅ Update voucher main data
@@ -504,7 +845,9 @@ export const updateVoucher = async (req, res) => {
     });
 
     // 🧾 Separate deletion of voucher items from transaction
-    await prisma.voucher_items.deleteMany({ where: { voucher_id: Number(id) } });
+    await prisma.voucher_items.deleteMany({
+      where: { voucher_id: Number(id) },
+    });
 
     // 🧾 Insert new voucher items
     if (parsedItems.length > 0) {
@@ -528,16 +871,27 @@ export const updateVoucher = async (req, res) => {
     const handleUploads = async (type, voucherId) => {
       const uploadedFiles = [];
       const files = req.files?.[type] || [];
-      for (const file of files) {
-        const url = await uploadToCloudinary(file.buffer, `vouchers/${type}`);
-        uploadedFiles.push({
-          voucher_id: voucherId,
-          file_name: file.originalname,
-          file_type: file.mimetype,
-          file_url: url,
-          attachment_type: type,
-        });
+
+      // Handle single file or array of files
+      const filesArray = Array.isArray(files) ? files : [files];
+
+      for (const file of filesArray) {
+        if (file) {
+          // Check if file exists
+          const url = await uploadToCloudinary(file, `vouchers/${type}`);
+          if (url) {
+            // Check if upload was successful
+            uploadedFiles.push({
+              voucher_id: voucherId,
+              file_name: file.name,
+              file_type: file.mimetype,
+              file_url: url,
+              attachment_type: type,
+            });
+          }
+        }
       }
+
       if (uploadedFiles.length > 0) {
         await prisma.voucher_attachments.createMany({ data: uploadedFiles });
       }
@@ -557,7 +911,6 @@ export const updateVoucher = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 /** ===================== DELETE VOUCHER ===================== */
 // export const deleteVoucher = async (req, res) => {
 //   try {
@@ -572,7 +925,6 @@ export const updateVoucher = async (req, res) => {
 //   }
 // };
 
-
 export const deleteVoucher = async (req, res) => {
   const { id } = req.params;
 
@@ -586,7 +938,9 @@ export const deleteVoucher = async (req, res) => {
     });
 
     if (!voucher) {
-      return res.status(404).json({ success: false, message: "Voucher not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Voucher not found" });
     }
 
     // 🧹 Prepare Cloudinary deletion list
@@ -607,7 +961,9 @@ export const deleteVoucher = async (req, res) => {
       await tx.voucher_items.deleteMany({ where: { voucher_id: Number(id) } });
 
       // Delete attachments
-      await tx.voucher_attachments.deleteMany({ where: { voucher_id: Number(id) } });
+      await tx.voucher_attachments.deleteMany({
+        where: { voucher_id: Number(id) },
+      });
 
       // Delete main voucher
       await tx.vouchers.delete({ where: { id: Number(id) } });

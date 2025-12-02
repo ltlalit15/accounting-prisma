@@ -1,11 +1,13 @@
-import { uploadToCloudinary } from "../config/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../config/cloudinary.js";
 import prisma from "../config/db.js";
-
 
 // Utility: Safe number conversion
 const toNumber = (val) => {
   if (val == null) return 0;
-  if (typeof val === 'object' && typeof val.toNumber === 'function') {
+  if (typeof val === "object" && typeof val.toNumber === "function") {
     return val.toNumber();
   }
   return Number(val);
@@ -125,6 +127,86 @@ const toNumber = (val) => {
 //   }
 // };
 
+// export const createContraVoucher = async (req, res) => {
+//   try {
+//     const {
+//       company_id,
+//       voucher_date,
+//       account_from_id,
+//       account_to_id,
+//       amount,
+//       narration,
+//       voucher_number, // 👈 add this if it comes from frontend (manual)
+//     } = req.body;
+
+//     // 🧩 Validate required fields
+//     if (
+//       !company_id ||
+//       !account_from_id ||
+//       !account_to_id ||
+//       !amount ||
+//       !voucher_date
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Missing required fields (company_id, account_from_id, account_to_id, amount, voucher_date).",
+//       });
+//     }
+
+//     let documentUrl = null;
+
+//     if (req.files && req.files.document) {
+//       const documentFile = req.files.document; // This object has the tempFilePath
+//       documentUrl = await uploadToCloudinary(documentFile, "contra_vouchers");
+
+//       // Since your function returns null on error, let's handle that.
+//       if (documentUrl === null) {
+//         return res.status(500).json({
+//           success: false,
+//           message: "Document upload failed. Please try again.",
+//         });
+//       }
+//     }
+
+//     // 🧾 Auto-generate voucher number (if not provided)
+//     const voucher_no_auto = `CON-${Date.now()}-${Math.floor(
+//       Math.random() * 1000
+//     )}`;
+//     const finalVoucherNumber = voucher_number || voucher_no_auto; // ✅ fallback if manual not given
+
+//     // 🧮 Create voucher record (with correct relations)
+//     const newVoucher = await prisma.contra_vouchers.create({
+//       data: {
+//         voucher_number: finalVoucherNumber, // ✅ REQUIRED FIELD
+//         voucher_no_auto,
+//         company_id: parseInt(company_id),
+
+//         voucher_date: new Date(voucher_date),
+//         amount: parseFloat(amount),
+//         document: documentUrl || null,
+//         narration: narration || null,
+
+//         // ✅ Connect relations properly
+//         account_from: { connect: { id: parseInt(account_from_id) } },
+//         account_to: { connect: { id: parseInt(account_to_id) } },
+//       },
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Contra Voucher created successfully",
+//       data: newVoucher,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error creating contra voucher:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create contra voucher",
+//       error: error.message,
+//     });
+//   }
+// };
 
 export const createContraVoucher = async (req, res) => {
   try {
@@ -135,11 +217,17 @@ export const createContraVoucher = async (req, res) => {
       account_to_id,
       amount,
       narration,
-      voucher_number, // 👈 add this if it comes from frontend (manual)
+      voucher_number,
     } = req.body;
 
     // 🧩 Validate required fields
-    if (!company_id || !account_from_id || !account_to_id || !amount || !voucher_date) {
+    if (
+      !company_id ||
+      !account_from_id ||
+      !account_to_id ||
+      !amount ||
+      !voucher_date
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -149,31 +237,65 @@ export const createContraVoucher = async (req, res) => {
 
     let documentUrl = null;
 
-    // 🖼️ Upload file to Cloudinary (multer.memoryStorage)
-    if (req.files?.document?.[0]) {
-      const fileBuffer = req.files.document[0].buffer;
-      documentUrl = await uploadToCloudinary(fileBuffer, "contra_vouchers");
+    if (req.files && req.files.document) {
+      const documentFile = req.files.document;
+      documentUrl = await uploadToCloudinary(documentFile, "contra_vouchers");
+
+      if (documentUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Document upload failed. Please try again.",
+        });
+      }
     }
 
     // 🧾 Auto-generate voucher number (if not provided)
-    const voucher_no_auto = `CON-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const finalVoucherNumber = voucher_number || voucher_no_auto; // ✅ fallback if manual not given
+    const voucher_no_auto = `CON-${Date.now()}-${Math.floor(
+      Math.random() * 1000
+    )}`;
+    const finalVoucherNumber = voucher_number || voucher_no_auto;
+
+    // Parse IDs to integers
+    const parsedCompanyId = parseInt(company_id);
+    const parsedAccountFromId = parseInt(account_from_id);
+    const parsedAccountToId = parseInt(account_to_id);
+
+    // 🔍 Validate that the accounts exist before creating the voucher
+    const accountFrom = await prisma.accounts.findUnique({
+      where: { id: parsedAccountFromId },
+    });
+
+    const accountTo = await prisma.accounts.findUnique({
+      where: { id: parsedAccountToId },
+    });
+
+    if (!accountFrom) {
+      return res.status(400).json({
+        success: false,
+        message: `Account with ID ${parsedAccountFromId} not found`,
+      });
+    }
+
+    if (!accountTo) {
+      return res.status(400).json({
+        success: false,
+        message: `Account with ID ${parsedAccountToId} not found`,
+      });
+    }
 
     // 🧮 Create voucher record (with correct relations)
     const newVoucher = await prisma.contra_vouchers.create({
       data: {
-        voucher_number: finalVoucherNumber, // ✅ REQUIRED FIELD
+        voucher_number: finalVoucherNumber,
         voucher_no_auto,
-        company_id: parseInt(company_id),
-        
+        company_id: parsedCompanyId,
         voucher_date: new Date(voucher_date),
         amount: parseFloat(amount),
         document: documentUrl || null,
         narration: narration || null,
-
         // ✅ Connect relations properly
-        account_from: { connect: { id: parseInt(account_from_id) } },
-        account_to: { connect: { id: parseInt(account_to_id) } },
+        account_from: { connect: { id: parsedAccountFromId } },
+        account_to: { connect: { id: parsedAccountToId } },
       },
     });
 
@@ -192,25 +314,21 @@ export const createContraVoucher = async (req, res) => {
   }
 };
 
-
-
-
-
 // ✅ GET All Contra Vouchers (with account names)
 export const getAllContraVouchers = async (req, res) => {
   try {
     const vouchers = await prisma.contra_vouchers.findMany({
       include: {
         account_from: { select: { account_name: true } }, // ✅ Changed from 'name' to 'account_name'
-        account_to: { select: { account_name: true } },   // ✅ Changed from 'name' to 'account_name'
+        account_to: { select: { account_name: true } }, // ✅ Changed from 'name' to 'account_name'
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: "desc" },
     });
 
-    const formatted = vouchers.map(v => ({
+    const formatted = vouchers.map((v) => ({
       ...v,
       account_from_name: v.account_from?.account_name || null, // ✅ Use account_name
-      account_to_name: v.account_to?.account_name || null,     // ✅ Use account_name
+      account_to_name: v.account_to?.account_name || null, // ✅ Use account_name
       amount: toNumber(v.amount),
     }));
 
@@ -239,7 +357,7 @@ export const getContraVoucherById = async (req, res) => {
       where: { id: voucherId },
       include: {
         account_from: { select: { account_name: true } }, // ✅ Changed
-        account_to: { select: { account_name: true } },   // ✅ Changed
+        account_to: { select: { account_name: true } }, // ✅ Changed
       },
     });
 
@@ -256,7 +374,7 @@ export const getContraVoucherById = async (req, res) => {
       data: {
         ...voucher,
         account_from_name: voucher.account_from?.account_name || null, // ✅
-        account_to_name: voucher.account_to?.account_name || null,     // ✅
+        account_to_name: voucher.account_to?.account_name || null, // ✅
         amount: toNumber(voucher.amount),
       },
     });
@@ -322,13 +440,86 @@ export const getContraVoucherById = async (req, res) => {
 //   }
 // };
 
+// export const updateContraVoucher = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const voucherId = parseInt(id);
+
+//     // 🔍 Check if voucher exists
+//     const existing = await prisma.contra_vouchers.findUnique({
+//       where: { id: voucherId },
+//     });
+//     if (!existing) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Contra Voucher not found",
+//       });
+//     }
+
+//     // 🖼️ Handle document replacement
+//     let documentUrl = existing.document;
+
+//     if (req.files?.document?.[0]) {
+//       // 🧹 Delete old document from Cloudinary if it exists
+//       if (existing.document) {
+//         try {
+//           const publicId = existing.document.split("/").pop().split(".")[0];
+//           await deleteFromCloudinary(`contra_vouchers/${publicId}`);
+//         } catch (err) {
+//           console.warn("⚠️ Cloudinary delete failed:", err.message);
+//         }
+//       }
+
+//       // ☁️ Upload new document
+//       const fileBuffer = req.files.document[0].buffer;
+//       documentUrl = await uploadToCloudinary(fileBuffer, "contra_vouchers");
+//     }
+
+//     // 🧩 Prepare update data dynamically (only provided fields)
+//     const data = {};
+
+//     if (req.body.voucher_date !== undefined)
+//       data.voucher_date = new Date(req.body.voucher_date);
+//     if (req.body.account_from_id !== undefined)
+//       data.account_from_id = parseInt(req.body.account_from_id);
+//     if (req.body.account_to_id !== undefined)
+//       data.account_to_id = parseInt(req.body.account_to_id);
+//     if (req.body.amount !== undefined)
+//       data.amount = parseFloat(req.body.amount);
+//     if (req.body.narration !== undefined)
+//       data.narration = req.body.narration || null;
+//     if (documentUrl !== undefined) data.document = documentUrl;
+
+//     // 🧾 Update record
+//     const updated = await prisma.contra_vouchers.update({
+//       where: { id: voucherId },
+//       data,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Contra Voucher updated successfully",
+//       data: updated,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error updating contra voucher:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update contra voucher",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const updateContraVoucher = async (req, res) => {
   try {
     const { id } = req.params;
     const voucherId = parseInt(id);
 
     // 🔍 Check if voucher exists
-    const existing = await prisma.contra_vouchers.findUnique({ where: { id: voucherId } });
+    const existing = await prisma.contra_vouchers.findUnique({
+      where: { id: voucherId },
+    });
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -339,7 +530,7 @@ export const updateContraVoucher = async (req, res) => {
     // 🖼️ Handle document replacement
     let documentUrl = existing.document;
 
-    if (req.files?.document?.[0]) {
+    if (req.files && req.files.document) {
       // 🧹 Delete old document from Cloudinary if it exists
       if (existing.document) {
         try {
@@ -350,26 +541,66 @@ export const updateContraVoucher = async (req, res) => {
         }
       }
 
-      // ☁️ Upload new document
-      const fileBuffer = req.files.document[0].buffer;
-      documentUrl = await uploadToCloudinary(fileBuffer, "contra_vouchers");
+      // ☁️ Upload new document using express-fileupload
+      const documentFile = req.files.document; // This object has the tempFilePath
+      documentUrl = await uploadToCloudinary(documentFile, "contra_vouchers");
+
+      // Since your function returns null on error, let's handle that.
+      if (documentUrl === null) {
+        return res.status(500).json({
+          success: false,
+          message: "Document upload failed. Please try again.",
+        });
+      }
     }
 
     // 🧩 Prepare update data dynamically (only provided fields)
     const data = {};
-    
+
     if (req.body.voucher_date !== undefined)
       data.voucher_date = new Date(req.body.voucher_date);
-    if (req.body.account_from_id !== undefined)
-      data.account_from_id = parseInt(req.body.account_from_id);
-    if (req.body.account_to_id !== undefined)
-      data.account_to_id = parseInt(req.body.account_to_id);
     if (req.body.amount !== undefined)
       data.amount = parseFloat(req.body.amount);
     if (req.body.narration !== undefined)
       data.narration = req.body.narration || null;
-    if (documentUrl !== undefined)
-      data.document = documentUrl;
+    if (documentUrl !== existing.document) data.document = documentUrl;
+
+    // 🔍 Validate account IDs if they're being updated
+    let accountFromValid = true;
+    let accountToValid = true;
+
+    if (req.body.account_from_id !== undefined) {
+      const accountFromId = parseInt(req.body.account_from_id);
+      const accountFrom = await prisma.accounts.findUnique({
+        where: { id: accountFromId },
+      });
+
+      if (!accountFrom) {
+        accountFromValid = false;
+      } else {
+        data.account_from = { connect: { id: accountFromId } };
+      }
+    }
+
+    if (req.body.account_to_id !== undefined) {
+      const accountToId = parseInt(req.body.account_to_id);
+      const accountTo = await prisma.accounts.findUnique({
+        where: { id: accountToId },
+      });
+
+      if (!accountTo) {
+        accountToValid = false;
+      } else {
+        data.account_to = { connect: { id: accountToId } };
+      }
+    }
+
+    if (!accountFromValid || !accountToValid) {
+      return res.status(400).json({
+        success: false,
+        message: "One or both account IDs are invalid",
+      });
+    }
 
     // 🧾 Update record
     const updated = await prisma.contra_vouchers.update({
@@ -391,7 +622,6 @@ export const updateContraVoucher = async (req, res) => {
     });
   }
 };
-
 // ✅ DELETE Contra Voucher
 // export const deleteContraVoucher = async (req, res) => {
 //   try {
@@ -444,7 +674,10 @@ export const deleteContraVoucher = async (req, res) => {
         const publicId = existing.document.split("/").pop().split(".")[0];
         await deleteFromCloudinary(`contra_vouchers/${publicId}`);
       } catch (error) {
-        console.warn("⚠️ Failed to delete image from Cloudinary:", error.message);
+        console.warn(
+          "⚠️ Failed to delete image from Cloudinary:",
+          error.message
+        );
       }
     }
 
@@ -475,7 +708,7 @@ export const getAccounts = async (req, res) => {
     });
 
     // Optional: rename field to 'name' in response for frontend simplicity
-    const formattedAccounts = accounts.map(acc => ({
+    const formattedAccounts = accounts.map((acc) => ({
       id: acc.id,
       name: acc.account_name, // frontend ko 'name' dikhayenge
     }));
@@ -494,8 +727,6 @@ export const getAccounts = async (req, res) => {
     });
   }
 };
-
-
 
 export const getContraVouchersByCompany = async (req, res) => {
   try {
