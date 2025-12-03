@@ -191,6 +191,179 @@ const JWT_EXPIRES_IN = "1d"; // token validity
 // ---------------------------------------------------
 // LOGIN (email + password, role in JWT)
 // ---------------------------------------------------
+
+// export const login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password) {
+//       return res
+//         .status(400)
+//         .json({ message: "Email and password are required" });
+//     }
+
+//     // Find user
+//     const user = await prisma.users.findUnique({ where: { email } });
+
+//     if (!user) {
+//       return res.status(401).json({ message: "Invalid credentials" });
+//     }
+
+//     // Check password
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) {
+//       return res.status(401).json({ message: "Invalid credentials" });
+//     }
+
+//     // JWT payload
+//     const payload = {
+//       id: user.id,
+//       email: user.email,
+//       role: user.role, // SUPERADMIN or COMPANY
+//     };
+
+//     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+//     return res.status(200).json({
+//       message: "Login successful",
+//       data: {
+//         user: {
+//           id: user.id,
+//           name: user.name,
+//           email: user.email,
+//           role: user.role,
+//           profile: user.profile,
+//           UserStatus: user.UserStatus,
+//         },
+//         token,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Login error:", error);
+//     return res
+//       .status(500)
+//       .json({ message: "Internal server error", error: error.message });
+//   }
+// };
+
+const UI_MODULE_MAPPING = {
+  Dashboard: null,
+  Charts_of_Accounts: "parent_accounts",
+  "Customers/Debtors": "vendorscustomer",
+  "Vendors/Creditors": "vendorscustomer",
+  All_Transaction: "transactions",
+  Create_Voucher: "journal_entries",
+  Expenses: "expensevouchers",
+  Income: "income_vouchers",
+  Contra_Voucher: "contra_vouchers",
+  Warehouse: "warehouses",
+  Unit_of_measure: "unit_details",
+  Product_Inventory: "products",
+  Service: "services",
+  StockTransfer: "transfers",
+  Inventory_Adjustment: "adjustments",
+  Sales_Order: "salesorder",
+  Sales_Return: "sales_return",
+  Purchase_Orders: "purchaseorder",
+  Purchase_Return: "purchase_return",
+  POS_Screen: "pos_invoices",
+  Sales_Report: null,
+  Purchase_Report: null,
+  POS_Report: null,
+  Tax_Report: null,
+  Inventory_Summary: null,
+  Balance_Sheet: null,
+  Cash_Flow: null,
+  Profit_Loss: null,
+  Vat_Report: null,
+  DayBook: null,
+  Journal_Entries: "journal_entries",
+  Ledger: null,
+  Trial_Balance: null,
+  Users: "users",
+  Roles_Permissions: "userroles",
+  Company_Info: "users",
+  Password_Requests: "password_change_requests",
+};
+
+const UI_PERMISSION_ORDER = [
+  "Dashboard",
+  "Charts_of_Accounts",
+  "Customers/Debtors",
+  "Vendors/Creditors",
+  "All_Transaction",
+  "Warehouse",
+  "Unit_of_measure",
+  "Product_Inventory",
+  "Service",
+  "StockTransfer",
+  "Inventory_Adjustment",
+  "Sales_Order",
+  "Sales_Return",
+  "Purchase_Orders",
+  "Purchase_Return",
+  "POS_Screen",
+  "Create_Voucher",
+  "Expenses",
+  "Income",
+  "Contra_Voucher",
+  "Sales_Report",
+  "Purchase_Report",
+  "POS_Report",
+  "Tax_Report",
+  "Inventory_Summary",
+  "Balance_Sheet",
+  "Cash_Flow",
+  "Profit_Loss",
+  "Vat_Report",
+  "DayBook",
+  "Journal_Entries",
+  "Ledger",
+  "Trial_Balance",
+  "Users",
+  "Roles_Permissions",
+  "Company_Info",
+  "Password_Requests",
+];
+
+/**
+ * Formats raw role data from the database into the required UI response format.
+ * @param {object} roleData - The role object including its permissions from Prisma.
+ * @returns {object} - The formatted permissions array.
+ */
+const formatPermissions = (roleData) => {
+  const permissionMap = new Map();
+  roleData.permissions.forEach((p) => {
+    permissionMap.set(p.module_name, p);
+  });
+
+  const orderedPermissions = UI_PERMISSION_ORDER.map((uiName) => {
+    const dbName = UI_MODULE_MAPPING[uiName];
+    const permission = permissionMap.get(dbName);
+
+    if (permission) {
+      return {
+        module_name: uiName,
+        can_create: permission.can_create,
+        can_view: permission.can_view,
+        can_update: permission.can_update,
+        can_delete: permission.can_delete,
+      };
+    } else {
+      // Default permission if not found in DB for this role
+      return {
+        module_name: uiName,
+        can_create: false,
+        can_view: false,
+        can_update: false,
+        can_delete: false,
+      };
+    }
+  });
+
+  return orderedPermissions;
+};
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -201,41 +374,90 @@ export const login = async (req, res) => {
         .json({ message: "Email and password are required" });
     }
 
-    // Find user
+    // 1. Find the user by email. This is a simple query.
     const user = await prisma.users.findUnique({ where: { email } });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Check password
+    // 2. Check if the provided password matches the stored hash
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // JWT payload
+    // 3. Create a JWT payload
     const payload = {
       id: user.id,
       email: user.email,
-      role: user.role, // SUPERADMIN or COMPANY
+      role: user.role,
     };
 
+    // Make sure to have JWT_SECRET and JWT_EXPIRES_IN in your .env file
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+    // 4. Prepare the base response data
+    const responseData = {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+        UserStatus: user.UserStatus,
+      },
+      token,
+    };
+
+    // 5. Handle permissions based on the user's role
+    // The role in the DB is 'USER', not 'STAFF', based on your schema.
+    if (user.role === "USER") {
+      // Check if the user has a specific role assigned (e.g., "Accountant", "Sales Manager")
+      if (user.user_role) {
+        try {
+          // 6. Fetch the role details using the ID from the user_role field (second query)
+          const userRole = await prisma.userroles.findUnique({
+            where: { id: parseInt(user.user_role) },
+            include: { permissions: true },
+          });
+
+          if (userRole) {
+            // Add the role and its formatted permissions to the response
+            responseData.userRole = {
+              role_id: userRole.id,
+              role_name: userRole.role_name,
+              status: userRole.status,
+              permissions: formatPermissions(userRole),
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+          // Proceed without role info if there's an error fetching it
+        }
+      }
+    } else if (user.role === "COMPANY" || user.role === "SUPERADMIN") {
+      // For COMPANY and SUPERADMIN, grant all permissions
+      const allPermissions = UI_PERMISSION_ORDER.map((uiName) => ({
+        module_name: uiName,
+        can_create: true,
+        can_view: true,
+        can_update: true,
+        can_delete: true,
+      }));
+
+      // Add role information using values from the user record
+      responseData.userRole = {
+        role_id: null, // These roles don't have an entry in the userroles table
+        role_name: user.role, // Use the role from the DB ('COMPANY' or 'SUPERADMIN')
+        status: user.UserStatus || "Active", // Use the user's status from the DB
+        permissions: allPermissions,
+      };
+    }
 
     return res.status(200).json({
       message: "Login successful",
-      data: {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          profile: user.profile,
-          UserStatus: user.UserStatus,
-        },
-        token,
-      },
+      data: responseData,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -244,7 +466,6 @@ export const login = async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 };
-
 // ----------Super Admin Controllers ----------
 
 export const createSuperAdmin = async (req, res) => {

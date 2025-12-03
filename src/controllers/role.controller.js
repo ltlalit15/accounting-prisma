@@ -15,7 +15,7 @@ const UI_MODULE_MAPPING = {
   Product_Inventory: "products",
   Service: "services",
   StockTransfer: "transfers",
-  Inventory_Management: "adjustments",
+  Inventory_Adjustment: "adjustments",
   Sales_Order: "salesorder",
   Sales_Return: "sales_return",
   Purchase_Orders: "purchaseorder",
@@ -52,7 +52,7 @@ const UI_PERMISSION_ORDER = [
   "Product_Inventory",
   "Service",
   "StockTransfer",
-  "Inventory_Management",
+  "Inventory_Adjustment",
   "Sales_Order",
   "Sales_Return",
   "Purchase_Orders",
@@ -147,6 +147,68 @@ const formatRoleResponse = (roleData) => {
 /**
  * CREATE a new role with permissions.
  */
+// export const createRole = async (req, res) => {
+//   try {
+//     const { company_id, role_name, permissions } = req.body;
+
+//     if (!role_name) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Role name is required" });
+//     }
+
+//     const permissionsToCreate = [];
+//     if (permissions && Array.isArray(permissions)) {
+//       for (const perm of permissions) {
+//         const dbName = UI_MODULE_MAPPING[perm.module_name];
+//         if (dbName) {
+//           permissionsToCreate.push({
+//             module_name: dbName,
+//             can_create: !!perm.can_create,
+//             can_view: !!perm.can_view,
+//             can_update: !!perm.can_update,
+//             can_delete: !!perm.can_delete,
+//           });
+//         }
+//       }
+//     }
+
+//     const newRole = await prisma.$transaction(async (tx) => {
+//       const role = await tx.userroles.create({
+//         data: {
+//           company_id: company_id ? Number(company_id) : null,
+//           role_name,
+//           general_permissions: JSON.stringify([]),
+//         },
+//       });
+
+//       if (permissionsToCreate.length > 0) {
+//         await tx.role_permissions.createMany({
+//           data: permissionsToCreate.map((p) => ({ ...p, role_id: role.id })),
+//         });
+//       }
+
+//       return role;
+//     });
+
+//     const roleWithPermissions = await prisma.userroles.findUnique({
+//       where: { id: newRole.id },
+//       include: { permissions: true },
+//     });
+
+//     const formattedResponse = formatRoleResponse(roleWithPermissions);
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Role created successfully",
+//       data: formattedResponse,
+//     });
+//   } catch (error) {
+//     console.error("Create Role Error:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const createRole = async (req, res) => {
   try {
     const { company_id, role_name, permissions } = req.body;
@@ -161,6 +223,8 @@ export const createRole = async (req, res) => {
     if (permissions && Array.isArray(permissions)) {
       for (const perm of permissions) {
         const dbName = UI_MODULE_MAPPING[perm.module_name];
+
+        // Only create permissions for modules that have a database table
         if (dbName) {
           permissionsToCreate.push({
             module_name: dbName,
@@ -170,6 +234,8 @@ export const createRole = async (req, res) => {
             can_delete: !!perm.can_delete,
           });
         }
+        // For reports (where dbName is null), we don't create database entries
+        // but we'll still include them in the formatted response
       }
     }
 
@@ -191,10 +257,42 @@ export const createRole = async (req, res) => {
       return role;
     });
 
-    const roleWithPermissions = await prisma.userroles.findUnique({
-      where: { id: newRole.id },
-      include: { permissions: true },
-    });
+    // Create a mock permissions array that includes reports
+    const allPermissions = [];
+    if (permissions && Array.isArray(permissions)) {
+      for (const perm of permissions) {
+        const dbName = UI_MODULE_MAPPING[perm.module_name];
+
+        if (dbName) {
+          // For modules with database tables, get the actual permission
+          const dbPermission = await prisma.role_permissions.findFirst({
+            where: {
+              role_id: newRole.id,
+              module_name: dbName,
+            },
+          });
+
+          if (dbPermission) {
+            allPermissions.push(dbPermission);
+          }
+        } else {
+          // For reports, create a mock permission object
+          allPermissions.push({
+            module_name: perm.module_name,
+            can_create: !!perm.can_create,
+            can_view: !!perm.can_view,
+            can_update: !!perm.can_update,
+            can_delete: !!perm.can_delete,
+          });
+        }
+      }
+    }
+
+    // Create a mock role object that includes all permissions
+    const roleWithPermissions = {
+      ...newRole,
+      permissions: allPermissions,
+    };
 
     const formattedResponse = formatRoleResponse(roleWithPermissions);
 
@@ -208,7 +306,6 @@ export const createRole = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 export const getAllRoles = async (req, res) => {
   try {
     const { company_id } = req.query;
@@ -262,10 +359,83 @@ export const getRoleById = async (req, res) => {
   }
 };
 
+// export const updateRole = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     // `general_permissions` is removed from destructuring
+//     const { role_name, permissions } = req.body;
+//     const roleId = Number(id);
+
+//     const existing = await prisma.userroles.findUnique({
+//       where: { id: roleId },
+//     });
+//     if (!existing) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Role not found" });
+//     }
+
+//     // Process incoming permissions to map UI names to DB names
+//     const permissionsToCreate = [];
+//     if (permissions && Array.isArray(permissions)) {
+//       for (const perm of permissions) {
+//         const dbName = UI_MODULE_MAPPING[perm.module_name];
+//         if (dbName) {
+//           permissionsToCreate.push({
+//             role_id: roleId,
+//             module_name: dbName,
+//             can_create: !!perm.can_create,
+//             can_view: !!perm.can_view,
+//             can_update: !!perm.can_update,
+//             can_delete: !!perm.can_delete,
+//             // `full_access` has been removed
+//           });
+//         }
+//       }
+//     }
+
+//     // Transactional update: update role, delete old perms, create new perms
+//     await prisma.$transaction([
+//       prisma.userroles.update({
+//         where: { id: roleId },
+//         data: {
+//           role_name,
+//           // general_permissions is updated to an empty array by default
+//           general_permissions: JSON.stringify([]),
+//         },
+//       }),
+//       prisma.role_permissions.deleteMany({ where: { role_id: roleId } }),
+//       ...(permissionsToCreate.length > 0
+//         ? [
+//             prisma.role_permissions.createMany({
+//               data: permissionsToCreate,
+//             }),
+//           ]
+//         : []),
+//     ]);
+
+//     const roleWithPermissions = await prisma.userroles.findUnique({
+//       where: { id: roleId },
+//       include: { permissions: true },
+//     });
+
+//     // Format the final role object using our helper
+//     const formattedResponse = formatRoleResponse(roleWithPermissions);
+
+//     res.json({
+//       success: true,
+//       message: "Role updated successfully",
+//       data: formattedResponse,
+//     });
+//   } catch (error) {
+//     console.error("Update Role Error:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
-    // `general_permissions` is removed from destructuring
     const { role_name, permissions } = req.body;
     const roleId = Number(id);
 
@@ -283,6 +453,8 @@ export const updateRole = async (req, res) => {
     if (permissions && Array.isArray(permissions)) {
       for (const perm of permissions) {
         const dbName = UI_MODULE_MAPPING[perm.module_name];
+
+        // Only create permissions for modules that have a database table
         if (dbName) {
           permissionsToCreate.push({
             role_id: roleId,
@@ -291,9 +463,9 @@ export const updateRole = async (req, res) => {
             can_view: !!perm.can_view,
             can_update: !!perm.can_update,
             can_delete: !!perm.can_delete,
-            // `full_access` has been removed
           });
         }
+        // For reports (where dbName is null), we don't create database entries
       }
     }
 
@@ -303,7 +475,6 @@ export const updateRole = async (req, res) => {
         where: { id: roleId },
         data: {
           role_name,
-          // general_permissions is updated to an empty array by default
           general_permissions: JSON.stringify([]),
         },
       }),
@@ -317,12 +488,46 @@ export const updateRole = async (req, res) => {
         : []),
     ]);
 
-    const roleWithPermissions = await prisma.userroles.findUnique({
-      where: { id: roleId },
-      include: { permissions: true },
-    });
+    // Create a mock permissions array that includes reports
+    const allPermissions = [];
+    if (permissions && Array.isArray(permissions)) {
+      for (const perm of permissions) {
+        const dbName = UI_MODULE_MAPPING[perm.module_name];
 
-    // Format the final role object using our helper
+        if (dbName) {
+          // For modules with database tables, get the actual permission
+          const dbPermission = await prisma.role_permissions.findFirst({
+            where: {
+              role_id: roleId,
+              module_name: dbName,
+            },
+          });
+
+          if (dbPermission) {
+            allPermissions.push(dbPermission);
+          }
+        } else {
+          // For reports, create a mock permission object
+          allPermissions.push({
+            module_name: perm.module_name,
+            can_create: !!perm.can_create,
+            can_view: !!perm.can_view,
+            can_update: !!perm.can_update,
+            can_delete: !!perm.can_delete,
+          });
+        }
+      }
+    }
+
+    // Create a mock role object that includes all permissions
+    const roleWithPermissions = {
+      id: roleId,
+      role_name,
+      status: existing.status,
+      created_at: existing.created_at,
+      permissions: allPermissions,
+    };
+
     const formattedResponse = formatRoleResponse(roleWithPermissions);
 
     res.json({
