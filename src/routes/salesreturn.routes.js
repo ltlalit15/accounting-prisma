@@ -32,7 +32,7 @@ import {
   getAllSalesReturns,
   getSalesReturnById,
   updateSalesReturn,
-  deleteSalesReturn
+  deleteSalesReturn,
 } from "../controllers/salesreturn.controller.js";
 
 const router = Router();
@@ -44,8 +44,7 @@ router.post("/create-sales-return", createSalesReturn);
 router.get("/get-returns", getAllSalesReturns);
 
 // Get Sales Return by ID (GET) - supports both path parameter and query parameter
-router.get("/get- /:id", getSalesReturnById);
-router.get("/get-particular", getSalesReturnById); // For query parameter format: ?id=1
+router.get("/get-particular/:id", getSalesReturnById); // For query parameter format: ?id=1
 
 // Update Sales Return (PUT)
 router.put("/update-sale/:id", updateSalesReturn);
@@ -54,6 +53,3 @@ router.put("/update-sale/:id", updateSalesReturn);
 router.delete("/delete-sale/:id", deleteSalesReturn);
 
 export default router;
-
-
-  
