@@ -1,5 +1,7 @@
 // src/controllers/planRequestController.js
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
 const prisma = new PrismaClient();
 
 // Utility: Safe number conversion
@@ -182,12 +184,83 @@ export const getRequestedPlans = async (req, res) => {
   }
 };
 // 📌 3. Approve / Reject Plan Request
+// export const updatePlanRequestStatus = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status } = req.body;
+
+//     // Validate status
+//     if (!["Approved", "Rejected"].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Status must be either 'Approved' or 'Rejected'",
+//       });
+//     }
+
+//     const requestId = Number(id);
+
+//     // Check if exists
+//     const existing = await prisma.plan_requests.findUnique({
+//       where: { id: requestId },
+//     });
+
+//     if (!existing) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Plan request not found",
+//       });
+//     }
+
+//     // Fetch plan for details
+//     const plan = await prisma.plans.findUnique({
+//       where: { id: existing.plan_id },
+//       select: {
+//         id: true,
+//         plan_name: true,
+//       },
+//     });
+
+//     // Update status only
+//     const updated = await prisma.plan_requests.update({
+//       where: { id: requestId },
+//       data: { status },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `Plan request ${status.toLowerCase()} successfully`,
+//       data: {
+//         id: updated.id,  // ← returning ID
+//         company: {
+//           id: updated.id,  // ← only ID available for company
+//           name: updated.company_name,
+//           email: updated.company_email,
+//         },
+//         plan: {
+//           id: plan?.id || null,
+//           plan_name: plan?.plan_name || "Unknown Plan",
+//         },
+//         billing_cycle: updated.billing_cycle,
+//         request_date: updated.request_date,
+//         status: updated.status,
+//       },
+//     });
+
+//   } catch (error) {
+//     console.error("Error updating plan request:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const updatePlanRequestStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Validate status
     if (!["Approved", "Rejected"].includes(status)) {
       return res.status(400).json({
         success: false,
@@ -197,7 +270,6 @@ export const updatePlanRequestStatus = async (req, res) => {
 
     const requestId = Number(id);
 
-    // Check if exists
     const existing = await prisma.plan_requests.findUnique({
       where: { id: requestId },
     });
@@ -209,41 +281,66 @@ export const updatePlanRequestStatus = async (req, res) => {
       });
     }
 
-    // Fetch plan for details
-    const plan = await prisma.plans.findUnique({
-      where: { id: existing.plan_id },
-      select: {
-        id: true,
-        plan_name: true,
-      },
-    });
-
-    // Update status only
-    const updated = await prisma.plan_requests.update({
+    // Update only the status
+    const updatedRequest = await prisma.plan_requests.update({
       where: { id: requestId },
       data: { status },
+    });
+
+    let companyCreated = null;
+    let randomPassword = null; // ✅ FIX: declare outside
+
+    // ------------------------
+    // ✅ If Approved → Create Company
+    // ------------------------
+    if (status === "Approved") {
+      randomPassword = Math.random().toString(36).slice(-8); // assign value
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      companyCreated = await prisma.users.create({
+        data: {
+          name: existing.company_name,
+          email: existing.company_email,
+          password: hashedPassword,
+          role: "COMPANY",
+          startDate: new Date(),
+          expireDate: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 1)
+          ),
+
+          user_plans: {
+            create: {
+              plan_id: existing.plan_id,
+              planType: existing.billing_cycle,
+            },
+          },
+        },
+      });
+
+      // Placeholder for future email sending
+    }
+
+    // Fetch plan info
+    const plan = await prisma.plans.findUnique({
+      where: { id: existing.plan_id },
+      select: { id: true, plan_name: true },
     });
 
     return res.status(200).json({
       success: true,
       message: `Plan request ${status.toLowerCase()} successfully`,
       data: {
-        id: updated.id,  // ← returning ID
-        company: {
-          id: updated.id,  // ← only ID available for company
-          name: updated.company_name,
-          email: updated.company_email,
+        plan_request: {
+          id: updatedRequest.id,
+          billing_cycle: updatedRequest.billing_cycle,
+          company_email: updatedRequest.company_email,
+          status: updatedRequest.status,
         },
-        plan: {
-          id: plan?.id || null,
-          plan_name: plan?.plan_name || "Unknown Plan",
-        },
-        billing_cycle: updated.billing_cycle,
-        request_date: updated.request_date,
-        status: updated.status,
+        plan,
+        company_created: companyCreated,
+        password: randomPassword, // now it will exist (null if rejected)
       },
     });
-
   } catch (error) {
     console.error("Error updating plan request:", error);
     return res.status(500).json({
@@ -253,6 +350,7 @@ export const updatePlanRequestStatus = async (req, res) => {
     });
   }
 };
+
 // 📌 4. Delete Plan Request
 export const deletePlanRequest = async (req, res) => {
   try {
