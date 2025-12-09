@@ -406,6 +406,7 @@ export const login = async (req, res) => {
         role: user.role,
         profile: user.profile,
         UserStatus: user.UserStatus,
+        companyId: user.created_by ? user.created_by : null
       },
       token,
     };
