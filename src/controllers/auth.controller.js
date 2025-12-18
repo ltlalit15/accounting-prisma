@@ -406,10 +406,24 @@ export const login = async (req, res) => {
         role: user.role,
         profile: user.profile,
         UserStatus: user.UserStatus,
-        companyId: user.created_by ? user.created_by : null
+        companyId: user.created_by ? user.created_by : null,
       },
       token,
     };
+    if (user.role === "USER") {
+      responseData.user = {
+        ...responseData.user,
+
+        // id should be companyId
+        id: user.created_by || null,
+
+        // replace companyId with userId
+        userId: user.id,
+      };
+
+      // remove companyId field
+      delete responseData.user.companyId;
+    }
 
     // 5. Handle permissions based on the user's role
     // The role in the DB is 'USER', not 'STAFF', based on your schema.
