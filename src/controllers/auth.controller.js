@@ -1,182 +1,3 @@
-// // src/controllers/auth.controller.js
-// import { PrismaClient } from "@prisma/client";
-// import bcrypt from "bcryptjs";
-// import jwt from "jsonwebtoken";
-
-// const prisma = new PrismaClient();
-
-// // ✅ Existing: Company Login
-// export const companyLogin = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-//     if (!email || !password) {
-//       return res.status(400).json({ message: "email and password are required" });
-//     }
-
-//     const company = await prisma.companies.findUnique({
-//       where: { email },
-//       select: {
-//         id: true,
-//         name: true,
-//         email: true,
-//         password_hash: true,
-//         plan_id: true,
-//         status: true,
-//       },
-//     });
-
-//     if (!company) {
-//       return res.status(404).json({ message: "Company not found" });
-//     }
-
-//     const ok = await bcrypt.compare(password, company.password_hash);
-//     if (!ok) {
-//       return res.status(401).json({ message: "Invalid credentials" });
-//     }
-
-//     if (company.status !== "Active") {
-//       return res.status(403).json({ message: "Company not active" });
-//     }
-
-//     const token = jwt.sign(
-//       {
-//         company_id: company.id,
-//         plan_id: company.plan_id,
-//         name: company.name,
-//         email: company.email,
-//       },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "12h" }
-//     );
-
-//     return res.status(200).json({
-//       message: "Login successful",
-//       data: {
-//         id: company.id,
-//         name: company.name,
-//         email: company.email,
-//         plan_id: company.plan_id,
-//         status: company.status,
-//       },
-//       token,
-//     });
-//   } catch (error) {
-//     console.error("Login error:", error);
-//     return res.status(500).json({ message: "Internal server error", error: error.message });
-//   }
-// };
-
-// // ✅ Existing: Get Company Modules
-// export const myModules = async (req, res) => {
-//   try {
-//     const { company_id, plan_id } = req.user;
-
-//     const planModules = await prisma.plan_modules.findMany({
-//       where: { plan_id: plan_id },
-//       include: {
-//         modules: {
-//           select: {
-//             id: true,
-//             key: true,
-//             label: true,
-//           },
-//         },
-//       },
-//     });
-
-//     if (planModules.length === 0) {
-//       return res.status(404).json({ message: "No modules mapped to your plan" });
-//     }
-
-//     const modules = planModules.map(pm => ({
-//       id: pm.modules.id,
-//       key: pm.modules.key,
-//       label: pm.modules.label,
-//       module_price: pm.module_price,
-//     }));
-
-//     return res.status(200).json({
-//       message: "Modules fetched successfully",
-//       data: {
-//         company_id,
-//         plan_id,
-//         modules,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Fetch modules error:", error);
-//     return res.status(500).json({ message: "Internal server error", error: error.message });
-//   }
-// };
-
-// // ✅ NEW: Superadmin Login
-// export const superadminLogin = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-
-//     if (!email || !password) {
-//       return res.status(400).json({ message: "Email and password are required" });
-//     }
-
-//     // Find user in platform_users table
-//     const user = await prisma.platform_users.findUnique({
-//       where: { email },
-//       select: {
-//         id: true,
-//         name: true,
-//         email: true,
-//         password_hash: true,
-//         role: true,
-//         status: true,
-//       },
-//     });
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Check if user is superadmin
-//     if (user.role !== "superadmin") {
-//       return res.status(403).json({ message: "Access denied. Only superadmin can login here." });
-//     }
-
-//     if (user.status !== "Active") {
-//       return res.status(403).json({ message: "Account is not active" });
-//     }
-
-//     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-//     if (!isPasswordValid) {
-//       return res.status(401).json({ message: "Invalid credentials" });
-//     }
-
-//     // Generate JWT token
-//     const token = jwt.sign(
-//       {
-//         user_id: user.id,
-//         role: user.role,
-//         name: user.name,
-//         email: user.email,
-//       },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "12h" }
-//     );
-
-//     return res.status(200).json({
-//       message: "Superadmin login successful",
-//       data: {
-//         id: user.id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role,
-//       },
-//       token,
-//     });
-//   } catch (error) {
-//     console.error("Superadmin login error:", error);
-//     return res.status(500).json({ message: "Internal server error" });
-//   }
-// };
-
 import prisma from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -248,25 +69,32 @@ const JWT_EXPIRES_IN = "1d"; // token validity
 
 const UI_MODULE_MAPPING = {
   Dashboard: null,
-  Charts_of_Accounts: "parent_accounts",
-  "Customers/Debtors": "vendorscustomer",
-  "Vendors/Creditors": "vendorscustomer",
-  All_Transaction: "transactions",
-  Create_Voucher: "journal_entries",
-  Expenses: "expensevouchers",
-  Income: "income_vouchers",
-  Contra_Voucher: "contra_vouchers",
+
+  Charts_of_Accounts: "charts_of_accounts",
+  "Customers/Debtors": "customers_debtors",
+  "Vendors/Creditors": "vendors_creditors",
+
+  All_Transaction: "all_transactions",
+
   Warehouse: "warehouses",
   Unit_of_measure: "unit_details",
   Product_Inventory: "products",
   Service: "services",
   StockTransfer: "transfers",
   Inventory_Adjustment: "adjustments",
+
   Sales_Order: "salesorder",
   Sales_Return: "sales_return",
   Purchase_Orders: "purchaseorder",
   Purchase_Return: "purchase_return",
+
   POS_Screen: "pos_invoices",
+  Create_Voucher: "journal_entries",
+
+  Expenses: "expensevouchers",
+  Income: "income_vouchers",
+  Contra_Voucher: "contra_vouchers",
+
   Sales_Report: null,
   Purchase_Report: null,
   POS_Report: null,
@@ -277,14 +105,17 @@ const UI_MODULE_MAPPING = {
   Profit_Loss: null,
   Vat_Report: null,
   DayBook: null,
+
   Journal_Entries: "journal_entries",
   Ledger: null,
   Trial_Balance: null,
+
   Users: "users",
   Roles_Permissions: "userroles",
   Company_Info: "users",
   Password_Requests: "password_change_requests",
 };
+
 
 const UI_PERMISSION_ORDER = [
   "Dashboard",
@@ -326,78 +157,129 @@ const UI_PERMISSION_ORDER = [
   "Password_Requests",
 ];
 
-/**
- * Formats raw role data from the database into the required UI response format.
- * @param {object} roleData - The role object including its permissions from Prisma.
- * @returns {object} - The formatted permissions array.
- */
-const formatPermissions = (roleData) => {
+export const formatPermissions = (roleData) => {
+  /* =========================
+     1️⃣ DB PERMISSIONS MAP
+  ========================= */
   const permissionMap = new Map();
-  roleData.permissions.forEach((p) => {
-    permissionMap.set(p.module_name, p);
+  (roleData.permissions || []).forEach((p) => {
+    permissionMap.set(p.module_name, {
+      can_create: !!p.can_create,
+      can_view: !!p.can_view,
+      can_update: !!p.can_update,
+      can_delete: !!p.can_delete,
+    });
   });
 
-  const orderedPermissions = UI_PERMISSION_ORDER.map((uiName) => {
-    const dbName = UI_MODULE_MAPPING[uiName];
-    const permission = permissionMap.get(dbName);
+  /* =========================
+     2️⃣ GENERAL PERMISSIONS
+  ========================= */
+  let generalPerms = [];
+  try {
+    if (Array.isArray(roleData.general_permissions)) {
+      generalPerms = roleData.general_permissions;
+    } else if (
+      typeof roleData.general_permissions === "string" &&
+      roleData.general_permissions.trim() !== ""
+    ) {
+      generalPerms = JSON.parse(roleData.general_permissions);
+    }
+  } catch {
+    generalPerms = [];
+  }
 
-    if (permission) {
-      return {
-        module_name: uiName,
-        can_create: permission.can_create,
-        can_view: permission.can_view,
-        can_update: permission.can_update,
-        can_delete: permission.can_delete,
-      };
-    } else {
-      // Default permission if not found in DB for this role
-      return {
-        module_name: uiName,
-        can_create: false,
-        can_view: false,
-        can_update: false,
-        can_delete: false,
-      };
+  const generalMap = new Map();
+  generalPerms.forEach((p) => {
+    if (p?.module_name) {
+      generalMap.set(p.module_name, p);
     }
   });
 
-  return orderedPermissions;
+  /* =========================
+     3️⃣ FINAL UI RESPONSE
+  ========================= */
+  return UI_PERMISSION_ORDER.map((uiName) => {
+    const dbName = UI_MODULE_MAPPING[uiName];
+
+    // 🔹 Dashboard + Reports
+    if (!dbName) {
+      const gp = generalMap.get(uiName);
+      return {
+        module_name: uiName,
+        can_create: gp ? !!gp.can_create : false,
+        can_view: gp ? !!gp.can_view : false,
+        can_update: gp ? !!gp.can_update : false,
+        can_delete: gp ? !!gp.can_delete : false,
+      };
+    }
+
+    // 🔹 DB modules (shared mapping SAFE)
+    const perm = permissionMap.get(dbName);
+    if (perm) {
+      return {
+        module_name: uiName,
+        ...perm,
+      };
+    }
+
+    // 🔹 Default
+    return {
+      module_name: uiName,
+      can_create: false,
+      can_view: false,
+      can_update: false,
+      can_delete: false,
+    };
+  });
 };
+
+
 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
 
-    // 1. Find the user by email. This is a simple query.
-    const user = await prisma.users.findUnique({ where: { email } });
+    /* =========================
+       1️⃣ FIND USER
+    ========================= */
+    const user = await prisma.users.findUnique({
+      where: { email },
+    });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // 2. Check if the provided password matches the stored hash
+    /* =========================
+       2️⃣ PASSWORD CHECK
+    ========================= */
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // 3. Create a JWT payload
-    const payload = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    };
+    /* =========================
+       3️⃣ JWT TOKEN
+    ========================= */
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
-    // Make sure to have JWT_SECRET and JWT_EXPIRES_IN in your .env file
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
-    // 4. Prepare the base response data
+    /* =========================
+       4️⃣ BASE RESPONSE
+    ========================= */
     const responseData = {
       user: {
         id: user.id,
@@ -406,81 +288,81 @@ export const login = async (req, res) => {
         role: user.role,
         profile: user.profile,
         UserStatus: user.UserStatus,
-        companyId: user.created_by ? user.created_by : null,
+        companyId: user.created_by || null,
       },
       token,
     };
+
+    // USER role adjustment
     if (user.role === "USER") {
       responseData.user = {
         ...responseData.user,
-
-        // id should be companyId
-        id: user.created_by || null,
-
-        // replace companyId with userId
-        userId: user.id,
+        id: user.created_by || null, // companyId as id
+        userId: user.id,             // actual user id
       };
-
-      // remove companyId field
       delete responseData.user.companyId;
     }
 
-    // 5. Handle permissions based on the user's role
-    // The role in the DB is 'USER', not 'STAFF', based on your schema.
-    if (user.role === "USER") {
-      // Check if the user has a specific role assigned (e.g., "Accountant", "Sales Manager")
-      if (user.user_role) {
-        try {
-          // 6. Fetch the role details using the ID from the user_role field (second query)
-          const userRole = await prisma.userroles.findUnique({
-            where: { id: parseInt(user.user_role) },
-            include: { permissions: true },
-          });
+    /* =========================
+       5️⃣ PERMISSIONS HANDLING
+    ========================= */
 
-          if (userRole) {
-            // Add the role and its formatted permissions to the response
-            responseData.userRole = {
-              role_id: userRole.id,
-              role_name: userRole.role_name,
-              status: userRole.status,
-              permissions: formatPermissions(userRole),
-            };
-          }
-        } catch (error) {
-          console.error("Error fetching user role:", error);
-          // Proceed without role info if there's an error fetching it
-        }
+    // 🔹 USER ROLE (CUSTOM ROLE)
+    if (user.role === "USER" && user.user_role) {
+      const userRole = await prisma.userroles.findUnique({
+        where: { id: Number(user.user_role) },
+        include: {
+          permissions: true, // role_permissions table
+        },
+      });
+
+      if (userRole) {
+        responseData.userRole = {
+          role_id: userRole.id,
+          role_name: userRole.role_name,
+          status: userRole.status,
+          permissions: formatPermissions(userRole), // ✅ DB + GENERAL
+        };
       }
-    } else if (user.role === "COMPANY" || user.role === "SUPERADMIN") {
-      // For COMPANY and SUPERADMIN, grant all permissions
-      const allPermissions = UI_PERMISSION_ORDER.map((uiName) => ({
-        module_name: uiName,
-        can_create: true,
-        can_view: true,
-        can_update: true,
-        can_delete: true,
-      }));
+    }
 
-      // Add role information using values from the user record
+    // 🔹 COMPANY / SUPERADMIN
+    else if (user.role === "COMPANY" || user.role === "SUPERADMIN") {
+      // ⚠️ NOTE:
+      // Agar future me COMPANY ke liye bhi role-based control chahiye,
+      // to yaha bhi userroles use kar sakte ho
+
       responseData.userRole = {
-        role_id: null, // These roles don't have an entry in the userroles table
-        role_name: user.role, // Use the role from the DB ('COMPANY' or 'SUPERADMIN')
-        status: user.UserStatus || "Active", // Use the user's status from the DB
-        permissions: allPermissions,
+        role_id: null,
+        role_name: user.role,
+        status: user.UserStatus || "Active",
+        permissions: UI_PERMISSION_ORDER.map((uiName) => ({
+          module_name: uiName,
+          can_create: true,
+          can_view: true,
+          can_update: true,
+          can_delete: true,
+        })),
       };
     }
 
+    /* =========================
+       6️⃣ FINAL RESPONSE
+    ========================= */
     return res.status(200).json({
       message: "Login successful",
       data: responseData,
     });
+
   } catch (error) {
     console.error("Login error:", error);
-    return res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 // ----------Super Admin Controllers ----------
 
 export const createSuperAdmin = async (req, res) => {
@@ -706,6 +588,9 @@ export const createCompany = async (req, res) => {
       terms_and_conditions,
     } = req.body;
 
+    /* =========================
+       1️⃣ BASIC VALIDATION
+    ========================= */
     if (
       !name ||
       !email ||
@@ -715,43 +600,69 @@ export const createCompany = async (req, res) => {
       !plan_id ||
       !planType
     ) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be provided" });
+      return res.status(400).json({
+        success: false,
+        message: "All required fields must be provided",
+      });
     }
 
-    const existingUser = await prisma.users.findUnique({ where: { email } });
+    /* =========================
+       2️⃣ CHECK DUPLICATE COMPANY
+    ========================= */
+    const existingUser = await prisma.users.findUnique({
+      where: { email },
+    });
+
     if (existingUser) {
-      return res
-        .status(409)
-        .json({ message: "Company with this email already exists" });
+      return res.status(409).json({
+        success: false,
+        message: "Company with this email already exists",
+      });
     }
 
+    /* =========================
+       3️⃣ HASH PASSWORD
+    ========================= */
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let company_icon_url = null,
-      favicon_url = null,
-      company_logo_url = null,
-      company_dark_logo_url = null;
+    /* =========================
+       4️⃣ FILE UPLOADS (PROFILE + LOGOS)
+    ========================= */
+    let profile_url = null;
+    let company_icon_url = null;
+    let favicon_url = null;
+    let company_logo_url = null;
+    let company_dark_logo_url = null;
+
     if (req.files) {
+      if (req.files.profile) {
+        profile_url = await uploadToCloudinary(
+          req.files.profile,
+          "company_profiles"
+        );
+      }
+
       if (req.files.company_icon) {
         company_icon_url = await uploadToCloudinary(
           req.files.company_icon,
           "company_icons"
         );
       }
+
       if (req.files.favicon) {
         favicon_url = await uploadToCloudinary(
           req.files.favicon,
           "company_favicons"
         );
       }
+
       if (req.files.company_logo) {
         company_logo_url = await uploadToCloudinary(
           req.files.company_logo,
           "company_logos"
         );
       }
+
       if (req.files.company_dark_logo) {
         company_dark_logo_url = await uploadToCloudinary(
           req.files.company_dark_logo,
@@ -760,27 +671,41 @@ export const createCompany = async (req, res) => {
       }
     }
 
+    /* =========================
+       5️⃣ CREATE COMPANY + PLAN
+    ========================= */
     const newCompany = await prisma.users.create({
       data: {
         name,
         email,
         password: hashedPassword,
         role: "COMPANY",
+
         startDate: new Date(startDate),
         expireDate: new Date(expireDate),
+
+        profile_url, // ✅ NEW FIELD
+
         address,
         country,
         state,
         city,
         postal_code,
         currency,
+
         company_icon_url,
         favicon_url,
         company_logo_url,
         company_dark_logo_url,
-        user_plans: { create: { plan_id: parseInt(plan_id), planType } },
 
-        // 💳 Bank details
+        user_plans: {
+          create: {
+            plan_id: parseInt(plan_id),
+            planType, // enum value e.g. "Paid"
+          },
+        },
+
+        // 💳 BANK DETAILS
         bank_name: bank_name || null,
         account_number: account_number || null,
         account_holder: account_holder || null,
@@ -788,41 +713,53 @@ export const createCompany = async (req, res) => {
         notes: notes || null,
         terms_and_conditions: terms_and_conditions || null,
       },
+
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+
         startDate: true,
         expireDate: true,
+
+        profile_url: true, // ✅ RETURN PROFILE
+
         address: true,
         country: true,
         state: true,
         city: true,
         postal_code: true,
         currency: true,
+
         company_icon_url: true,
         favicon_url: true,
         company_logo_url: true,
         company_dark_logo_url: true,
+
         bank_name: true,
         account_number: true,
         account_holder: true,
         ifsc_code: true,
         notes: true,
         terms_and_conditions: true,
+
         user_plans: true,
         created_at: true,
       },
     });
 
+    /* =========================
+       6️⃣ SUCCESS RESPONSE
+    ========================= */
     return res.status(201).json({
       success: true,
-      message: "✅ Company created successfully with bank details",
+      message: "✅ Company created successfully",
       data: newCompany,
     });
   } catch (error) {
     console.error("❌ Create company error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -830,6 +767,7 @@ export const createCompany = async (req, res) => {
     });
   }
 };
+
 
 // export const updateCompany = async (req, res) => {
 //   try {
@@ -1673,7 +1611,7 @@ export const getAllCompanies = async (req, res) => {
       });
     }
 
-    const format = (value) => value ?? ""; // Replace null with empty string
+    const format = (value) => value ?? "";
 
     const formattedCompanies = companies.map((c) => ({
       id: c.id,
@@ -1682,18 +1620,23 @@ export const getAllCompanies = async (req, res) => {
       phone: format(c.phone),
       role: c.role,
       user_role: format(c.user_role),
+
+      // ✅ PROFILE ADDED
+      profile: format(c.profile_url),
+
       address: format(c.address),
       country: format(c.country),
       state: format(c.state),
       city: format(c.city),
       postal_code: format(c.postal_code),
       currency: format(c.currency),
+
       startDate: c.startDate,
       expireDate: c.expireDate,
       UserStatus: format(c.UserStatus),
       created_at: c.created_at,
 
-      // 🏦 Bank details (null-proof)
+      // 🏦 Bank details
       bank_details: {
         bank_name: format(c.bank_name),
         account_number: format(c.account_number),
@@ -1704,7 +1647,7 @@ export const getAllCompanies = async (req, res) => {
       notes: format(c.notes),
       terms_and_conditions: format(c.terms_and_conditions),
 
-      // 🖼 Branding (null-safe)
+      // 🖼 Branding
       branding: {
         company_logo_url: format(c.company_logo_url),
         company_dark_logo_url: format(c.company_dark_logo_url),
@@ -1712,7 +1655,7 @@ export const getAllCompanies = async (req, res) => {
         favicon_url: format(c.favicon_url),
       },
 
-      // 📅 User plan info
+      // 📅 User plans
       user_plans: c.user_plans.map((p) => ({
         id: p.id,
         status: p.status,
@@ -1747,6 +1690,7 @@ export const getAllCompanies = async (req, res) => {
     });
   }
 };
+
 
 export const deleteCompany = async (req, res) => {
   try {

@@ -389,9 +389,31 @@ export const createPlan = async (req, res) => {
       billing_cycle,
       status,
       description,
-      plan_modules,
+      plan_modules = [],
     } = req.body;
 
+    /* =========================
+       BASIC VALIDATION
+    ========================= */
+    if (!plan_name) {
+      return res.status(400).json({
+        success: false,
+        message: "plan_name is required",
+      });
+    }
+
+    /* =========================
+       MODULE DATA PREPARE
+       (ONLY fields that exist)
+    ========================= */
+    const modulesData = plan_modules.map((m) => ({
+      module_name: m.module_name,
+      module_price: m.module_price ?? 0,
+    }));
+
+    /* =========================
+       CREATE PLAN + MODULES
+    ========================= */
     const plan = await prisma.plans.create({
       data: {
         plan_name,
@@ -401,20 +423,36 @@ export const createPlan = async (req, res) => {
         additional_invoice_price,
         user_limit,
         storage_capacity,
-        billing_cycle,
-        status,
+
+        // ENUM values must match Prisma enums exactly
+        billing_cycle: billing_cycle || "Monthly",
+        status: status || "Active",
+
         description,
-        plan_modules: {
-          create: plan_modules || [],
-        },
+
+        plan_modules: modulesData.length
+          ? {
+              create: modulesData,
+            }
+          : undefined,
       },
-      include: { plan_modules: true },
+      include: {
+        plan_modules: true,
+      },
     });
 
-    res.status(201).json({ success: true, message: "Plan created", data: plan });
+    return res.status(201).json({
+      success: true,
+      message: "Plan created successfully",
+      data: plan,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Server error", error });
+    console.error("CREATE PLAN ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Server error",
+    });
   }
 };
 

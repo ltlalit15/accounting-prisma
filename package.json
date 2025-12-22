@@ -13,7 +13,7 @@
     "prisma:refresh": "npx prisma migrate dev && npx prisma generate"
   },
   "keywords": [],
-  "author": "veni yadav",
+  "author": "Saff Coders",
   "license": "ISC",
   "dependencies": {
     "@faker-js/faker": "^10.0.0",
