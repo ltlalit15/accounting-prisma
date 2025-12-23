@@ -4427,29 +4427,17 @@ const handleFileUploads = async (data, fileFields) => {
 //   }
 // };
 
-const updateProductTotalStock = async (tx, productId) => {
-  const aggregatedStock = await tx.product_warehouses.aggregate({
-    where: { product_id: productId },
-    _sum: { stock_qty: true },
-  });
-
-  const totalStock = aggregatedStock._sum.stock_qty || 0;
-
-  await tx.products.update({
-    where: { id: productId },
-    data: { total_stock: totalStock },
-  });
-};
-
-
-
 export const createOrUpdateSalesOrder = async (req, res) => {
   try {
     const body = { ...req.body };
     const orderId = req.method === "PUT" ? Number(req.params.id) : null;
+    if (!body.company_info) body.company_info = {};
+    if (!body.additional_info) body.additional_info = {};
 
     let existingOrder = null;
+    let existingItems = [];
 
+    // ================= EXISTING ORDER (FOR PUT) =================
     if (orderId) {
       existingOrder = await prisma.salesorder.findUnique({
         where: { id: orderId },
@@ -4462,232 +4450,808 @@ export const createOrUpdateSalesOrder = async (req, res) => {
           message: "Sales order not found",
         });
       }
+
+      existingItems = existingOrder.salesorderitems || [];
     }
 
+    // ================= FILE UPLOADS (MULTER + CLOUDINARY) =================
+    // if (req.files) {
+    //   // MULTIPLE IMAGES ARRAY -> files[]
+    //   if (req.files.files) {
+    //     body.additional_info.files = req.files.files.map((f) => f.path);
+    //   }
+
+    //   // SINGLE FILES
+    //   if (req.files.logo_url) {
+    //     body.company_info.logo_url = req.files.logo_url[0].path;
+    //   }
+    //   if (req.files.signature_url) {
+    //     body.additional_info.signature_url = req.files.signature_url[0].path;
+    //   }
+    //   if (req.files.photo_url) {
+    //     body.additional_info.photo_url = req.files.photo_url[0].path;
+    //   }
+    //   if (req.files.attachment_url) {
+    //     body.additional_info.attachment_url = req.files.attachment_url[0].path;
+    //   }
+    // }
+
+    if (req.files) {
+      // MULTIPLE IMAGES: files[]
+      if (req.files.files) {
+        const filesArr = Array.isArray(req.files.files)
+          ? req.files.files
+          : [req.files.files];
+
+        body.additional_info.files = [];
+
+        for (const file of filesArr) {
+          const url = await uploadToCloudinary(file, "sales_order_files");
+          if (url) body.additional_info.files.push(url);
+        }
+      }
+
+      // SINGLE FILE: logo_url
+
+      // if (req.files.logo_url) {
+      //   const url = await uploadToCloudinary(req.files.logo_url, "sales_logo");
+      //   if (url) body.company_info.logo_url = url;
+      // }
+
+      if (req.files.logo_url) {
+        const logoFile = Array.isArray(req.files.logo_url)
+          ? req.files.logo_url[0]
+          : req.files.logo_url;
+
+        const url = await uploadToCloudinary(logoFile, "sales_logo");
+        if (url) body.company_info.logo_url = url;
+      }
+
+      // SINGLE FILE: signature_url
+      // if (req.files.signature_url) {
+      //   const url = await uploadToCloudinary(req.files.signature_url, "sales_signature");
+      //   if (url) body.additional_info.signature_url = url;
+      // }
+      if (req.files.signature_url) {
+        const file = Array.isArray(req.files.signature_url)
+          ? req.files.signature_url[0]
+          : req.files.signature_url;
+
+        const url = await uploadToCloudinary(file, "sales_signature");
+        if (url) body.additional_info.signature_url = url;
+      }
+
+      // SINGLE FILE: photo_url
+      // if (req.files.photo_url) {
+      //   const url = await uploadToCloudinary(req.files.photo_url, "sales_photo");
+      //   if (url) body.additional_info.photo_url = url;
+      // }
+      if (req.files.photo_url) {
+        const file = Array.isArray(req.files.photo_url)
+          ? req.files.photo_url[0]
+          : req.files.photo_url;
+
+        const url = await uploadToCloudinary(file, "sales_photo");
+        if (url) body.additional_info.photo_url = url;
+      }
+
+      // SINGLE FILE: attachment_url
+      // if (req.files.attachment_url) {
+      //   const url = await uploadToCloudinary(req.files.attachment_url, "sales_attachment");
+      //   if (url) body.additional_info.attachment_url = url;
+      // }
+      //        if (req.files.attachment_url) {
+      //   const file = Array.isArray(req.files.attachment_url)
+      //     ? req.files.attachment_url[0]
+      //     : req.files.attachment_url;
+
+      //   const url = await uploadToCloudinary(file, "sales_attachment");
+      //   if (url) body.additional_info.attachment_url = url;
+      // }
+
+      if (req.files.attachment_url) {
+        // Ensure we are always working with an array
+        const attachmentFiles = Array.isArray(req.files.attachment_url)
+          ? req.files.attachment_url
+          : [req.files.attachment_url];
+
+        const attachmentUrls = [];
+        // Loop through each file, upload it, and collect the URL
+        for (const file of attachmentFiles) {
+          const url = await uploadToCloudinary(file, "sales_attachment");
+          if (url) {
+            attachmentUrls.push(url);
+          }
+        }
+
+        // Convert the array of URLs to a single JSON string to be stored in the DB
+        if (attachmentUrls.length > 0) {
+          body.additional_info.attachment_url = JSON.stringify(attachmentUrls);
+        }
+      }
+    }
+
+    //Safe helper to preserve existing values
+    const safeMerge = (oldObj = {}, newObj = {}) => {
+      const merged = { ...oldObj };
+      for (const key in newObj) {
+        if (
+          newObj[key] !== undefined &&
+          newObj[key] !== null &&
+          newObj[key] !== ""
+        ) {
+          merged[key] = newObj[key];
+        }
+      }
+      return merged;
+    };
+
+    // ================= STEP COMPLETION RULES =================
+    const stepRequired = {
+      quotation: ["quotation_no", "quotation_date"],
+      sales_order: ["SO_no"],
+      delivery_challan: ["challan_no"],
+      invoice: ["invoice_no", "invoice_date"],
+      payment: ["payment_no", "amount_received"],
+    };
+
+    const stepCompleted = (obj, required) =>
+      required.every(
+        (f) => obj?.[f] !== "" && obj?.[f] !== null && obj?.[f] !== undefined
+      );
+
+    // ================= MERGE STEPS =================
+    const mergeStep = (stepName) =>
+      orderId
+        ? { ...existingOrder, ...(body.steps?.[stepName] || {}) }
+        : body.steps?.[stepName] || {};
+
+    const steps = {
+      quotation: mergeStep("quotation"),
+      sales_order: mergeStep("sales_order"),
+      delivery_challan: mergeStep("delivery_challan"),
+      invoice: mergeStep("invoice"),
+      payment: mergeStep("payment"),
+    };
+
+    Object.keys(steps).forEach((step) => {
+      steps[step].status = stepCompleted(steps[step], stepRequired[step])
+        ? "completed"
+        : "pending";
+    });
+
+    // ================= SHIPPING =================
+    const shipping = body.shipping_details
+      ? {
+          bill_to_company_name: body.shipping_details.bill_to_name || "",
+          bill_to_company_address: body.shipping_details.bill_to_address || "",
+          bill_to_company_email: body.shipping_details.bill_to_email || "",
+          bill_to_company_phone: body.shipping_details.bill_to_phone || "",
+          bill_to_attention_name:
+            body.shipping_details.bill_to_attention_name || "",
+
+          ship_to_company_name: body.shipping_details.ship_to_name || "",
+          ship_to_company_address: body.shipping_details.ship_to_address || "",
+          ship_to_company_email: body.shipping_details.ship_to_email || "",
+          ship_to_company_phone: body.shipping_details.ship_to_phone || "",
+          ship_to_attention_name:
+            body.shipping_details.ship_to_attention_name || "",
+        }
+      : orderId
+      ? {
+          bill_to_company_name: existingOrder.bill_to_company_name,
+          bill_to_company_address: existingOrder.bill_to_company_address,
+          bill_to_company_email: existingOrder.bill_to_company_email,
+          bill_to_company_phone: existingOrder.bill_to_company_phone,
+          bill_to_attention_name: existingOrder.bill_to_attention_name,
+
+          ship_to_company_name: existingOrder.ship_to_company_name,
+          ship_to_company_address: existingOrder.ship_to_company_address,
+          ship_to_company_email: existingOrder.ship_to_company_email,
+          ship_to_company_phone: existingOrder.ship_to_company_phone,
+          ship_to_attention_name: existingOrder.ship_to_attention_name,
+        }
+      : {};
+
+    // ================= COMPANY INFO =================
+    const companyData = body.company_info
+      ? {
+          company_id: Number(body.company_info.company_id),
+          company_name: body.company_info.company_name,
+          company_address: body.company_info.company_address,
+          company_email: body.company_info.company_email,
+          company_phone: body.company_info.company_phone,
+          logo_url: body.company_info.logo_url || "",
+          bank_name: body.company_info.bank_name || "",
+          account_no: body.company_info.account_no || "",
+          account_holder: body.company_info.account_holder || "",
+          ifsc_code: body.company_info.ifsc_code || "",
+          terms: body.company_info.terms || "",
+        }
+      : orderId
+      ? existingOrder
+      : {};
+
+    // ================= ITEMS =================
+    const itemsData = body.items
+      ? body.items.map((i) => ({
+          item_name: i.item_name,
+          qty: Number(i.qty),
+          rate: Number(i.rate),
+          tax_percent: Number(i.tax_percent),
+          discount: Number(i.discount),
+          amount: Number(i.amount),
+          warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
+          product_id: i.product_id ? Number(i.product_id) : null,
+        }))
+      : existingItems;
+
+    // ================= DB DATA =================
+    const dbData = {
+      ...companyData,
+      ...shipping,
+
+      quotation_no: steps.quotation.quotation_no || "",
+      manual_quo_no: steps.quotation.manual_quo_no || "",
+      quotation_date: steps.quotation.quotation_date
+        ? new Date(steps.quotation.quotation_date)
+        : null,
+      valid_till: steps.quotation.valid_till
+        ? new Date(steps.quotation.valid_till)
+        : null,
+      quotation_status: steps.quotation.status,
+      qoutation_to_customer_name: steps.quotation.qoutation_to_customer_name,
+      qoutation_to_customer_address:
+        steps.quotation.qoutation_to_customer_address,
+      qoutation_to_customer_email: steps.quotation.qoutation_to_customer_email,
+      qoutation_to_customer_phone: steps.quotation.qoutation_to_customer_phone,
+      notes: steps.quotation.notes,
+      customer_ref: steps.quotation.customer_ref,
+
+      SO_no: steps.sales_order.SO_no,
+      Manual_SO_ref: steps.sales_order.manual_ref_no,
+      manual_quo_no: steps.sales_order.manual_quo_no,
+      sales_order_status: steps.sales_order.status,
+
+      Challan_no: steps.delivery_challan.challan_no,
+      Manual_challan_no: steps.delivery_challan.manual_challan_no,
+      delivery_challan_status: steps.delivery_challan.status,
+      driver_name: steps.delivery_challan.driver_name,
+      driver_phone: steps.delivery_challan.driver_phone,
+
+      invoice_no: steps.invoice.invoice_no,
+      Manual_invoice_no: steps.invoice.manual_invoice_no,
+      invoice_date: steps.invoice.invoice_date
+        ? new Date(steps.invoice.invoice_date)
+        : null,
+      due_date: steps.invoice.due_date
+        ? new Date(steps.invoice.due_date)
+        : null,
+      invoice_status: steps.invoice.status,
+
+      Payment_no: steps.payment.payment_no || "",
+      Manual_payment_no: steps.payment.manual_payment_no || "",
+      payment_date: steps.payment.payment_date
+        ? new Date(steps.payment.payment_date)
+        : null,
+      payment_status: steps.payment.status,
+      amount_received: Number(steps.payment.amount_received) || 0,
+      payment_note: steps.payment.payment_note || "",
+
+      signature_url:
+        body.additional_info.signature_url ||
+        existingOrder?.signature_url ||
+        "",
+      photo_url:
+        body.additional_info.photo_url || existingOrder?.photo_url || "",
+      attachment_url:
+        body.additional_info.attachment_url ||
+        existingOrder?.attachment_url ||
+        "",
+
+      subtotal: body.sub_total
+        ? Number(body.sub_total)
+        : existingOrder?.subtotal || 0,
+      total: body.total ? Number(body.total) : existingOrder?.total || 0,
+      updated_at: new Date(),
+      total_invoice:
+        steps.payment.total_invoice !== undefined
+          ? Number(steps.payment.total_invoice)
+          : existingOrder?.total_invoice || 0,
+
+      balance:
+        steps.payment.balance !== undefined
+          ? Number(steps.payment.balance)
+          : existingOrder?.balance || 0,
+    };
+
+    // ================= CREATE OR UPDATE =================
     let savedOrder;
 
-    /* ======================================================
-       UPDATE SALES ORDER
-    ====================================================== */
+    // if (orderId) {
+    //   if (body.items) {
+    //     await prisma.salesorderitems.deleteMany({
+    //       where: { sales_order_id: orderId },
+    //     });
+    //   }
+
+    // savedOrder = await prisma.salesorder.update({
+    //   where: { id: orderId },
+    //   data: {
+    //     ...dbData,
+    //     ...(body.items && { salesorderitems: { create: itemsData } }),
+    //   },
+    //   include: { salesorderitems: true },
+    // });
+    //       savedOrder = await prisma.salesorder.update({
+    //   where: { id: orderId },
+    //   data: {
+    //     ...safeMerge(existingOrder, dbData),
+    //     ...(body.items && { salesorderitems: { create: itemsData } }),
+    //   },
+    //   include: { salesorderitems: true },
+    // });
+    //     }
+    //     else {
+    //       savedOrder = await prisma.salesorder.create({
+    //         data: {
+    //           ...dbData,
+    //           created_at: new Date(),
+    //           salesorderitems: { create: itemsData },
+    //         },
+    //         include: { salesorderitems: true },
+    //       });
+    //     }
+
+    // if (orderId) {
+    //   // Check if the request includes items to be updated
+    //   if (body.items && Array.isArray(body.items)) {
+    //     // Use a transaction to ensure all item operations and the main update succeed or fail together.
+    //     savedOrder = await prisma.$transaction(async (tx) => {
+    //       // --- Step 1: Sync the salesorderitems ---
+
+    //       // a) Identify items to be deleted (present in DB but not in the request)
+    //       const incomingItemIds = body.items
+    //         .filter((item) => item.id) // Filter out items that don't have an ID (they are new)
+    //         .map((item) => item.id);
+
+    //       // Delete any items associated with the order that are NOT in the incoming list.
+    //       await tx.salesorderitems.deleteMany({
+    //         where: {
+    //           sales_order_id: orderId,
+    //           ...(incomingItemIds.length > 0 && {
+    //             id: { notIn: incomingItemIds },
+    //           }),
+    //         },
+    //       });
+
+    //       // b) Update or create each item from the request
+    //       for (const item of body.items) {
+    //         const itemData = {
+    //           item_name: item.item_name,
+    //           qty: Number(item.qty),
+    //           rate: Number(item.rate),
+    //           tax_percent: Number(item.tax_percent),
+    //           discount: Number(item.discount),
+    //           amount: Number(item.amount),
+    //           warehouse_id: item.warehouse_id
+    //             ? Number(item.warehouse_id)
+    //             : null,
+    //         };
+
+    //         if (item.id) {
+    //           // Update existing item
+    //           await tx.salesorderitems.update({
+    //             where: { id: item.id },
+    //             data: itemData,
+    //           });
+    //         } else {
+    //           // Create new item
+    //           await tx.salesorderitems.create({
+    //             data: {
+    //               ...itemData,
+    //               sales_order_id: orderId,
+    //             },
+    //           });
+    //         }
+    //       }
+
+    //       // --- Step 2: Update the main salesorder record ---
+    //       // Use safeMerge for scalar fields, then filter out the relation.
+    //       const mergedData = safeMerge(existingOrder, dbData);
+    //       const { salesorderitems, ...dataForUpdate } = mergedData;
+
+    //       const updatedOrder = await tx.salesorder.update({
+    //         where: { id: orderId },
+    //         data: dataForUpdate,
+    //         include: { salesorderitems: true },
+    //       });
+
+    //       return updatedOrder;
+    //     });
+    //   } else {
+    //     // --- If no items are sent, just update the main order fields ---
+    //     // This is your original partial update logic, now cleaned up.
+    //     const mergedData = safeMerge(existingOrder, dbData);
+    //     const { salesorderitems, ...dataForUpdate } = mergedData;
+
+    //     savedOrder = await prisma.salesorder.update({
+    //       where: { id: orderId },
+    //       data: dataForUpdate,
+    //       include: { salesorderitems: true },
+    //     });
+    //   }
+    // } else {
+    //   // The CREATE logic remains the same
+    //   savedOrder = await prisma.salesorder.create({
+    //     data: {
+    //       ...dbData,
+    //       created_at: new Date(),
+    //       salesorderitems: { create: itemsData },
+    //     },
+    //     include: { salesorderitems: true },
+    //   });
+    // }
+
     if (orderId) {
-      savedOrder = await prisma.$transaction(async (tx) => {
+      // ================= PUT (UPDATE) LOGIC =================
+      if (body.items && Array.isArray(body.items)) {
+        savedOrder = await prisma.$transaction(async (tx) => {
+          // --- Step 1: Handle item deletions and restore stock ---
+          const incomingItemIds = body.items
+            .filter((item) => item.id)
+            .map((item) => item.id);
 
-        /* ---------- DELETE REMOVED ITEMS (RESTORE STOCK) ---------- */
-        const incomingIds = body.items.filter(i => i.id).map(i => i.id);
-
-        const itemsToDelete = await tx.salesorderitems.findMany({
-          where: {
-            sales_order_id: orderId,
-            ...(incomingIds.length && { id: { notIn: incomingIds } }),
-          },
-        });
-
-        for (const item of itemsToDelete) {
-          if (item.product_id && item.warehouse_id) {
-            await tx.product_warehouses.update({
-              where: {
-                product_id_warehouse_id: {
-                  product_id: item.product_id,
-                  warehouse_id: item.warehouse_id,
-                },
-              },
-              data: {
-                stock_qty: { increment: Number(item.qty) },
-              },
-            });
-
-            await updateProductTotalStock(tx, item.product_id);
-          }
-        }
-
-        await tx.salesorderitems.deleteMany({
-          where: { id: { in: itemsToDelete.map(i => i.id) } },
-        });
-
-        /* ---------- UPDATE / CREATE ITEMS ---------- */
-        for (const item of body.items) {
-          let oldQty = 0;
-
-          if (item.id) {
-            const oldItem = await tx.salesorderitems.findUnique({
-              where: { id: item.id },
-              select: { qty: true },
-            });
-            oldQty = oldItem ? Number(oldItem.qty) : 0;
-          }
-
-          const newQty = Number(item.qty);
-          const diff = newQty - oldQty;
-
-          if (item.product_id && item.warehouse_id && diff !== 0) {
-            const warehouseStock = await tx.product_warehouses.findUnique({
-              where: {
-                product_id_warehouse_id: {
-                  product_id: item.product_id,
-                  warehouse_id: item.warehouse_id,
-                },
-              },
-            });
-
-            const availableStock = warehouseStock?.stock_qty ?? 0;
-
-            if (diff > 0 && availableStock < diff) {
-              throw new Error(
-                `Insufficient stock. Available: ${availableStock}, Required: ${diff}`
-              );
-            }
-
-            if (diff > 0) {
-              // qty increased → reduce stock
-              await tx.product_warehouses.update({
-                where: {
-                  product_id_warehouse_id: {
-                    product_id: item.product_id,
-                    warehouse_id: item.warehouse_id,
-                  },
-                },
-                data: { stock_qty: { decrement: diff } },
-              });
-            } else {
-              // qty decreased → return stock
-              await tx.product_warehouses.update({
-                where: {
-                  product_id_warehouse_id: {
-                    product_id: item.product_id,
-                    warehouse_id: item.warehouse_id,
-                  },
-                },
-                data: { stock_qty: { increment: Math.abs(diff) } },
-              });
-            }
-
-            await updateProductTotalStock(tx, item.product_id);
-          }
-
-          const itemData = {
-            item_name: item.item_name,
-            qty: newQty,
-            rate: Number(item.rate),
-            tax_percent: Number(item.tax_percent),
-            discount: Number(item.discount),
-            amount: Number(item.amount),
-            warehouse_id: Number(item.warehouse_id),
-            product_id: Number(item.product_id),
-          };
-
-          if (item.id) {
-            await tx.salesorderitems.update({
-              where: { id: item.id },
-              data: itemData,
-            });
-          } else {
-            await tx.salesorderitems.create({
-              data: {
-                ...itemData,
-                sales_order_id: orderId,
-              },
-            });
-          }
-        }
-
-        return await tx.salesorder.update({
-          where: { id: orderId },
-          data: {
-            SO_no: body.steps?.sales_order?.SO_no,
-            total: Number(body.total),
-            subtotal: Number(body.sub_total),
-            updated_at: new Date(),
-          },
-          include: { salesorderitems: true },
-        });
-      });
-    }
-
-    /* ======================================================
-       CREATE SALES ORDER
-    ====================================================== */
-    else {
-      savedOrder = await prisma.$transaction(async (tx) => {
-        const order = await tx.salesorder.create({
-          data: {
-            SO_no: body.steps?.sales_order?.SO_no,
-            subtotal: Number(body.sub_total),
-            total: Number(body.total),
-            created_at: new Date(),
-          },
-        });
-
-        for (const item of body.items) {
-          const warehouseStock = await tx.product_warehouses.findUnique({
+          const itemsToDelete = await tx.salesorderitems.findMany({
             where: {
-              product_id_warehouse_id: {
-                product_id: item.product_id,
-                warehouse_id: item.warehouse_id,
-              },
+              sales_order_id: orderId,
+              ...(incomingItemIds.length > 0 && {
+                id: { notIn: incomingItemIds },
+              }),
             },
           });
 
-          const availableStock = warehouseStock?.stock_qty ?? 0;
+        for (const itemToDelete of itemsToDelete) {
 
-          if (availableStock < item.qty) {
-            throw new Error(
-              `Insufficient stock. Available: ${availableStock}, Required: ${item.qty}`
-            );
+  // ✅ RESTORE PRODUCT MASTER STOCK
+  await tx.products.update({
+    where: { id: itemToDelete.product_id },
+    data: {
+      total_stock: { increment: Number(itemToDelete.qty) },
+    },
+  });
+
+  // ✅ RESTORE WAREHOUSE STOCK
+  await tx.product_warehouses.update({
+    where: {
+      product_id_warehouse_id: {
+        product_id: itemToDelete.product_id,
+        warehouse_id: itemToDelete.warehouse_id,
+      },
+    },
+    data: {
+      stock_qty: { increment: Number(itemToDelete.qty) },
+    },
+  });
+}
+
+
+          if (itemsToDelete.length > 0) {
+            await tx.salesorderitems.deleteMany({
+              where: { id: { in: itemsToDelete.map((item) => item.id) } },
+            });
           }
 
-          await tx.salesorderitems.create({
-            data: {
+          // --- Step 2: Process item updates and creations ---
+          for (const item of body.items) {
+            const itemData = {
               item_name: item.item_name,
               qty: Number(item.qty),
               rate: Number(item.rate),
               tax_percent: Number(item.tax_percent),
               discount: Number(item.discount),
               amount: Number(item.amount),
-              warehouse_id: Number(item.warehouse_id),
-              product_id: Number(item.product_id),
-              sales_order_id: order.id,
-            },
-          });
+              warehouse_id: item.warehouse_id
+                ? Number(item.warehouse_id)
+                : null,
+              product_id: item.product_id ? Number(item.product_id) : null,
+            };
 
-          await tx.product_warehouses.update({
-            where: {
-              product_id_warehouse_id: {
-                product_id: item.product_id,
-                warehouse_id: item.warehouse_id,
-              },
-            },
-            data: {
-              stock_qty: { decrement: Number(item.qty) },
-            },
-          });
+         if (item.product_id) {
+  await tx.products.update({
+    where: { id: item.product_id },
+    data: {
+      item_name: item.item_name,
+      sale_price: Number(item.rate),
+      // ❌ total_stock yahan kabhi mat touch karo
+    },
+  });
+}
 
-          await updateProductTotalStock(tx, item.product_id);
+
+            if (item.warehouse_id && item.product_id) {
+              let existingItemQty = 0;
+              if (item.id) {
+                const existingItem = await tx.salesorderitems.findUnique({
+                  where: { id: item.id },
+                  select: { qty: true },
+                });
+                existingItemQty = existingItem ? Number(existingItem.qty) : 0;
+              }
+            const netQtyChange = Number(item.qty) - existingItemQty;
+
+if (netQtyChange !== 0) {
+
+  // ✅ PRODUCT MASTER STOCK UPDATE
+  await tx.products.update({
+    where: { id: item.product_id },
+    data: {
+      total_stock:
+        netQtyChange > 0
+          ? { decrement: netQtyChange }   // more sold
+          : { increment: Math.abs(netQtyChange) }, // qty reduced
+    },
+  });
+
+  // ✅ WAREHOUSE STOCK UPDATE
+  await tx.product_warehouses.upsert({
+    where: {
+      product_id_warehouse_id: {
+        product_id: item.product_id,
+        warehouse_id: item.warehouse_id,
+      },
+    },
+    update: {
+      stock_qty:
+        netQtyChange > 0
+          ? { decrement: netQtyChange }
+          : { increment: Math.abs(netQtyChange) },
+    },
+    create: {
+      product_id: item.product_id,
+      warehouse_id: item.warehouse_id,
+      stock_qty: -netQtyChange,
+    },
+  });
+}
+            }
+
+            if (item.id) {
+              await tx.salesorderitems.update({
+                where: { id: item.id },
+                data: itemData,
+              });
+            } else {
+              await tx.salesorderitems.create({
+                data: {
+                  ...itemData,
+                  sales_order_id: orderId,
+                },
+              });
+            }
+          }
+
+          // --- Step 3: Update the main salesorder record ---
+          const mergedData = safeMerge(existingOrder, dbData);
+          const { salesorderitems, ...dataForUpdate } = mergedData;
+
+          return await tx.salesorder.update({
+            where: { id: orderId },
+            data: dataForUpdate,
+            include: { salesorderitems: true },
+          });
+        });
+      } else {
+        // --- If no items are sent, just update the main order fields ---
+        const mergedData = safeMerge(existingOrder, dbData);
+        const { salesorderitems, ...dataForUpdate } = mergedData;
+
+        savedOrder = await prisma.salesorder.update({
+          where: { id: orderId },
+          data: dataForUpdate,
+          include: { salesorderitems: true },
+        });
+      }
+    } else {
+      // The CREATE logic remains the same
+      // savedOrder = await prisma.salesorder.create({
+      //   data: {
+      //     ...dbData,
+      //     created_at: new Date(),
+      //     salesorderitems: { create: itemsData },
+      //   },
+      //   include: { salesorderitems: true },
+      // });
+
+      savedOrder = await prisma.$transaction(async (tx) => {
+        const newOrder = await tx.salesorder.create({
+          data: {
+            ...dbData,
+            created_at: new Date(),
+          },
+        });
+
+        if (body.items && Array.isArray(body.items)) {
+          for (const item of body.items) {
+            const itemData = {
+              item_name: item.item_name,
+              qty: Number(item.qty),
+              rate: Number(item.rate),
+              tax_percent: Number(item.tax_percent),
+              discount: Number(item.discount),
+              amount: Number(item.amount),
+              warehouse_id: item.warehouse_id
+                ? Number(item.warehouse_id)
+                : null,
+              product_id: item.product_id ? Number(item.product_id) : null,
+              sales_order_id: newOrder.id,
+            };
+
+            await tx.salesorderitems.create({ data: itemData });
+if (item.product_id) {
+  await tx.products.update({
+    where: { id: item.product_id },
+    data: {
+      item_name: item.item_name,
+      sale_price: Number(item.rate),
+      total_stock: { decrement: Number(item.qty) }, // ✅ YAHI MISSING THA
+    },
+  });
+}
+
+
+
+         if (item.warehouse_id && item.product_id) {
+  await tx.product_warehouses.upsert({
+    where: {
+      product_id_warehouse_id: {
+        product_id: item.product_id,
+        warehouse_id: item.warehouse_id,
+      },
+    },
+    update: {
+      stock_qty: { decrement: Number(item.qty) },
+    },
+    create: {
+      product_id: item.product_id,
+      warehouse_id: item.warehouse_id,
+      stock_qty: -Number(item.qty),
+    },
+  });
+}
+
+          }
         }
 
         return await tx.salesorder.findUnique({
-          where: { id: order.id },
+          where: { id: newOrder.id },
           include: { salesorderitems: true },
         });
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: orderId ? "Sales order updated" : "Sales order created",
-      data: savedOrder,
-    });
+      data: {
+        sales_order_id: savedOrder.id,
+        company_info: {
+          company_id: savedOrder.company_id,
+          company_name: savedOrder.company_name,
+          company_address: savedOrder.company_address,
+          company_email: savedOrder.company_email,
+          company_phone: savedOrder.company_phone,
+          logo_url: savedOrder.logo_url,
+          bank_name: savedOrder.bank_name,
+          account_no: savedOrder.account_no,
+          account_holder: savedOrder.account_holder,
+          ifsc_code: savedOrder.ifsc_code,
+          terms: savedOrder.terms,
+        },
 
+        shipping_details: {
+          bill_to_name: savedOrder.bill_to_company_name,
+          bill_to_address: savedOrder.bill_to_company_address,
+          bill_to_email: savedOrder.bill_to_company_email,
+          bill_to_phone: savedOrder.bill_to_company_phone,
+          bill_to_attention_name: savedOrder.bill_to_attention_name,
+
+          ship_to_name: savedOrder.ship_to_company_name,
+          ship_to_address: savedOrder.ship_to_company_address,
+          ship_to_email: savedOrder.ship_to_company_email,
+          ship_to_phone: savedOrder.ship_to_company_phone,
+          ship_to_attention_name: savedOrder.ship_to_attention_name,
+        },
+
+        steps: {
+          quotation: {
+            status: savedOrder.quotation_status, // ← status added
+            quotation_no: savedOrder.quotation_no,
+            manual_quo_no: savedOrder.manual_quo_no,
+            quotation_date: savedOrder.quotation_date,
+            valid_till: savedOrder.valid_till,
+            qoutation_to_customer_name: savedOrder.qoutation_to_customer_name,
+            qoutation_to_customer_address:
+              savedOrder.qoutation_to_customer_address,
+            qoutation_to_customer_email: savedOrder.qoutation_to_customer_email,
+            qoutation_to_customer_phone: savedOrder.qoutation_to_customer_phone,
+            notes: savedOrder.notes,
+            customer_ref: savedOrder.customer_ref,
+          },
+
+          sales_order: {
+            status: savedOrder.sales_order_status, // ← added
+            SO_no: savedOrder.SO_no,
+            manual_ref_no: savedOrder.Manual_SO_ref,
+            manual_quo_no: savedOrder.manual_quo_no,
+          },
+
+          delivery_challan: {
+            status: savedOrder.delivery_challan_status, // ← added
+            challan_no: savedOrder.Challan_no,
+            manual_challan_no: savedOrder.Manual_challan_no,
+            driver_name: savedOrder.driver_name,
+            driver_phone: savedOrder.driver_phone,
+          },
+
+          invoice: {
+            status: savedOrder.invoice_status, // ← added
+            invoice_no: savedOrder.invoice_no,
+            manual_invoice_no: savedOrder.Manual_invoice_no,
+            invoice_date: savedOrder.invoice_date,
+            due_date: savedOrder.due_date,
+          },
+
+          payment: {
+            status: savedOrder.payment_status, // ← added
+            payment_no: savedOrder.Payment_no,
+            manual_payment_no: savedOrder.Manual_payment_no,
+            payment_date: savedOrder.payment_date,
+            amount_received: savedOrder.amount_received,
+            balance: savedOrder.balance,
+            payment_note: savedOrder.payment_note,
+            total_invoice: savedOrder.total_invoice,
+          },
+        },
+
+        items: savedOrder.salesorderitems,
+
+        additional_info: {
+          files: body.additional_info.files || existingOrder?.files || [],
+          signature_url: savedOrder.signature_url,
+          photo_url: savedOrder.photo_url,
+          attachment_url: (() => {
+            // If there's no attachment URL, return an empty array.
+            if (!savedOrder.attachment_url) {
+              return [];
+            }
+
+            try {
+              // Try to parse it as a JSON array (the new format).
+              const parsed = JSON.parse(savedOrder.attachment_url);
+              // Ensure the result is an array, even if it was a single JSON string like '"url"'
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              // If parsing fails, it's the old format (a single URL string).
+              // Wrap it in an array to maintain consistency for the frontend.
+              return [savedOrder.attachment_url];
+            }
+          })(),
+        },
+
+        sub_total: savedOrder.subtotal,
+        total: savedOrder.total,
+      },
+    });
   } catch (err) {
-    console.error(err);
-    return res.status(400).json({
+    console.error("Error:", err);
+    return res.status(500).json({
       success: false,
-      message: err.message || "Internal Server Error",
+      message: "Internal Server Error",
+      error: err.message,
     });
   }
 };
-
-
-
 
 const toNumber = (val) => {
   if (val == null) return 0;

@@ -116,7 +116,6 @@ const UI_MODULE_MAPPING = {
   Password_Requests: "password_change_requests",
 };
 
-
 const UI_PERMISSION_ORDER = [
   "Dashboard",
   "Charts_of_Accounts",
@@ -233,8 +232,6 @@ export const formatPermissions = (roleData) => {
   });
 };
 
-
-
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -298,7 +295,7 @@ export const login = async (req, res) => {
       responseData.user = {
         ...responseData.user,
         id: user.created_by || null, // companyId as id
-        userId: user.id,             // actual user id
+        userId: user.id, // actual user id
       };
       delete responseData.user.companyId;
     }
@@ -353,7 +350,6 @@ export const login = async (req, res) => {
       message: "Login successful",
       data: responseData,
     });
-
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({
@@ -767,7 +763,6 @@ export const createCompany = async (req, res) => {
     });
   }
 };
-
 
 // export const updateCompany = async (req, res) => {
 //   try {
@@ -1691,7 +1686,6 @@ export const getAllCompanies = async (req, res) => {
   }
 };
 
-
 export const deleteCompany = async (req, res) => {
   try {
     const { id } = req.params;
@@ -2237,6 +2231,142 @@ export const deleteUser = async (req, res) => {
       success: false,
       message: "Internal server error",
       error: error.message,
+    });
+  }
+};
+
+export const getUserProfile = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true, // username
+        email: true,
+        phone: true,
+        profile: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // split name → first & last (UI ke liye)
+    const [firstName = "", lastName = ""] = user.name?.split(" ");
+
+    return res.json({
+      success: true,
+      data: {
+        id: user.id,
+        firstName,
+        lastName,
+        username: user.name,
+        email: user.email,
+        phone: user.phone,
+        profile: user.profile,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const updateUserProfile = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    // ✅ SAFETY FIX
+    const body = req.body || {};
+
+    const { firstName, lastName, username, email, phone, password } = body;
+
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const updateData = {};
+
+    // 👤 Name
+    if (username?.trim()) {
+      updateData.name = username.trim();
+    } else if (firstName || lastName) {
+      updateData.name = `${firstName || ""} ${lastName || ""}`.trim();
+    }
+
+    // 📧 Email
+    if (email?.trim()) updateData.email = email.trim();
+
+    // 📞 Phone
+    if (phone?.trim()) updateData.phone = phone.trim();
+
+    // 🔐 Password
+    if (password?.trim()) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    // 🖼 Profile Image
+    if (req.files?.profile) {
+      const imageUrl = await uploadToCloudinary(
+        req.files.profile,
+        "users/profile"
+      );
+
+      if (!imageUrl) {
+        return res.status(400).json({
+          success: false,
+          message: "Image upload failed",
+        });
+      }
+
+      if (user.profile) {
+        const publicId = user.profile
+          .split("/")
+          .slice(-2)
+          .join("/")
+          .split(".")[0];
+
+        await deleteFromCloudinary(publicId);
+      }
+
+      updateData.profile = imageUrl;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No data provided to update",
+      });
+    }
+
+    const updatedUser = await prisma.users.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    return res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("PROFILE UPDATE ERROR =>", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

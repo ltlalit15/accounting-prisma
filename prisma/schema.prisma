@@ -250,6 +250,7 @@ model warehouses {
   product_warehouses   product_warehouses[]
   salesorderitems      salesorderitems[]      @relation("SOI_Warehouse")
   transfer_items       transfer_items[]
+  purchase_items       purchaseorderitems[]
 }
 
 model item_category {
@@ -289,6 +290,7 @@ model products {
   unit_detail        unit_details?          @relation(fields: [unit_detail_id], references: [id])
   transfer_items     transfer_items[]
   salesorderitems    salesorderitems[]      @relation("SOItemProduct")
+  purchase_items     purchaseorderitems[]
 
   @@index([item_category_id], map: "products_item_category_id_fkey")
   @@index([unit_detail_id], map: "products_unit_detail_id_fkey")
@@ -810,6 +812,8 @@ model purchaseorder {
 
 model purchaseorderitems {
   id                Int           @id @default(autoincrement())
+  product_id        Int?        
+  warehouse_id      Int? 
   purchase_order_id Int
   item_name         String
   qty               Decimal       @db.Decimal(10, 2)
@@ -819,7 +823,13 @@ model purchaseorderitems {
   amount            Decimal       @db.Decimal(15, 2)
   purchaseorder     purchaseorder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
 
+
+  product           products?     @relation(fields: [product_id], references: [id])
+  warehouse         warehouses?   @relation(fields: [warehouse_id], references: [id])
+
   @@index([purchase_order_id])
+   @@index([product_id])
+  @@index([warehouse_id])
 }
 
 model purchase_return {

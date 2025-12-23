@@ -1629,6 +1629,8 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
     const items = body.items
       ? body.items.map((i) => ({
           item_name: i.item_name,
+          product_id: i.product_id ? Number(i.product_id) : null,
+          warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
           qty: Number(i.qty ?? 0),
           rate: Number(i.rate ?? 0),
           tax_percent: Number(i.tax_percent ?? 0),
@@ -1719,14 +1721,66 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
         include: { purchaseorderitems: true },
       });
     } else {
-      saved = await prisma.purchaseorder.create({
-        data: {
-          ...dbData,
-          created_at: new Date(),
-          purchaseorderitems: { create: items },
+    saved = await prisma.$transaction(async (tx) => {
+
+  // 1️⃣ CREATE PURCHASE ORDER
+  const order = await tx.purchaseorder.create({
+    data: {
+      ...dbData,
+      created_at: new Date(),
+    },
+  });
+
+  // 2️⃣ CREATE ITEMS + UPDATE STOCK
+  for (const item of items) {
+
+    // 🔹 CREATE PURCHASE ITEM
+    await tx.purchaseorderitems.create({
+      data: {
+        ...item,
+        purchase_order_id: order.id,
+      },
+    });
+
+    // 🔹 SAFETY CHECK
+    if (!item.product_id || !item.warehouse_id) continue;
+
+    const qty = Number(item.qty);
+
+    // 3️⃣ PRODUCT MASTER STOCK ↑
+    await tx.products.update({
+      where: { id: item.product_id },
+      data: {
+        total_stock: { increment: qty },
+      },
+    });
+
+    // 4️⃣ WAREHOUSE STOCK ↑ (UPSERT)
+    await tx.product_warehouses.upsert({
+      where: {
+        product_id_warehouse_id: {
+          product_id: item.product_id,
+          warehouse_id: item.warehouse_id,
         },
-        include: { purchaseorderitems: true },
-      });
+      },
+      update: {
+        stock_qty: { increment: qty },
+      },
+      create: {
+        product_id: item.product_id,
+        warehouse_id: item.warehouse_id,
+        stock_qty: qty,
+      },
+    });
+  }
+
+  // 5️⃣ RETURN FULL ORDER
+  return await tx.purchaseorder.findUnique({
+    where: { id: order.id },
+    include: { purchaseorderitems: true },
+  });
+});
+
     }
 
     // ================= RESPONSE =================

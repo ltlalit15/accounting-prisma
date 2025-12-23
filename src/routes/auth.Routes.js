@@ -13,6 +13,8 @@ import {
   login,
   updateCompany,
   updateUser,
+   getUserProfile,
+  updateUserProfile,
 } from "../controllers/auth.controller.js";
 import upload from "../middlewares/multer.js";
 
@@ -39,8 +41,12 @@ router.delete("/Company/:id", deleteCompany);
 //-------User routes-------//
 router.post("/User", createUser);
 router.put("/User/:id", updateUser);
+router.put("/profile/:id", updateUserProfile);
 router.delete("/User/:id", deleteUser);
 router.get("/User/company/:company_id", getUsersByCompanyId);
 router.get("/User/:id", getUserById);
+router.get("/profile/:id", getUserProfile);
+
+
 
 export default router;
