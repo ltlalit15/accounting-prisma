@@ -4,13 +4,13 @@ import {
   getAllPurchaseReturns,
   getPurchaseReturnById,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
 } from "../controllers/purchase.controller.js";
 
 const router = Router();
 
 // Create Purchase Return (POST)
-router.post("/ ", createPurchaseReturn);
+router.post("/create-purchase-return", createPurchaseReturn);
 
 // Get All Purchase Returns (GET) with filters
 router.get("/get-returns", getAllPurchaseReturns);
