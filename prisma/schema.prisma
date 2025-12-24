@@ -251,6 +251,7 @@ model warehouses {
   salesorderitems      salesorderitems[]      @relation("SOI_Warehouse")
   transfer_items       transfer_items[]
   purchase_items       purchaseorderitems[]
+  sales_return_items sales_return_items[]
 }
 
 model item_category {
@@ -291,6 +292,7 @@ model products {
   transfer_items     transfer_items[]
   salesorderitems    salesorderitems[]      @relation("SOItemProduct")
   purchase_items     purchaseorderitems[]
+  sales_return_items sales_return_items[] 
 
   @@index([item_category_id], map: "products_item_category_id_fkey")
   @@index([unit_detail_id], map: "products_unit_detail_id_fkey")
@@ -713,6 +715,7 @@ model sales_return_items {
   id              Int          @id @default(autoincrement())
   sales_return_id Int
   product_id      Int?
+  warehouse_id    Int? 
   item_name       String       @db.VarChar(255)
   quantity        Decimal      @db.Decimal(10, 2)
   rate            Decimal?     @default(0.00) @db.Decimal(15, 2)
@@ -723,6 +726,8 @@ model sales_return_items {
   updated_at      DateTime     @default(now()) @db.Timestamp(0)
   narration       String?      @db.VarChar(255)
   sales_return    sales_return @relation(fields: [sales_return_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesReturnItems")
+  product         products?   @relation(fields: [product_id], references: [id])
+  warehouse       warehouses? @relation(fields: [warehouse_id], references: [id])
 
   @@index([sales_return_id], map: "fk_salesReturnItems")
 }

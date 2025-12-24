@@ -502,109 +502,137 @@ const generateAutoVoucherNo = async () => {
 // ✅ CREATE SALES RETURN
 export const createSalesReturn = async (req, res) => {
   try {
-    console.log("🟢 Incoming Raw Body:", req.body);
-
     const data = { ...req.body };
 
-    // 🔹 Parse items safely
     let items = data.items || data.sales_return_items || [];
     if (typeof items === "string") {
-      try {
-        items = JSON.parse(items);
-      } catch (err) {
-        console.error("❌ Error parsing items JSON:", err.message);
-        items = [];
-      }
+      items = JSON.parse(items);
     }
-    console.log("🟢 Parsed Items:", items);
 
-    // 🔹 Validate items contain narration
-    items.forEach((item, index) => {
-      console.log(`🧾 Item ${index + 1}:`, item.narration);
-    });
-
-    // 🔹 Calculate totals (same as before)
+    // 🔹 Calculate totals
     let subTotal = 0,
       taxTotal = 0,
       discountTotal = 0,
       grandTotal = 0;
 
     items.forEach((item) => {
-      const qty = parseFloat(item.quantity || 0);
-      const rate = parseFloat(item.rate || 0);
-      const taxPercent = parseFloat(item.tax_percent || 0);
-      const discount = parseFloat(item.discount || 0);
+      const qty = Number(item.quantity || 0);
+      const rate = Number(item.rate || 0);
+      const tax = Number(item.tax_percent || 0);
+      const discount = Number(item.discount || 0);
 
-      const itemSubTotal = qty * rate;
-      const itemDiscount = (itemSubTotal * discount) / 100;
-      const itemAfterDiscount = itemSubTotal - itemDiscount;
-      const itemTax = (itemAfterDiscount * taxPercent) / 100;
-      const itemAmount = itemAfterDiscount + itemTax;
+      const itemSub = qty * rate;
+      const itemDiscount = (itemSub * discount) / 100;
+      const afterDiscount = itemSub - itemDiscount;
+      const itemTax = (afterDiscount * tax) / 100;
+      const amount = afterDiscount + itemTax;
 
-      subTotal += itemSubTotal;
+      subTotal += itemSub;
       discountTotal += itemDiscount;
       taxTotal += itemTax;
-      grandTotal += itemAmount;
+      grandTotal += amount;
     });
 
-    // 🔹 Prepare create data
-    const createData = {
-      company_id: Number(data.company_id),
-      reference_id: data.reference_id || "REF-AUTO",
-      auto_voucher_no: data.auto_voucher_no || "AUTO-VR",
-      customer_id: data.customer_id ? Number(data.customer_id) : null,
-      return_no: data.return_no,
-      invoice_no: data.invoice_no,
-      return_date: new Date(data.return_date),
-      return_type: data.return_type || "Sales Return",
-      warehouse_id: Number(data.warehouse_id),
-      reason_for_return: data.reason_for_return || null,
-      sub_total: subTotal,
-      tax_total: taxTotal,
-      discount_total: discountTotal,
-      grand_total: grandTotal,
-      status: data.status || "pending",
-      notes: data.notes || null,
-      created_at: new Date(),
-      updated_at: new Date(),
-      sales_return_items: {
-        create: items.map((item) => ({
-          product_id: item.product_id ? Number(item.product_id) : null,
-          item_name: item.item_name || "",
-          quantity: parseFloat(item.quantity || 0),
-          rate: parseFloat(item.rate || 0),
-          tax_percent: parseFloat(item.tax_percent || 0),
-          discount: parseFloat(item.discount || 0),
-          amount:
-            parseFloat(item.amount) ||
-            parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
-          narration: item.narration || null, // ✅ Should now appear
-        })),
-      },
-    };
+    // 🔥 TRANSACTION START
+    const result = await prisma.$transaction(async (tx) => {
+      /* 1️⃣ CREATE SALES RETURN */
+      const salesReturn = await tx.sales_return.create({
+        data: {
+          company_id: Number(data.company_id),
+          reference_id: data.reference_id || null,
+          auto_voucher_no: data.auto_voucher_no || null,
+          manual_voucher_no: data.manual_voucher_no || null,
+          customer_id: data.customer_id ? Number(data.customer_id) : null,
+          return_no: data.return_no,
+          invoice_no: data.invoice_no,
+          return_date: new Date(data.return_date),
+          return_type: "Sales Return",
+          warehouse_id: Number(data.warehouse_id),
+          reason_for_return: data.reason_for_return || null,
+          sub_total: subTotal,
+          tax_total: taxTotal,
+          discount_total: discountTotal,
+          grand_total: grandTotal,
+          status: "pending",
+          notes: data.notes || null,
+          sales_return_items: {
+            create: items.map((item) => ({
+              product_id: Number(item.product_id),
+              item_name: item.item_name,
+              quantity: Number(item.quantity),
+              rate: Number(item.rate),
+              tax_percent: Number(item.tax_percent),
+              discount: Number(item.discount),
+              amount: Number(item.amount),
+              narration: item.narration || null,
+            })),
+          },
+        },
+        include: { sales_return_items: true },
+      });
 
-    console.log("🟡 Final Data to Insert:", JSON.stringify(createData, null, 2));
+      /* 2️⃣ UPDATE STOCK (VERY IMPORTANT) */
+      for (const item of items) {
+        const qty = Number(item.quantity);
+        const productId = Number(item.product_id);
+        const warehouseId = Number(data.warehouse_id);
 
-    // 🔹 Insert to DB
-    const newReturn = await prisma.sales_return.create({
-      data: createData,
-      include: { sales_return_items: true },
+        // 🔹 Product total stock increase
+        await tx.products.update({
+          where: { id: productId },
+          data: {
+            total_stock: {
+              increment: qty, // ✅ ADD BACK
+            },
+          },
+        });
+
+        // 🔹 Warehouse stock increase
+        const existing = await tx.product_warehouses.findFirst({
+          where: {
+            product_id: productId,
+            warehouse_id: warehouseId,
+          },
+        });
+
+        if (existing) {
+          await tx.product_warehouses.update({
+            where: { id: existing.id },
+            data: {
+              stock_qty: {
+                increment: qty, // ✅ ADD BACK
+              },
+            },
+          });
+        } else {
+          // 🔹 If product not found in warehouse
+          await tx.product_warehouses.create({
+            data: {
+              product_id: productId,
+              warehouse_id: warehouseId,
+              stock_qty: qty,
+            },
+          });
+        }
+      }
+
+      return salesReturn;
     });
 
     return res.status(201).json({
       success: true,
-      message: "Sales return created successfully",
-      data: newReturn,
+      message: "Sales return created & stock updated successfully",
+      data: result,
     });
   } catch (error) {
-    console.error("❌ Error creating sales return:", error);
+    console.error("❌ Sales Return Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
-      error: error.message,
+      message: error.message,
     });
   }
 };
+
 
 
 
@@ -705,6 +733,7 @@ export const getAllSalesReturns = async (req, res) => {
     // -----------------------------
 
     const tableData = salesReturns.map((s, index) => ({
+      id: s.id,                 // ✅ REAL DB ID (MOST IMPORTANT)
       sr_no: index + 1,
       return_no: s.return_no,
       reference_id: s.reference_id,
