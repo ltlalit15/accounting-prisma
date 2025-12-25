@@ -1773,6 +1773,32 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
       },
     });
   }
+// ================= 🔥 CREATE PURCHASE VOUCHER =================
+const voucher = await tx.vouchers.create({
+  data: {
+    company_id: order.company_id,
+    voucher_type: "Purchase",
+    voucher_number: `PUR-${Date.now()}`,
+    manual_voucher_no: order.Bill_no || null,
+    purchase_order_id: order.id,
+    date: new Date(),
+    from_name: order.quotation_from_vendor_name,
+    notes: "Auto generated from Purchase Order",
+  },
+});
+
+// ================= 🔥 CREATE VOUCHER ITEMS =================
+for (const item of items) {
+  await tx.voucher_items.create({
+    data: {
+      voucher_id: voucher.id,
+      item_name: item.item_name,
+      quantity: item.qty,
+      rate: item.rate,
+      amount: Number(item.qty) * Number(item.rate),
+    },
+  });
+}
 
   // 5️⃣ RETURN FULL ORDER
   return await tx.purchaseorder.findUnique({
@@ -2433,10 +2459,10 @@ export const getPurchaseOrderById = async (req, res) => {
 
 export const deletePurchaseOrder = async (req, res) => {
   try {
-    const { id } = req.params;
+    const orderId = Number(req.params.id);
 
     const purchaseOrder = await prisma.purchaseorder.findUnique({
-      where: { id: Number(id) }
+      where: { id: orderId },
     });
 
     if (!purchaseOrder) {
@@ -2446,27 +2472,51 @@ export const deletePurchaseOrder = async (req, res) => {
       });
     }
 
-    // Delete child items first
-    await prisma.purchaseorderitems.deleteMany({
-      where: { purchase_order_id: Number(id) }
-    });
+    await prisma.$transaction(async (tx) => {
 
-    // Delete parent order
-    await prisma.purchaseorder.delete({
-      where: { id: Number(id) }
+      // 🔥 1️⃣ FIND VOUCHER BY purchase_order_id
+      const voucher = await tx.vouchers.findFirst({
+        where: {
+          voucher_type: "Purchase",
+          purchase_order_id: orderId,
+        },
+      });
+
+      // 🔥 2️⃣ DELETE VOUCHER ITEMS
+      if (voucher) {
+        await tx.voucher_items.deleteMany({
+          where: { voucher_id: voucher.id },
+        });
+
+        // 🔥 3️⃣ DELETE VOUCHER
+        await tx.vouchers.delete({
+          where: { id: voucher.id },
+        });
+      }
+
+      // 🔥 4️⃣ DELETE PURCHASE ORDER ITEMS
+      await tx.purchaseorderitems.deleteMany({
+        where: { purchase_order_id: orderId },
+      });
+
+      // 🔥 5️⃣ DELETE PURCHASE ORDER
+      await tx.purchaseorder.delete({
+        where: { id: orderId },
+      });
     });
 
     return res.status(200).json({
       success: true,
-      message: "Purchase order deleted successfully"
+      message: "Purchase order & purchase voucher deleted successfully",
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Delete PO Error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete purchase order",
-      error: error.message
+      error: error.message,
     });
   }
 };
+

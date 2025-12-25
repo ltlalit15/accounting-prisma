@@ -6,7 +6,6 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
-
 model plans {
   id                       Int               @id @default(autoincrement())
   plan_name                String            @db.VarChar(100)
@@ -345,6 +344,7 @@ model services {
 model vouchers {
   id                  Int                   @id @default(autoincrement())
   company_id          Int
+  purchase_order_id   Int?  
   voucher_type        String                @db.VarChar(50)
   voucher_number      String                @db.VarChar(100)
   date                DateTime              @db.Date
