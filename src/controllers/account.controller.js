@@ -619,13 +619,13 @@ export const getLedger = async (req, res) => {
         accountBalance: true,
       },
     });
-      if (!accounts.length) {
-        return res.status(404).json({
-          success: false,
-          message: "No accounts found for this subgroup",
-          ledger: [],
-        });
-      }
+    if (!accounts.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No accounts found for this subgroup",
+        ledger: [],
+      });
+    }
 
     const accountIds = accounts.map((a) => a.id);
 
@@ -639,6 +639,7 @@ export const getLedger = async (req, res) => {
       select: {
         id: true,
         account_id: true,
+        account_balance: true,
         creation_date: true,
         created_at: true,
         name_english: true,
@@ -944,10 +945,13 @@ export const getLedger = async (req, res) => {
     );
     partiesForAccount.forEach((p) => {
       if (!existingPartyIds.has(p.id)) {
+        const bal = Number(p.account_balance || 0);
+        const debit = bal < 0 ? Math.abs(bal) : 0;
+        const credit = bal > 0 ? bal : 0;
         filteredRows.push({
           date: p.creation_date || p.created_at || new Date(0),
-          debit: 0,
-          credit: 0,
+          debit,
+          credit,
           vendor_customer_id: p.id,
           name: p.name_english || null,
           account_type: p.account_type || null,
@@ -959,10 +963,8 @@ export const getLedger = async (req, res) => {
 
     // sort & running balance
     filteredRows.sort((a, b) => new Date(a.date) - new Date(b.date));
-    let running = accounts.reduce(
-      (sum, a) => sum + Number(a.accountBalance || 0),
-      0
-    );
+    // Start running from 0 — opening balances are added as creation rows above
+    let running = 0;
 
     const ledger = filteredRows.map((r) => {
       running = running + Number(r.credit || 0) - Number(r.debit || 0);
