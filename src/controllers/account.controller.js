@@ -608,71 +608,136 @@ export const getLedger = async (req, res) => {
         .json({ success: false, message: "company_id & account_id required" });
     }
 
-    // ---------------- OPENING BALANCE ----------------
+    // ensure account exists for given company
     const accountInfo = await prisma.accounts.findFirst({
       where: { id: account_id, company_id },
       select: { accountBalance: true },
     });
+    if (!accountInfo) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Account not found for given company_id/account_id",
+          ledger: [],
+        });
+    }
 
-    // ---------------- VENDOR / CUSTOMER ----------------
-    const party = await prisma.vendorscustomer.findFirst({
-      where: { id: account_id, company_id },
-      select: { name_english: true, type: true }, // vender | customer
+    // parties linked to this account (vendorscustomer rows that reference this account)
+    const partiesForAccount = await prisma.vendorscustomer.findMany({
+      where: { company_id, account_id: account_id },
+      select: {
+        id: true,
+        account_id: true,
+        name_english: true,
+        account_type: true,
+        account_name: true,
+      },
+    });
+    console.log(
+      "getLedger partiesForAccount count:",
+      partiesForAccount.length,
+      "sample:",
+      partiesForAccount.slice(0, 3)
+    );
+    console.log("getLedger params:", { account_id, company_id });
+    const partyIds = partiesForAccount.map((p) => p.id);
+    const partyNames = partiesForAccount
+      .map((p) => (p.name_english || "").toLowerCase())
+      .filter(Boolean);
+    const partiesById = {};
+    partiesForAccount.forEach((p) => {
+      partiesById[p.id] = p;
+    });
+    const rows = [];
+
+    // add an initial/creation row for each party so they always appear in ledger
+    partiesForAccount.forEach((p) => {
+      rows.push({
+        date: p.creation_date || p.created_at || new Date(0),
+        debit: 0,
+        credit: 0,
+        vendor_customer_id: p.id,
+        name: p.name_english || null,
+        account_type: p.account_type || null,
+        account_name: p.account_name || null,
+      });
     });
 
-    // dynamic field
-    const partyField =
-      party?.type === "vender"
-        ? { vendor: party.name_english }
-        : party?.type === "customer"
-        ? { customer: party.name_english }
-        : {};
-
-    let rows = [];
-
-    // ---------------- 1) VOUCHERS ----------------
+    // VOUCHERS
     const vouchers = await prisma.vouchers.findMany({
       where: {
         company_id,
         OR: [{ from_account: account_id }, { to_account: account_id }],
       },
     });
+    const voucherAccountIds = [
+      ...new Set(vouchers.flatMap((v) => [v.from_account, v.to_account])),
+    ];
+    const voucherParties = await prisma.vendorscustomer.findMany({
+      where: {
+        company_id,
+        account_id: { in: voucherAccountIds.filter(Boolean) },
+      },
+      select: {
+        id: true,
+        account_id: true,
+        name_english: true,
+        account_type: true,
+        account_name: true,
+      },
+    });
+    const voucherPartyMap = {};
+    voucherParties.forEach((p) => {
+      voucherPartyMap[p.account_id] = p;
+    });
 
     vouchers.forEach((v) => {
       const isDebit = v.from_account === account_id;
+      const relatedAccount = isDebit ? v.to_account : v.from_account;
+      let p = voucherPartyMap[relatedAccount];
+      // fallback: vouchers may reference vendorscustomer by customer_id/vendor_id
+      if (!p)
+        p = partiesById[v.customer_id] || partiesById[v.vendor_id] || null;
+      console.log("voucher row party lookup", {
+        voucherId: v.id,
+        relatedAccount,
+        customer_id: v.customer_id,
+        vendor_id: v.vendor_id,
+        partyFound: !!p,
+      });
       rows.push({
         date: v.date,
-        ...partyField,
-        vch_no: v.voucher_number,
-        ref_no: v.manual_voucher_no,
-        vch_type: v.voucher_type,
         debit: isDebit ? Number(v.transfer_amount) : 0,
         credit: isDebit ? 0 : Number(v.transfer_amount),
+        vendor_customer_id: p?.id || null,
+        name: p?.name_english || null,
+        account_type: p?.account_type || null,
+        account_name: p?.account_name || null,
       });
     });
 
-    // ---------------- 2) CONTRA ----------------
+    // CONTRA
     const contra = await prisma.contra_vouchers.findMany({
       where: {
         company_id,
         OR: [{ account_from_id: account_id }, { account_to_id: account_id }],
       },
     });
-
     contra.forEach((c) => {
       const isDebit = c.account_from_id === account_id;
       rows.push({
         date: c.voucher_date,
-        ...partyField,
-        vch_no: c.voucher_number,
-        ref_no: c.voucher_no_auto,
-        vch_type: "Contra",
         debit: isDebit ? Number(c.amount) : 0,
         credit: isDebit ? 0 : Number(c.amount),
+        vendor_customer_id: null,
+        name: null,
+        account_type: null,
+        account_name: null,
       });
     });
 
-    // ---------------- 3) INCOME ----------------
+    // INCOME
     const income = await prisma.income_voucher_entries.findMany({
       where: {
         income_vouchers: { company_id },
@@ -680,172 +745,204 @@ export const getLedger = async (req, res) => {
       },
       include: { income_vouchers: true },
     });
-
     income.forEach((i) => {
       rows.push({
         date: i.income_vouchers.voucher_date,
-        ...partyField,
-        vch_no: i.income_vouchers.auto_receipt_no,
-        ref_no: i.income_vouchers.manual_receipt_no,
-        vch_type: "Income",
         debit: 0,
         credit: Number(i.amount),
+        vendor_customer_id: null,
+        name: null,
+        account_type: null,
+        account_name: null,
       });
     });
 
-    // ---------------- 4) EXPENSE ----------------
+    // EXPENSE
     const expense = await prisma.expensevouchers.findMany({
       where: { company_id, paid_from_account_id: account_id },
     });
-
     expense.forEach((e) => {
       rows.push({
         date: e.voucher_date,
-        ...partyField,
-        vch_no: e.auto_receipt_no,
-        ref_no: e.manual_receipt_no,
-        vch_type: "Expense",
         debit: Number(e.total_amount),
         credit: 0,
+        vendor_customer_id: null,
+        name: null,
+        account_type: null,
+        account_name: null,
       });
     });
 
-    // ---------------- 5) POS INVOICE ----------------
+    // POS INVOICES (only those where the invoice's customer is linked to this account)
     const posInvoices = await prisma.pos_invoices.findMany({
-      where: { company_id },
+      where: {
+        company_id,
+        payment_status: "Paid",
+        customer: { account_id: account_id },
+      },
+      include: {
+        customer: {
+          select: { id: true, name_english: true, account_id: true },
+        },
+      },
     });
-
     posInvoices.forEach((p) => {
-      if (p.payment_status === "Paid") {
-        rows.push({
-          date: p.created_at,
-          ...partyField,
-          vch_no: `POS-${p.id}`,
-          ref_no: null,
-          vch_type: "POS",
-          debit: 0,
-          credit: Number(p.total),
-        });
-      }
+      rows.push({
+        date: p.created_at,
+        debit: 0,
+        credit: Number(p.total),
+        vendor_customer_id: p.customer?.id || null,
+        name: p.customer?.name_english || null,
+        account_type: null,
+        account_name: null,
+      });
     });
 
-    // ---------------- 6) SALES RETURN ----------------
+    // SALES RETURN (customer_id maps to vendorscustomer.id)
     const salesReturn = await prisma.sales_return.findMany({
-      where: { company_id },
+      where: {
+        company_id,
+        customer_id: { in: partyIds.length ? partyIds : [0] },
+      },
     });
-
     salesReturn.forEach((s) => {
+      const p = partiesById[s.customer_id] || null;
+      console.log("salesReturn party lookup", {
+        id: s.id,
+        customer_id: s.customer_id,
+        partyFound: !!p,
+      });
       rows.push({
         date: s.return_date,
-        ...partyField,
-        vch_no: s.return_no,
-        ref_no: s.auto_voucher_no,
-        vch_type: "Sales Return",
         debit: Number(s.grand_total),
         credit: 0,
+        vendor_customer_id: p?.id || null,
+        name: p?.name_english || null,
+        account_type: p?.account_type || null,
+        account_name: p?.account_name || null,
       });
     });
 
-    // ---------------- 7) PURCHASE ORDER ----------------
+    // PURCHASE ORDER (match by vendor-name fields against party names — approximate)
     const purchaseOrders = await prisma.purchaseorder.findMany({
       where: { company_id },
     });
-
-    purchaseOrders.forEach((p) => {
+    const matchedPOs = partyNames.length
+      ? purchaseOrders.filter((po) => {
+          const fields = [
+            po.bill_to_vendor_name,
+            po.quotation_from_vendor_name,
+            po.payment_made_vendor_name,
+            po.vendor_ref,
+            po.ship_to_vendor_name,
+          ];
+          return fields.some((f) => f && partyNames.includes(f.toLowerCase()));
+        })
+      : [];
+    matchedPOs.forEach((p) => {
       rows.push({
         date: p.created_at,
-        ...partyField,
-        vch_no: p.PO_no,
-        ref_no: p.Manual_PO_ref,
-        vch_type: "Purchase Order",
         debit: 0,
-        credit: Number(p.total),
+        credit: Number(p.total || p.total_amount || 0),
+        vendor_customer_id: null,
+        name: null,
+        account_type: null,
+        account_name: null,
       });
     });
 
-    // ---------------- 8) PURCHASE RETURN ----------------
+    // PURCHASE RETURN (vendor_id maps to vendorscustomer.id)
     const purchaseReturn = await prisma.purchase_return.findMany({
-      where: { company_id },
+      where: {
+        company_id,
+        vendor_id: { in: partyIds.length ? partyIds : [0] },
+      },
     });
-
-    purchaseReturn.forEach((p) => {
+    purchaseReturn.forEach((pr) => {
+      const p = partiesById[pr.vendor_id] || null;
+      console.log("purchaseReturn party lookup", {
+        id: pr.id,
+        vendor_id: pr.vendor_id,
+        partyFound: !!p,
+      });
       rows.push({
-        date: p.return_date,
-        ...partyField,
-        vch_no: p.return_no,
-        ref_no: p.auto_voucher_no,
-        vch_type: "Purchase Return",
-        debit: Number(p.grand_total),
+        date: pr.return_date,
+        debit: Number(pr.grand_total),
         credit: 0,
+        vendor_customer_id: p?.id || null,
+        name: p?.name_english || null,
+        account_type: p?.account_type || null,
+        account_name: p?.account_name || null,
       });
     });
 
-    // ---------------- 9) ADJUSTMENTS ----------------
+    // ADJUSTMENTS
     const adjustments = await prisma.adjustments.findMany({
       where: { company_id },
     });
-
     adjustments.forEach((a) => {
       rows.push({
         date: a.voucher_date,
-        ...partyField,
-        vch_no: a.voucher_no,
-        ref_no: a.manual_voucher_no,
-        vch_type: "Adjustment",
         debit: Number(a.total_value),
         credit: 0,
+        vendor_customer_id: null,
+        name: null,
+        account_type: null,
+        account_name: null,
       });
     });
 
-    // ---------------- 10) JOURNAL ----------------
+    // JOURNAL / transactions
     const journal = await prisma.transactions.findMany({
       where: { company_id },
     });
-
     journal.forEach((j) => {
       if (Number(j.from_id) === account_id) {
         rows.push({
           date: j.date,
-          ...partyField,
-          vch_no: j.voucher_no,
-          ref_no: j.transaction_id,
-          vch_type: j.voucher_type,
           debit: Number(j.amount),
           credit: 0,
+          vendor_customer_id: null,
+          name: null,
+          account_type: null,
+          account_name: null,
         });
       }
-
       if (Number(j.balance_type) === account_id) {
         rows.push({
           date: j.date,
-          ...partyField,
-          vch_no: j.voucher_no,
-          ref_no: j.transaction_id,
-          vch_type: j.voucher_type,
           debit: 0,
           credit: Number(j.amount),
+          vendor_customer_id: null,
+          name: null,
+          account_type: null,
+          account_name: null,
         });
       }
     });
 
-    // ---------------- SORT & RUNNING BALANCE ----------------
-    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // filter to only rows that are linked to the parties for this account
+    console.log("ledger rows before filter:", rows.length);
+    const filteredRows = rows.filter((r) => r.vendor_customer_id !== null);
+    console.log("ledger rows after party-filter:", filteredRows.length);
 
+    // sort & running balance
+    filteredRows.sort((a, b) => new Date(a.date) - new Date(b.date));
     let running = Number(accountInfo?.accountBalance || 0);
-    rows = rows.map((r) => {
-      running = running + r.credit - r.debit;
+    const ledger = filteredRows.map((r) => {
+      running = running + Number(r.credit || 0) - Number(r.debit || 0);
       return { ...r, running_balance: running.toFixed(2) };
     });
 
-    // ---------------- RESPONSE ----------------
     return res.json({
       success: true,
+      account_id,
       opening_balance: Number(accountInfo?.accountBalance || 0),
       closing_balance: running.toFixed(2),
-      ledger: rows,
+      ledger,
     });
   } catch (err) {
-    console.log(err);
+    console.error("Ledger Error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
