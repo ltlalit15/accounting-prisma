@@ -138,13 +138,13 @@ model parent_accounts {
 }
 
 model sub_of_subgroups {
-  id             Int             @id @default(autoincrement())
-  name           String
-  subgroup_id    Int
-  created_at     DateTime        @default(now())
-  accounts       accounts[]
+  id              Int               @id @default(autoincrement())
+  name            String
+  subgroup_id     Int
+  created_at      DateTime          @default(now())
+  accounts        accounts[]
   vendorscustomer vendorscustomer[]
-  parent_account parent_accounts @relation(fields: [subgroup_id], references: [id])
+  parent_account  parent_accounts   @relation(fields: [subgroup_id], references: [id])
 
   @@index([subgroup_id], map: "sub_of_subgroups_subgroup_id_fkey")
 }
@@ -166,9 +166,6 @@ model accounts {
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
   journal_lines        journal_lines[]   @relation("AccountJournalLines")
   vendorscustomer      vendorscustomer[]
-  
-
-
 
   @@index([company_id])
   @@index([sub_of_subgroup_id])
@@ -205,17 +202,13 @@ model vendorscustomer {
   gstIn               String?
   type                venderCustomertype
   sub_of_subgroup_id  Int?
-  account_id          Int?  
-  
-  
+  account_id          Int?
 
-  created_at          DateTime           @default(now())
-  invoices            pos_invoices[]
-  company             users              @relation(fields: [company_id], references: [id])
-  sub_of_subgroup     sub_of_subgroups?  @relation(fields: [sub_of_subgroup_id], references: [id])
-   account             accounts?          @relation(fields: [account_id], references: [id])
-
- 
+  created_at      DateTime          @default(now())
+  invoices        pos_invoices[]
+  company         users             @relation(fields: [company_id], references: [id])
+  sub_of_subgroup sub_of_subgroups? @relation(fields: [sub_of_subgroup_id], references: [id])
+  account         accounts?         @relation(fields: [account_id], references: [id])
 
   @@index([company_id], map: "vendorscustomer_company_id_fkey")
   @@index([sub_of_subgroup_id], map: "vendorscustomer_sub_of_subgroup_id_fkey")
