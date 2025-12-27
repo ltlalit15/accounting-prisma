@@ -133,13 +133,14 @@ export const createVendor = async (req, res) => {
       enable_gst,
       gstIn,
       type,
-      accounting_id,
+      sub_of_subgroup_id,
+       account_id,
     } = req.body;
 
-    if (!company_id || !name_english || !type || !accounting_id) {
+    if (!company_id || !name_english || !type || !sub_of_subgroup_id ) {
       return res.status(400).json({
         success: false,
-        message: "company_id and name_english accounting_id are required",
+        message: "company_id and name_english sub_of_subgroup_id account_id are required",
       });
     }
 
@@ -165,7 +166,8 @@ export const createVendor = async (req, res) => {
     const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
-        accounting_id: Number(accounting_id),
+        sub_of_subgroup_id: Number(sub_of_subgroup_id), 
+           account_id: Number(account_id), 
         name_english,
         name_arabic,
         company_name,
@@ -448,10 +450,11 @@ export const getVendorById = async (req, res) => {
 export const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    let data = req.body;
+    let data = req.body || {};
 
+    /* ================= FETCH EXISTING ================= */
     const vendor = await prisma.vendorscustomer.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: Number(id) },
     });
 
     if (!vendor) {
@@ -464,32 +467,21 @@ export const updateVendor = async (req, res) => {
     let idCardImageUrl = vendor.id_card_image;
     let anyFileUrl = vendor.any_file;
 
-    // ==========================================
-    // SAFE DATE PARSER
-    // ==========================================
+    /* ================= SAFE DATE ================= */
     const safeDate = (val) => {
       if (!val) return null;
       const d = new Date(val);
       return isNaN(d.getTime()) ? null : d;
     };
-
     data.creation_date = safeDate(data.creation_date);
 
-    // ==========================================
-    // FIX FRONTEND WRONG FIELD NAMES
-    // ==========================================
-
-    // ❌ frontend sent account_balance_type
-    // ✔ prisma needs balance_type
+    /* ================= FIELD FIX ================= */
     if (data.account_balance_type) {
       data.balance_type = data.account_balance_type;
       delete data.account_balance_type;
     }
 
-    // ==========================================
-    // IMAGE HANDLING
-    // ==========================================
-
+    /* ================= IMAGE HANDLING ================= */
     if (req.files?.id_card_image?.[0]) {
       if (vendor.id_card_image) {
         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
@@ -514,42 +506,60 @@ export const updateVendor = async (req, res) => {
       );
     }
 
-    // ==========================================
-    // NUMERIC & BOOLEAN SANITIZATION
-    // ==========================================
+    /* ================= SANITIZATION ================= */
     const numericData = {
-      company_id: data.company_id ? Number(data.company_id) : vendor.company_id,
-      account_balance: data.account_balance
-        ? Number(data.account_balance)
-        : vendor.account_balance,
-      credit_period_days: data.credit_period_days
-        ? Number(data.credit_period_days)
-        : vendor.credit_period_days,
+      account_balance:
+        data.account_balance !== undefined
+          ? Number(data.account_balance)
+          : vendor.account_balance,
+
+      credit_period_days:
+        data.credit_period_days !== undefined
+          ? Number(data.credit_period_days)
+          : vendor.credit_period_days,
 
       enable_gst:
         data.enable_gst === "1" ||
         data.enable_gst === 1 ||
         data.enable_gst === true,
 
-      // ENUM field must be "customer" or "vender"
       type:
         data.type === "customer" || data.type === "vender"
           ? data.type
           : vendor.type,
     };
 
-    // ==========================================
-    // FINAL UPDATE OBJECT
-    // ==========================================
+    /* ================= FINAL UPDATE PAYLOAD ================= */
     const updatePayload = {
       ...data,
       ...numericData,
+
+      // ❌ NEVER update FK columns directly
+      account_id: undefined,
+      company_id: undefined,
+      sub_of_subgroup_id: undefined,
+
       id_card_image: idCardImageUrl,
       any_file: anyFileUrl,
+
+      // ✅ ACCOUNT RELATION UPDATE
+      ...(data.account_id && {
+        account: {
+          connect: { id: Number(data.account_id) },
+        },
+      }),
+
+      // ✅ SUB OF SUBGROUP RELATION UPDATE
+      ...(data.sub_of_subgroup_id && {
+        sub_of_subgroup: {
+          connect: { id: Number(data.sub_of_subgroup_id) },
+        },
+      }),
     };
 
+    /* ================= UPDATE ================= */
     const updatedVendor = await prisma.vendorscustomer.update({
-      where: { id: parseInt(id) },
+      where: { id: Number(id) },
       data: updatePayload,
     });
 
@@ -559,13 +569,15 @@ export const updateVendor = async (req, res) => {
       data: updatedVendor,
     });
   } catch (error) {
-    console.error("Error updating vendor:", error);
+    console.error("❌ Error updating vendor:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
+
 
 export const deleteVendor = async (req, res) => {
   try {

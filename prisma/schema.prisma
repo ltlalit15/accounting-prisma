@@ -143,6 +143,7 @@ model sub_of_subgroups {
   subgroup_id    Int
   created_at     DateTime        @default(now())
   accounts       accounts[]
+  vendorscustomer vendorscustomer[]
   parent_account parent_accounts @relation(fields: [subgroup_id], references: [id])
 
   @@index([subgroup_id], map: "sub_of_subgroups_subgroup_id_fkey")
@@ -165,6 +166,7 @@ model accounts {
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
   journal_lines        journal_lines[]   @relation("AccountJournalLines")
   vendorscustomer      vendorscustomer[]
+  
 
 
 
@@ -202,15 +204,21 @@ model vendorscustomer {
   enable_gst          Boolean?           @default(false)
   gstIn               String?
   type                venderCustomertype
- 
-  account_id          Int?
-  account             accounts?          @relation(fields: [account_id], references: [id])
+  sub_of_subgroup_id  Int?
+  account_id          Int?  
+  
+  
+
   created_at          DateTime           @default(now())
   invoices            pos_invoices[]
   company             users              @relation(fields: [company_id], references: [id])
+  sub_of_subgroup     sub_of_subgroups?  @relation(fields: [sub_of_subgroup_id], references: [id])
+   account             accounts?          @relation(fields: [account_id], references: [id])
+
+ 
 
   @@index([company_id], map: "vendorscustomer_company_id_fkey")
-  
+  @@index([sub_of_subgroup_id], map: "vendorscustomer_sub_of_subgroup_id_fkey")
   @@index([account_id], map: "vendorscustomer_account_id_fkey")
 }
 
