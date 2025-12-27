@@ -620,7 +620,13 @@ export const updateVendor = async (req, res) => {
     }
 
     // Numeric / boolean fields
-    if (data.company_id) updatePayload.company_id = Number(data.company_id);
+// ✅ Relation: company
+if (data.company_id) {
+  updatePayload.company = {
+    connect: { id: Number(data.company_id) },
+  };
+}
+
     if (data.account_balance !== undefined)
       updatePayload.account_balance = Number(data.account_balance);
     if (data.credit_period_days !== undefined)
@@ -653,6 +659,13 @@ export const updateVendor = async (req, res) => {
     if (data.account_id) {
       updatePayload.account = { connect: { id: Number(data.account_id) } };
     }
+
+    // ✅ Relation: sub_of_subgroup
+if (data.sub_of_subgroup_id) {
+  updatePayload.sub_of_subgroup = {
+    connect: { id: Number(data.sub_of_subgroup_id) },
+  };
+}
 
     // 5️⃣ Handle uploaded files
     if (req.files?.id_card_image?.[0]) {
@@ -703,7 +716,7 @@ export const updateVendor = async (req, res) => {
     });
   }
 };
-
+       
 export const deleteVendor = async (req, res) => {
   try {
     const { id } = req.params;

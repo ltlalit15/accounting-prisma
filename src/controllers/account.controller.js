@@ -1070,7 +1070,8 @@ const buildLedgerForAccount = async (account_id, company_id) => {
   let running = Number(accountInfo.accountBalance || 0);
   const ledger = rows.map((r) => {
     running = running + r.credit - r.debit;
-    return { ...r, running_balance: running.toFixed(2) };
+    const { vch_type, ...rest } = r;
+    return { ...rest, running_balance: running.toFixed(2) };
   });
 
   return {
