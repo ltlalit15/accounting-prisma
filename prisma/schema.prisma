@@ -164,6 +164,7 @@ model accounts {
   from_contra_vouchers contra_vouchers[] @relation("from_contra_vouchers")
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
   journal_lines        journal_lines[]   @relation("AccountJournalLines")
+  vendorscustomer      vendorscustomer[]
 
 
 
@@ -201,13 +202,16 @@ model vendorscustomer {
   enable_gst          Boolean?           @default(false)
   gstIn               String?
   type                venderCustomertype
-  accounting_id       Int
+ 
+  account_id          Int?
+  account             accounts?          @relation(fields: [account_id], references: [id])
   created_at          DateTime           @default(now())
   invoices            pos_invoices[]
   company             users              @relation(fields: [company_id], references: [id])
 
   @@index([company_id], map: "vendorscustomer_company_id_fkey")
-  @@index([accounting_id], map: "idx_vendorscustomer_accounting_id")
+  
+  @@index([account_id], map: "vendorscustomer_account_id_fkey")
 }
 
 model transactions {
