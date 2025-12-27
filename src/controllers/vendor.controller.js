@@ -133,13 +133,15 @@ export const createVendor = async (req, res) => {
       enable_gst,
       gstIn,
       type,
-      accounting_id,
+      sub_of_subgroup_id,
+      account_id,
     } = req.body;
 
-    if (!company_id || !name_english || !type || !accounting_id) {
+    if (!company_id || !name_english || !type || !sub_of_subgroup_id) {
       return res.status(400).json({
         success: false,
-        message: "company_id and name_english accounting_id are required",
+        message:
+          "company_id and name_english sub_of_subgroup_id account_id are required",
       });
     }
 
@@ -165,7 +167,8 @@ export const createVendor = async (req, res) => {
     const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
-        accounting_id: Number(accounting_id),
+        sub_of_subgroup_id: Number(sub_of_subgroup_id),
+        account_id: Number(account_id),
         name_english,
         name_arabic,
         company_name,
@@ -576,7 +579,7 @@ export const updateVendor = async (req, res) => {
 
     // 1️⃣ Find existing vendor
     const vendor = await prisma.vendorscustomer.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: Number(id) },
     });
 
     if (!vendor) {
@@ -683,7 +686,7 @@ export const updateVendor = async (req, res) => {
 
     // 7️⃣ Update vendor
     const updatedVendor = await prisma.vendorscustomer.update({
-      where: { id: parseInt(id) },
+      where: { id: Number(id) },
       data: updatePayload,
     });
 
@@ -693,7 +696,7 @@ export const updateVendor = async (req, res) => {
       data: updatedVendor,
     });
   } catch (error) {
-    console.error("Error updating vendor:", error);
+    console.error("❌ Error updating vendor:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
