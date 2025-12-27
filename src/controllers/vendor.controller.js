@@ -134,13 +134,14 @@ export const createVendor = async (req, res) => {
       gstIn,
       type,
       sub_of_subgroup_id,
-       account_id,
+      account_id,
     } = req.body;
 
-    if (!company_id || !name_english || !type || !sub_of_subgroup_id ) {
+    if (!company_id || !name_english || !type || !sub_of_subgroup_id) {
       return res.status(400).json({
         success: false,
-        message: "company_id and name_english sub_of_subgroup_id account_id are required",
+        message:
+          "company_id and name_english sub_of_subgroup_id account_id are required",
       });
     }
 
@@ -150,14 +151,14 @@ export const createVendor = async (req, res) => {
 
     if (req.files?.id_card_image) {
       idCardImageUrl = await uploadToCloudinary(
-        req.files.id_card_image,     // <-- pass whole file object (NOT buffer)
+        req.files.id_card_image, // <-- pass whole file object (NOT buffer)
         "vendorsCustomer/id_cards"
       );
     }
 
     if (req.files?.any_file) {
       anyFileUrl = await uploadToCloudinary(
-        req.files.any_file,          // <-- pass whole file object
+        req.files.any_file, // <-- pass whole file object
         "vendorsCustomer/files"
       );
     }
@@ -166,8 +167,8 @@ export const createVendor = async (req, res) => {
     const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
-        sub_of_subgroup_id: Number(sub_of_subgroup_id), 
-           account_id: Number(account_id), 
+        sub_of_subgroup_id: Number(sub_of_subgroup_id),
+        account_id: Number(account_id),
         name_english,
         name_arabic,
         company_name,
@@ -191,7 +192,9 @@ export const createVendor = async (req, res) => {
         phone,
         email,
         type,
-        credit_period_days: credit_period_days ? parseInt(credit_period_days) : 0,
+        credit_period_days: credit_period_days
+          ? parseInt(credit_period_days)
+          : 0,
         enable_gst: enable_gst === true || enable_gst === "true",
         gstIn,
       },
@@ -447,12 +450,134 @@ export const getVendorById = async (req, res) => {
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
+// export const updateVendor = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     let data = req.body;
+
+//     const vendor = await prisma.vendorscustomer.findUnique({
+//       where: { id: parseInt(id) },
+//     });
+
+//     if (!vendor) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Vendor not found",
+//       });
+//     }
+
+//     let idCardImageUrl = vendor.id_card_image;
+//     let anyFileUrl = vendor.any_file;
+
+//     // ==========================================
+//     // SAFE DATE PARSER
+//     // ==========================================
+//     const safeDate = (val) => {
+//       if (!val) return null;
+//       const d = new Date(val);
+//       return isNaN(d.getTime()) ? null : d;
+//     };
+
+//     data.creation_date = safeDate(data.creation_date);
+
+//     // ==========================================
+//     // FIX FRONTEND WRONG FIELD NAMES
+//     // ==========================================
+
+//     // ❌ frontend sent account_balance_type
+//     // ✔ prisma needs balance_type
+//     if (data.account_balance_type) {
+//       data.balance_type = data.account_balance_type;
+//       delete data.account_balance_type;
+//     }
+
+//     // ==========================================
+//     // IMAGE HANDLING
+//     // ==========================================
+
+//     if (req.files?.id_card_image?.[0]) {
+//       if (vendor.id_card_image) {
+//         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       idCardImageUrl = await uploadToCloudinary(
+//         req.files.id_card_image[0].buffer,
+//         "vendorsCustomer/id_cards"
+//       );
+//     }
+
+//     if (req.files?.any_file?.[0]) {
+//       if (vendor.any_file) {
+//         const publicId = vendor.any_file.split("/").pop().split(".")[0];
+//         await deleteFromCloudinary(publicId);
+//       }
+
+//       anyFileUrl = await uploadToCloudinary(
+//         req.files.any_file[0].buffer,
+//         "vendorsCustomer/files"
+//       );
+//     }
+
+//     // ==========================================
+//     // NUMERIC & BOOLEAN SANITIZATION
+//     // ==========================================
+//     const numericData = {
+//       company_id: data.company_id ? Number(data.company_id) : vendor.company_id,
+//       account_balance: data.account_balance
+//         ? Number(data.account_balance)
+//         : vendor.account_balance,
+//       credit_period_days: data.credit_period_days
+//         ? Number(data.credit_period_days)
+//         : vendor.credit_period_days,
+
+//       enable_gst:
+//         data.enable_gst === "1" ||
+//         data.enable_gst === 1 ||
+//         data.enable_gst === true,
+
+//       // ENUM field must be "customer" or "vender"
+//       type:
+//         data.type === "customer" || data.type === "vender"
+//           ? data.type
+//           : vendor.type,
+//     };
+
+//     // ==========================================
+//     // FINAL UPDATE OBJECT
+//     // ==========================================
+//     const updatePayload = {
+//       ...data,
+//       ...numericData,
+//       id_card_image: idCardImageUrl,
+//       any_file: anyFileUrl,
+//     };
+
+//     const updatedVendor = await prisma.vendorscustomer.update({
+//       where: { id: parseInt(id) },
+//       data: updatePayload,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Vendor updated successfully",
+//       data: updatedVendor,
+//     });
+//   } catch (error) {
+//     console.error("Error updating vendor:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
 export const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    let data = req.body || {};
+    const data = req.body;
 
-    /* ================= FETCH EXISTING ================= */
+    // 1️⃣ Find existing vendor
     const vendor = await prisma.vendorscustomer.findUnique({
       where: { id: Number(id) },
     });
@@ -467,31 +592,79 @@ export const updateVendor = async (req, res) => {
     let idCardImageUrl = vendor.id_card_image;
     let anyFileUrl = vendor.any_file;
 
-    /* ================= SAFE DATE ================= */
+    // 2️⃣ Helper for safe date parsing
     const safeDate = (val) => {
-      if (!val) return null;
+      if (!val) return undefined;
       const d = new Date(val);
-      return isNaN(d.getTime()) ? null : d;
+      return isNaN(d.getTime()) ? undefined : d;
     };
-    data.creation_date = safeDate(data.creation_date);
 
-    /* ================= FIELD FIX ================= */
-    if (data.account_balance_type) {
-      data.balance_type = data.account_balance_type;
-      delete data.account_balance_type;
+    // 3️⃣ Build update payload only for provided fields
+    const updatePayload = {};
+
+    // Text fields
+    if (data.name_english) updatePayload.name_english = data.name_english;
+    if (data.name_arabic) updatePayload.name_arabic = data.name_arabic;
+    if (data.company_name) updatePayload.company_name = data.company_name;
+    if (data.google_location)
+      updatePayload.google_location = data.google_location;
+    if (data.account_type) updatePayload.account_type = data.account_type;
+    if (data.account_name) updatePayload.account_name = data.account_name;
+    if (data.balance_type || data.account_balance_type) {
+      updatePayload.balance_type =
+        data.balance_type || data.account_balance_type;
+    }
+    if (data.gstin) updatePayload.gstIn = data.gstin;
+    if (data.type && (data.type === "customer" || data.type === "vender")) {
+      updatePayload.type = data.type;
     }
 
-    /* ================= IMAGE HANDLING ================= */
+    // Numeric / boolean fields
+    if (data.company_id) updatePayload.company_id = Number(data.company_id);
+    if (data.account_balance !== undefined)
+      updatePayload.account_balance = Number(data.account_balance);
+    if (data.credit_period_days !== undefined)
+      updatePayload.credit_period_days = Number(data.credit_period_days);
+    if (data.enable_gst !== undefined) {
+      updatePayload.enable_gst =
+        data.enable_gst === "1" ||
+        data.enable_gst === 1 ||
+        data.enable_gst === true;
+    }
+    if (data.creation_date)
+      updatePayload.creation_date = safeDate(data.creation_date);
+
+    if (data.bank_account_number)
+      updatePayload.bank_account_number = data.bank_account_number;
+    if (data.bank_ifsc) updatePayload.bank_ifsc = data.bank_ifsc;
+    if (data.bank_name_branch)
+      updatePayload.bank_name_branch = data.bank_name_branch;
+    if (data.country) updatePayload.country = data.country;
+    if (data.state) updatePayload.state = data.state;
+    if (data.pincode) updatePayload.pincode = data.pincode;
+    if (data.address) updatePayload.address = data.address;
+    if (data.state_code) updatePayload.state_code = data.state_code;
+    if (data.shipping_address)
+      updatePayload.shipping_address = data.shipping_address;
+    if (data.phone) updatePayload.phone = data.phone;
+    if (data.email) updatePayload.email = data.email;
+
+    // 4️⃣ Relation: account
+    if (data.account_id) {
+      updatePayload.account = { connect: { id: Number(data.account_id) } };
+    }
+
+    // 5️⃣ Handle uploaded files
     if (req.files?.id_card_image?.[0]) {
       if (vendor.id_card_image) {
         const publicId = vendor.id_card_image.split("/").pop().split(".")[0];
         await deleteFromCloudinary(publicId);
       }
-
       idCardImageUrl = await uploadToCloudinary(
         req.files.id_card_image[0].buffer,
         "vendorsCustomer/id_cards"
       );
+      updatePayload.id_card_image = idCardImageUrl;
     }
 
     if (req.files?.any_file?.[0]) {
@@ -499,65 +672,19 @@ export const updateVendor = async (req, res) => {
         const publicId = vendor.any_file.split("/").pop().split(".")[0];
         await deleteFromCloudinary(publicId);
       }
-
       anyFileUrl = await uploadToCloudinary(
         req.files.any_file[0].buffer,
         "vendorsCustomer/files"
       );
+      updatePayload.any_file = anyFileUrl;
     }
 
-    /* ================= SANITIZATION ================= */
-    const numericData = {
-      account_balance:
-        data.account_balance !== undefined
-          ? Number(data.account_balance)
-          : vendor.account_balance,
+    // 6️⃣ Remove undefined keys just in case
+    Object.keys(updatePayload).forEach(
+      (key) => updatePayload[key] === undefined && delete updatePayload[key]
+    );
 
-      credit_period_days:
-        data.credit_period_days !== undefined
-          ? Number(data.credit_period_days)
-          : vendor.credit_period_days,
-
-      enable_gst:
-        data.enable_gst === "1" ||
-        data.enable_gst === 1 ||
-        data.enable_gst === true,
-
-      type:
-        data.type === "customer" || data.type === "vender"
-          ? data.type
-          : vendor.type,
-    };
-
-    /* ================= FINAL UPDATE PAYLOAD ================= */
-    const updatePayload = {
-      ...data,
-      ...numericData,
-
-      // ❌ NEVER update FK columns directly
-      account_id: undefined,
-      company_id: undefined,
-      sub_of_subgroup_id: undefined,
-
-      id_card_image: idCardImageUrl,
-      any_file: anyFileUrl,
-
-      // ✅ ACCOUNT RELATION UPDATE
-      ...(data.account_id && {
-        account: {
-          connect: { id: Number(data.account_id) },
-        },
-      }),
-
-      // ✅ SUB OF SUBGROUP RELATION UPDATE
-      ...(data.sub_of_subgroup_id && {
-        sub_of_subgroup: {
-          connect: { id: Number(data.sub_of_subgroup_id) },
-        },
-      }),
-    };
-
-    /* ================= UPDATE ================= */
+    // 7️⃣ Update vendor
     const updatedVendor = await prisma.vendorscustomer.update({
       where: { id: Number(id) },
       data: updatePayload,
@@ -576,8 +703,6 @@ export const updateVendor = async (req, res) => {
     });
   }
 };
-
-
 
 export const deleteVendor = async (req, res) => {
   try {
@@ -1101,278 +1226,287 @@ export const getVendorLedger = async (req, res) => {
     // Match the route param names
     const { vendor_id, company_id } = req.params;
 
-   const vendorId = Number(vendor_id);
-const companyId = Number(company_id);
+    const vendorId = Number(vendor_id);
+    const companyId = Number(company_id);
 
-if (isNaN(vendorId) || isNaN(companyId)) {
-  return res.status(400).json({ message: "Invalid vendor or company ID" });
-}
-
-// Vendor Details
-const vendor = await prisma.vendorscustomer.findUnique({
-  where: { id: vendorId },
-  include: {
-    company: {
-      select: {
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        company_logo_url: true
-      }
+    if (isNaN(vendorId) || isNaN(companyId)) {
+      return res.status(400).json({ message: "Invalid vendor or company ID" });
     }
-  }
-});
 
-if (!vendor) {
-  return res.status(404).json({ message: "Vendor not found" });
-}
+    // Vendor Details
+    const vendor = await prisma.vendorscustomer.findUnique({
+      where: { id: vendorId },
+      include: {
+        company: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            company_logo_url: true,
+          },
+        },
+      },
+    });
 
-// Fetch Transactions
-const [purchases, purchaseReturns, payments] = await Promise.all([
-  prisma.purchaseorder.findMany({
-    where: {
-      company_id: companyId,
-      bill_to_vendor_name: vendor.name_english
-    },
-    include: { purchaseorderitems: true }
-  }),
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
 
-  prisma.purchase_return.findMany({
-    where: {
-      company_id: companyId,
-      vendor_id: vendorId
-    },
-    include: { purchase_return_items: true }
-  }),
+    // Fetch Transactions
+    const [purchases, purchaseReturns, payments] = await Promise.all([
+      prisma.purchaseorder.findMany({
+        where: {
+          company_id: companyId,
+          bill_to_vendor_name: vendor.name_english,
+        },
+        include: { purchaseorderitems: true },
+      }),
 
-  prisma.expensevouchers.findMany({
-    where: {
-      company_id: companyId,
-      expensevoucher_items: { some: { vendor_id: vendorId } }
-    },
-    include: { expensevoucher_items: true }
-  })
-]);
+      prisma.purchase_return.findMany({
+        where: {
+          company_id: companyId,
+          vendor_id: vendorId,
+        },
+        include: { purchase_return_items: true },
+      }),
 
-// Build Transaction List
-const transactions = [];
-let runningBalance = 0;
+      prisma.expensevouchers.findMany({
+        where: {
+          company_id: companyId,
+          expensevoucher_items: { some: { vendor_id: vendorId } },
+        },
+        include: { expensevoucher_items: true },
+      }),
+    ]);
 
-// Opening Balance – FIXED VERSION (No Hard Code)
-if (vendor.account_balance && vendor.account_balance !== 0) {
-  const amt = vendor.account_balance;
-  const type = vendor.balance_type === "Dr" ? "Dr" : "Cr";
+    // Build Transaction List
+    const transactions = [];
+    let runningBalance = 0;
 
-  runningBalance = type === "Cr" ? amt : -amt;
+    // Opening Balance – FIXED VERSION (No Hard Code)
+    if (vendor.account_balance && vendor.account_balance !== 0) {
+      const amt = vendor.account_balance;
+      const type = vendor.balance_type === "Dr" ? "Dr" : "Cr";
 
-  transactions.push({
-    date: vendor.creation_date || vendor.created_at,
-    particulars: "Opening Balance",
-    vch_no: null,                         // FIXED
-    vch_type: "Opening",                  // Not a number, valid
-    debit: type === "Dr" ? amt : 0,
-    credit: type === "Cr" ? amt : 0,
-    balance: runningBalance,
-    narration: vendor.notes || "Opening balance",
-    items: []
-  });
-}
+      runningBalance = type === "Cr" ? amt : -amt;
 
-// Purchases
-purchases.forEach(po => {
-  const total = po.total.toNumber();
-  runningBalance += total;
+      transactions.push({
+        date: vendor.creation_date || vendor.created_at,
+        particulars: "Opening Balance",
+        vch_no: null, // FIXED
+        vch_type: "Opening", // Not a number, valid
+        debit: type === "Dr" ? amt : 0,
+        credit: type === "Cr" ? amt : 0,
+        balance: runningBalance,
+        narration: vendor.notes || "Opening balance",
+        items: [],
+      });
+    }
 
-  transactions.push({
-    date: po.created_at,
-    particulars: `Purchase Invoice ${po.PO_no}`,
-    vch_no: po.PO_no,
-    vch_type: "Purchase",
-    debit: total,
-    credit: 0,
-    balance: runningBalance,
-    narration: po.notes|| "",
-    items: po.purchaseorderitems.map(i => ({
-      item_name: i.item_name,
-      quantity: i.qty.toNumber(),
-      rate: i.rate.toNumber(),
-      discount: i.discount?.toNumber() || 0,
-      tax_percent: i.tax_percent?.toNumber() || 0,
-      tax_amount: 0,
-      value: i.amount.toNumber(),
-      description: i.description || ""
-    }))
-  });
-});
+    // Purchases
+    purchases.forEach((po) => {
+      const total = po.total.toNumber();
+      runningBalance += total;
 
-// Purchase Return (Credit)
-purchaseReturns.forEach(pr => {
-  const total = pr.grand_total.toNumber();
-  runningBalance -= total;
+      transactions.push({
+        date: po.created_at,
+        particulars: `Purchase Invoice ${po.PO_no}`,
+        vch_no: po.PO_no,
+        vch_type: "Purchase",
+        debit: total,
+        credit: 0,
+        balance: runningBalance,
+        narration: po.notes || "",
+        items: po.purchaseorderitems.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.qty.toNumber(),
+          rate: i.rate.toNumber(),
+          discount: i.discount?.toNumber() || 0,
+          tax_percent: i.tax_percent?.toNumber() || 0,
+          tax_amount: 0,
+          value: i.amount.toNumber(),
+          description: i.description || "",
+        })),
+      });
+    });
 
-  transactions.push({
-    date: pr.return_date,
-    particulars: `Purchase Return ${pr.return_no}`,
-    vch_no: pr.return_no,
-    vch_type: "Return",
-    debit: 0,
-    credit: total,
-    balance: runningBalance,
-    narration: pr.reason_for_return || "",
-    items: pr.purchase_return_items.map(i => ({
-      item_name: i.item_name,
-      quantity: i.quantity.toNumber(),
-      rate: i.rate.toNumber(),
-      discount: i.discount?.toNumber() || 0,
-      tax_percent: i.tax_percent?.toNumber() || 0,
-      tax_amount: 0,
-      value: i.amount.toNumber(),
-      description: i.narration || ""
-    }))
-  });
-});
+    // Purchase Return (Credit)
+    purchaseReturns.forEach((pr) => {
+      const total = pr.grand_total.toNumber();
+      runningBalance -= total;
 
-// Payments (Credit)
-payments.forEach(pay => {
-  const total = pay.total_amount?.toNumber() || 0;
-  runningBalance -= total;
+      transactions.push({
+        date: pr.return_date,
+        particulars: `Purchase Return ${pr.return_no}`,
+        vch_no: pr.return_no,
+        vch_type: "Return",
+        debit: 0,
+        credit: total,
+        balance: runningBalance,
+        narration: pr.reason_for_return || "",
+        items: pr.purchase_return_items.map((i) => ({
+          item_name: i.item_name,
+          quantity: i.quantity.toNumber(),
+          rate: i.rate.toNumber(),
+          discount: i.discount?.toNumber() || 0,
+          tax_percent: i.tax_percent?.toNumber() || 0,
+          tax_amount: 0,
+          value: i.amount.toNumber(),
+          description: i.narration || "",
+        })),
+      });
+    });
 
-  transactions.push({
-    date: pay.voucher_date,
-    particulars: "Payment Made",
-    vch_no: pay.auto_receipt_no,
-    vch_type: "Payment",
-    debit: 0,
-    credit: total,
-    balance: runningBalance,
-    narration: pay.narration || "",
-    items: []
-  });
-});
+    // Payments (Credit)
+    payments.forEach((pay) => {
+      const total = pay.total_amount?.toNumber() || 0;
+      runningBalance -= total;
 
-// Sort Transactions
-transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+      transactions.push({
+        date: pay.voucher_date,
+        particulars: "Payment Made",
+        vch_no: pay.auto_receipt_no,
+        vch_type: "Payment",
+        debit: 0,
+        credit: total,
+        balance: runningBalance,
+        narration: pay.narration || "",
+        items: [],
+      });
+    });
 
-//
-const [
-  receipts,
-  salesReturns,
-  stockTransfers,
-  stockAdjustments,
-  bankingVouchers,
-  journalVouchers
-] = await Promise.all([
-  prisma.income_vouchers.count({
-    where: { company_id: companyId, received_from: vendorId }
-  }),
-  prisma.sales_return.count({
-    where: { company_id: companyId, customer_id: vendorId }
-  }),
-  prisma.transfers.count({
-    where: { company_id: companyId }
-  }),
-  prisma.adjustments.count({
-    where: { company_id: companyId }
-  }),
-  prisma.contra_vouchers.count({
-    where: { company_id: companyId }
-  }),
-  prisma.vouchers.count({
-    where: { company_id: companyId, voucher_type: "Journal" }
-  })
-]);
+    // Sort Transactions
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-// Transaction Summary
-const summary = {
-  opening_balance: vendor.account_balance ? 1 : 0,
-  purchase: purchases.length,
-  payment: payments.length,
-  purchase_return: purchaseReturns.length,
-  receipt: receipts,
-  sales_return: salesReturns,
-  manufacturing: 0, // No manufacturing table exists
-  stock_journal: stockTransfers,
-  stock_adjustment: stockAdjustments,
-  banking: bankingVouchers,
-  journal: journalVouchers
-};
-summary.total_transactions = Object.values(summary).reduce((a, b) => a + b, 0);
+    //
+    const [
+      receipts,
+      salesReturns,
+      stockTransfers,
+      stockAdjustments,
+      bankingVouchers,
+      journalVouchers,
+    ] = await Promise.all([
+      prisma.income_vouchers.count({
+        where: { company_id: companyId, received_from: vendorId },
+      }),
+      prisma.sales_return.count({
+        where: { company_id: companyId, customer_id: vendorId },
+      }),
+      prisma.transfers.count({
+        where: { company_id: companyId },
+      }),
+      prisma.adjustments.count({
+        where: { company_id: companyId },
+      }),
+      prisma.contra_vouchers.count({
+        where: { company_id: companyId },
+      }),
+      prisma.vouchers.count({
+        where: { company_id: companyId, voucher_type: "Journal" },
+      }),
+    ]);
 
-// Ledger Summary Cards
-const totalPurchase = purchases.reduce((a, b) => a + b.total.toNumber(), 0);
-const totalReturn = purchaseReturns.reduce((a, b) => a + b.grand_total.toNumber(), 0);
-const totalPayment = payments.reduce((a, b) => a + (b.total_amount?.toNumber() || 0), 0);
+    // Transaction Summary
+    const summary = {
+      opening_balance: vendor.account_balance ? 1 : 0,
+      purchase: purchases.length,
+      payment: payments.length,
+      purchase_return: purchaseReturns.length,
+      receipt: receipts,
+      sales_return: salesReturns,
+      manufacturing: 0, // No manufacturing table exists
+      stock_journal: stockTransfers,
+      stock_adjustment: stockAdjustments,
+      banking: bankingVouchers,
+      journal: journalVouchers,
+    };
+    summary.total_transactions = Object.values(summary).reduce(
+      (a, b) => a + b,
+      0
+    );
 
-const initialBalance = vendor.balance_type === "Cr"
-  ? vendor.account_balance
-  : -vendor.account_balance;
+    // Ledger Summary Cards
+    const totalPurchase = purchases.reduce((a, b) => a + b.total.toNumber(), 0);
+    const totalReturn = purchaseReturns.reduce(
+      (a, b) => a + b.grand_total.toNumber(),
+      0
+    );
+    const totalPayment = payments.reduce(
+      (a, b) => a + (b.total_amount?.toNumber() || 0),
+      0
+    );
 
-const closing = initialBalance + totalPurchase - (totalPayment + totalReturn);
-// ===== NEW SUMMARY BLOCKS (INSERTED AFTER ledgerSummary) =====
+    const initialBalance =
+      vendor.balance_type === "Cr"
+        ? vendor.account_balance
+        : -vendor.account_balance;
 
-// Opening Balance Info
-const openingBalanceAmt = vendor.account_balance || 0;
-const openingBalanceType = vendor.balance_type === "Dr" ? "Dr" : "Cr";
+    const closing =
+      initialBalance + totalPurchase - (totalPayment + totalReturn);
+    // ===== NEW SUMMARY BLOCKS (INSERTED AFTER ledgerSummary) =====
 
-// Current Balance
-const currentBalanceAmt = Math.abs(closing);
-const currentBalanceType = closing >= 0 ? "Cr" : "Dr";
+    // Opening Balance Info
+    const openingBalanceAmt = vendor.account_balance || 0;
+    const openingBalanceType = vendor.balance_type === "Dr" ? "Dr" : "Cr";
 
-// Outstanding Balance (same as closing balance)
-const outstandingBalanceAmt = currentBalanceAmt;
-const outstandingBalanceType = currentBalanceType;
+    // Current Balance
+    const currentBalanceAmt = Math.abs(closing);
+    const currentBalanceType = closing >= 0 ? "Cr" : "Dr";
 
-// Description Summary Table (for top table UI)
-const description_summary = [
-  {
-    description: "Opening Balance",
-    amount: openingBalanceAmt,
-    type: openingBalanceType
-  },
-  {
-    description: "Total Purchases (Cr)",
-    amount: totalPurchase,
-    type: "Cr"
-  },
-  {
-    description: "Total Payments (Dr)",
-    amount: totalPayment,
-    type: "Dr"
-  },
-  {
-    description: "Current Balance",
-    amount: currentBalanceAmt,
-    type: currentBalanceType
-  }
-];
+    // Outstanding Balance (same as closing balance)
+    const outstandingBalanceAmt = currentBalanceAmt;
+    const outstandingBalanceType = currentBalanceType;
 
-const ledgerSummary = {
-  total_purchases: totalPurchase,
-  total_payments: totalPayment,
-  outstanding_balance: {
-    amount: outstandingBalanceAmt,
-    type: outstandingBalanceType
-  },
-  total_returns: totalReturn,
-  balance: Math.abs(closing),
-  balance_type: closing >= 0 ? "Cr" : "Dr"
-};
+    // Description Summary Table (for top table UI)
+    const description_summary = [
+      {
+        description: "Opening Balance",
+        amount: openingBalanceAmt,
+        type: openingBalanceType,
+      },
+      {
+        description: "Total Purchases (Cr)",
+        amount: totalPurchase,
+        type: "Cr",
+      },
+      {
+        description: "Total Payments (Dr)",
+        amount: totalPayment,
+        type: "Dr",
+      },
+      {
+        description: "Current Balance",
+        amount: currentBalanceAmt,
+        type: currentBalanceType,
+      },
+    ];
 
-return res.status(200).json({
-  vendor,
-  transactions,
-  transaction_summary: summary,
-  ledger_summary: ledgerSummary,
-   description_summary,
-  
-});
+    const ledgerSummary = {
+      total_purchases: totalPurchase,
+      total_payments: totalPayment,
+      outstanding_balance: {
+        amount: outstandingBalanceAmt,
+        type: outstandingBalanceType,
+      },
+      total_returns: totalReturn,
+      balance: Math.abs(closing),
+      balance_type: closing >= 0 ? "Cr" : "Dr",
+    };
+
+    return res.status(200).json({
+      vendor,
+      transactions,
+      transaction_summary: summary,
+      ledger_summary: ledgerSummary,
+      description_summary,
+    });
   } catch (error) {
     console.error("Error fetching vendor ledger:", error);
     res.status(500).json({ message: "Internal server error", error });
   }
 };
-
 
 // export const getCustomerLedger = async (req, res) => {
 //   try {
@@ -1560,7 +1694,6 @@ return res.status(200).json({
 //   }
 // };
 
-
 // export const getCustomerLedger = async (req, res) => {
 //   try {
 //     // Match the route param names
@@ -1721,7 +1854,6 @@ return res.status(200).json({
 //   }
 // };
 
-
 // customerLedger.controller.js
 
 export const getCustomerLedger = async (req, res) => {
@@ -1730,205 +1862,230 @@ export const getCustomerLedger = async (req, res) => {
     const customerId = Number(customer_id);
     const companyId = Number(company_id);
 
-   if (isNaN(customerId) || isNaN(companyId)) {
-  return res.status(400).json({ message: "Invalid customer or company ID" })
-}
-
-// CUSTOMER DETAILS
-const customer = await prisma.vendorscustomer.findUnique({
-  where: { id: customerId },
-  include: {
-    company: {
-      select: {
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        company_logo_url: true
-      }
+    if (isNaN(customerId) || isNaN(companyId)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid customer or company ID" });
     }
-  }
-})
 
-if (!customer) {
-  return res.status(404).json({ message: "Customer not found" })
-}
+    // CUSTOMER DETAILS
+    const customer = await prisma.vendorscustomer.findUnique({
+      where: { id: customerId },
+      include: {
+        company: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            company_logo_url: true,
+          },
+        },
+      },
+    });
 
-// FETCH DOCUMENTS
-const [
-  invoices,
-  salesReturns,
-  receipts,
-  journalVouchersCount,
-  contraCount,
-  adjustmentsCount
-] = await Promise.all([
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
 
-  prisma.pos_invoices.findMany({
-    where: { company_id: companyId, customer_id: customerId },
-    include: { products: { include: { product: true } } }
-  }),
+    // FETCH DOCUMENTS
+    const [
+      invoices,
+      salesReturns,
+      receipts,
+      journalVouchersCount,
+      contraCount,
+      adjustmentsCount,
+    ] = await Promise.all([
+      prisma.pos_invoices.findMany({
+        where: { company_id: companyId, customer_id: customerId },
+        include: { products: { include: { product: true } } },
+      }),
 
-  prisma.sales_return.findMany({
-    where: { company_id: companyId, customer_id: customerId },
-    include: { sales_return_items: true }
-  }),
+      prisma.sales_return.findMany({
+        where: { company_id: companyId, customer_id: customerId },
+        include: { sales_return_items: true },
+      }),
 
-  prisma.income_vouchers.findMany({
-    where: { company_id: companyId, received_from: customerId },
-    include: { income_voucher_entries: true }
-  }),
+      prisma.income_vouchers.findMany({
+        where: { company_id: companyId, received_from: customerId },
+        include: { income_voucher_entries: true },
+      }),
 
-  prisma.vouchers.count({ where: { company_id: companyId, voucher_type: "Journal" } }),
-  prisma.contra_vouchers.count({ where: { company_id: companyId } }),
-  prisma.adjustments.count({ where: { company_id: companyId } })
-])
+      prisma.vouchers.count({
+        where: { company_id: companyId, voucher_type: "Journal" },
+      }),
+      prisma.contra_vouchers.count({ where: { company_id: companyId } }),
+      prisma.adjustments.count({ where: { company_id: companyId } }),
+    ]);
 
-const entries = []
+    const entries = [];
 
-// OPENING BALANCE
-if (customer.account_balance && customer.account_balance !== 0) {
-  const amt = Number(customer.account_balance)
-  const type = customer.balance_type === "Dr" ? "Dr" : "Cr"
-  entries.push({
-    date: customer.creation_date || customer.created_at,
-    particulars: "Opening Balance",
-    vch_no: "--",
-    vch_type: "Opening",
-    debit: type === "Dr" ? amt : 0,
-    credit: type === "Cr" ? amt : 0,
-    narration: customer.notes || "",
-    items: []
-  })
-}
+    // OPENING BALANCE
+    if (customer.account_balance && customer.account_balance !== 0) {
+      const amt = Number(customer.account_balance);
+      const type = customer.balance_type === "Dr" ? "Dr" : "Cr";
+      entries.push({
+        date: customer.creation_date || customer.created_at,
+        particulars: "Opening Balance",
+        vch_no: "--",
+        vch_type: "Opening",
+        debit: type === "Dr" ? amt : 0,
+        credit: type === "Cr" ? amt : 0,
+        narration: customer.notes || "",
+        items: [],
+      });
+    }
 
-// SALES INVOICE (CREDIT)
-invoices.forEach(inv => {
-  const total = Number(inv.total)
-  entries.push({
-    date: inv.created_at,
-    particulars: `Sales Invoice ${inv.invoice_no || inv.id}`,
-    vch_no: inv.invoice_no || inv.id,
-    vch_type: "Sales",
-    debit: 0,
-    credit: total,
-    narration: inv.payment_status || "",
-    items: inv.products.map(p => ({
-      item_name: p.product?.item_name || p.item_name || "",
-      quantity: Number(p.quantity),
-      rate: Number(p.price),
-      discount: 0,
-      tax_percent: 0,
-      tax_amount: 0,
-      value: Number(p.price) * Number(p.quantity),
-      description: ""
-    }))
-  })
-})
+    // SALES INVOICE (CREDIT)
+    invoices.forEach((inv) => {
+      const total = Number(inv.total);
+      entries.push({
+        date: inv.created_at,
+        particulars: `Sales Invoice ${inv.invoice_no || inv.id}`,
+        vch_no: inv.invoice_no || inv.id,
+        vch_type: "Sales",
+        debit: 0,
+        credit: total,
+        narration: inv.payment_status || "",
+        items: inv.products.map((p) => ({
+          item_name: p.product?.item_name || p.item_name || "",
+          quantity: Number(p.quantity),
+          rate: Number(p.price),
+          discount: 0,
+          tax_percent: 0,
+          tax_amount: 0,
+          value: Number(p.price) * Number(p.quantity),
+          description: "",
+        })),
+      });
+    });
 
-// SALES RETURN (DEBIT)
-salesReturns.forEach(sr => {
-  const total = Number(sr.grand_total)
-  entries.push({
-    date: sr.return_date,
-    particulars: `Return ${sr.return_no}`,
-    vch_no: sr.return_no,
-    vch_type: "Sales Return",
-    debit: total,
-    credit: 0,
-    narration: sr.reason_for_return || "",
-    items: sr.sales_return_items.map(i => ({
-      item_name: i.item_name,
-      quantity: Number(i.quantity),
-      rate: Number(i.rate),
-      discount: Number(i.discount || 0),
-      tax_percent: Number(i.tax_percent || 0),
-      tax_amount: (Number(i.quantity) * Number(i.rate) * Number(i.tax_percent)) / 100,
-      value: Number(i.amount),
-      description: i.narration || ""
-    }))
-  })
-})
+    // SALES RETURN (DEBIT)
+    salesReturns.forEach((sr) => {
+      const total = Number(sr.grand_total);
+      entries.push({
+        date: sr.return_date,
+        particulars: `Return ${sr.return_no}`,
+        vch_no: sr.return_no,
+        vch_type: "Sales Return",
+        debit: total,
+        credit: 0,
+        narration: sr.reason_for_return || "",
+        items: sr.sales_return_items.map((i) => ({
+          item_name: i.item_name,
+          quantity: Number(i.quantity),
+          rate: Number(i.rate),
+          discount: Number(i.discount || 0),
+          tax_percent: Number(i.tax_percent || 0),
+          tax_amount:
+            (Number(i.quantity) * Number(i.rate) * Number(i.tax_percent)) / 100,
+          value: Number(i.amount),
+          description: i.narration || "",
+        })),
+      });
+    });
 
-// RECEIPTS (DEBIT)
-receipts.forEach(rc => {
-  const total = Number(rc.total_amount)
-  entries.push({
-    date: rc.voucher_date,
-    particulars: "Payment / Receipt",
-    vch_no: rc.auto_receipt_no,
-    vch_type: "Receipt",
-    debit: total,
-    credit: 0,
-    narration: rc.narration || "",
-    items: []
-  })
-})
+    // RECEIPTS (DEBIT)
+    receipts.forEach((rc) => {
+      const total = Number(rc.total_amount);
+      entries.push({
+        date: rc.voucher_date,
+        particulars: "Payment / Receipt",
+        vch_no: rc.auto_receipt_no,
+        vch_type: "Receipt",
+        debit: total,
+        credit: 0,
+        narration: rc.narration || "",
+        items: [],
+      });
+    });
 
-// SORT TRANSACTIONS
-entries.sort((a, b) => new Date(a.date) - new Date(b.date))
+    // SORT TRANSACTIONS
+    entries.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-// RUNNING BALANCE
-let runningBalance = 0
-const transactions = entries.map(e => {
-  const debit = Number(e.debit || 0)
-  const credit = Number(e.credit || 0)
+    // RUNNING BALANCE
+    let runningBalance = 0;
+    const transactions = entries.map((e) => {
+      const debit = Number(e.debit || 0);
+      const credit = Number(e.credit || 0);
 
-  runningBalance = runningBalance + debit - credit
+      runningBalance = runningBalance + debit - credit;
 
-  return {
-    ...e,
-    balance: Math.abs(runningBalance),
-    balance_type: runningBalance >= 0 ? "Dr" : "Cr"
-  }
-})
+      return {
+        ...e,
+        balance: Math.abs(runningBalance),
+        balance_type: runningBalance >= 0 ? "Dr" : "Cr",
+      };
+    });
 
-// TOTALS
-const totalDebit = transactions.reduce((s, t) => s + Number(t.debit || 0), 0)
-const totalCredit = transactions.reduce((s, t) => s + Number(t.credit || 0), 0)
+    // TOTALS
+    const totalDebit = transactions.reduce(
+      (s, t) => s + Number(t.debit || 0),
+      0
+    );
+    const totalCredit = transactions.reduce(
+      (s, t) => s + Number(t.credit || 0),
+      0
+    );
 
-// CURRENT BALANCE
-const currentBalanceAmt = Math.abs(runningBalance)
-const currentBalanceType = runningBalance >= 0 ? "Dr" : "Cr"
+    // CURRENT BALANCE
+    const currentBalanceAmt = Math.abs(runningBalance);
+    const currentBalanceType = runningBalance >= 0 ? "Dr" : "Cr";
 
-// TRANSACTION SUMMARY
-const transaction_summary = {
-  opening_balance: customer.account_balance ? 1 : 0,
-  sales: invoices.length,
-  receipt: receipts.length,
-  sales_return: salesReturns.length,
-  journal: journalVouchersCount,
-  contra: contraCount,
-  adjustments: adjustmentsCount,
-  total_transactions: customer.account_balance ? 1 + invoices.length + receipts.length + salesReturns.length : invoices.length + receipts.length + salesReturns.length
-}
+    // TRANSACTION SUMMARY
+    const transaction_summary = {
+      opening_balance: customer.account_balance ? 1 : 0,
+      sales: invoices.length,
+      receipt: receipts.length,
+      sales_return: salesReturns.length,
+      journal: journalVouchersCount,
+      contra: contraCount,
+      adjustments: adjustmentsCount,
+      total_transactions: customer.account_balance
+        ? 1 + invoices.length + receipts.length + salesReturns.length
+        : invoices.length + receipts.length + salesReturns.length,
+    };
 
-// DESCRIPTION SUMMARY (TOP TABLE)
-const description_summary = [
-  { description: "Opening Balance", amount: Number(customer.account_balance || 0), type: customer.balance_type || "Dr" },
-  { description: "Total Debit", amount: totalDebit, type: "Dr" },
-  { description: "Total Credit", amount: totalCredit, type: "Cr" },
-  { description: "Current Balance", amount: currentBalanceAmt, type: currentBalanceType }
-]
+    // DESCRIPTION SUMMARY (TOP TABLE)
+    const description_summary = [
+      {
+        description: "Opening Balance",
+        amount: Number(customer.account_balance || 0),
+        type: customer.balance_type || "Dr",
+      },
+      { description: "Total Debit", amount: totalDebit, type: "Dr" },
+      { description: "Total Credit", amount: totalCredit, type: "Cr" },
+      {
+        description: "Current Balance",
+        amount: currentBalanceAmt,
+        type: currentBalanceType,
+      },
+    ];
 
-// LEDGER SUMMARY (CARD)
-const ledger_summary = {
-  total_debit: totalDebit,
-  total_credit: totalCredit,
-  outstanding_balance: { amount: currentBalanceAmt, type: currentBalanceType },
-  balance: currentBalanceAmt,
-  balance_type: currentBalanceType
-}
+    // LEDGER SUMMARY (CARD)
+    const ledger_summary = {
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      outstanding_balance: {
+        amount: currentBalanceAmt,
+        type: currentBalanceType,
+      },
+      balance: currentBalanceAmt,
+      balance_type: currentBalanceType,
+    };
 
-return res.status(200).json({
-  customer,
-  transactions,
-  transaction_summary,
-  ledger_summary,
-  description_summary
-})
+    return res.status(200).json({
+      customer,
+      transactions,
+      transaction_summary,
+      ledger_summary,
+      description_summary,
+    });
   } catch (error) {
     console.error("Error fetching customer ledger:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
