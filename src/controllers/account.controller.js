@@ -614,32 +614,19 @@ export const getLedger = async (req, res) => {
       select: { accountBalance: true },
     });
 
-    // ---------------- VENDOR / CUSTOMER (by account_id) ----------------
+    // ---------------- VENDOR / CUSTOMER ----------------
     const party = await prisma.vendorscustomer.findFirst({
-      where: { account_id: account_id, company_id },
-      select: {
-        id: true,
-        name_english: true,
-        type: true,
-        account_type: true,
-        account_name: true,
-        creation_date: true,
-      },
+      where: { id: account_id, company_id },
+      select: { name_english: true, type: true }, // vender | customer
     });
 
-    const partyInfo = party
-      ? {
-          vendor_customer_id: party.id,
-          vendor_customer_name: party.name_english,
-          account_type: party.account_type,
-          account_name: party.account_name,
-        }
-      : {
-          vendor_customer_id: null,
-          vendor_customer_name: null,
-          account_type: null,
-          account_name: null,
-        };
+    // dynamic field
+    const partyField =
+      party?.type === "vender"
+        ? { vendor: party.name_english }
+        : party?.type === "customer"
+        ? { customer: party.name_english }
+        : {};
 
     let rows = [];
 
@@ -655,10 +642,12 @@ export const getLedger = async (req, res) => {
       const isDebit = v.from_account === account_id;
       rows.push({
         date: v.date,
+        ...partyField,
+        vch_no: v.voucher_number,
+        ref_no: v.manual_voucher_no,
         vch_type: v.voucher_type,
         debit: isDebit ? Number(v.transfer_amount) : 0,
         credit: isDebit ? 0 : Number(v.transfer_amount),
-        ...partyInfo,
       });
     });
 
@@ -674,10 +663,12 @@ export const getLedger = async (req, res) => {
       const isDebit = c.account_from_id === account_id;
       rows.push({
         date: c.voucher_date,
+        ...partyField,
+        vch_no: c.voucher_number,
+        ref_no: c.voucher_no_auto,
         vch_type: "Contra",
         debit: isDebit ? Number(c.amount) : 0,
         credit: isDebit ? 0 : Number(c.amount),
-        ...partyInfo,
       });
     });
 
@@ -693,10 +684,12 @@ export const getLedger = async (req, res) => {
     income.forEach((i) => {
       rows.push({
         date: i.income_vouchers.voucher_date,
+        ...partyField,
+        vch_no: i.income_vouchers.auto_receipt_no,
+        ref_no: i.income_vouchers.manual_receipt_no,
         vch_type: "Income",
         debit: 0,
         credit: Number(i.amount),
-        ...partyInfo,
       });
     });
 
@@ -708,10 +701,12 @@ export const getLedger = async (req, res) => {
     expense.forEach((e) => {
       rows.push({
         date: e.voucher_date,
+        ...partyField,
+        vch_no: e.auto_receipt_no,
+        ref_no: e.manual_receipt_no,
         vch_type: "Expense",
         debit: Number(e.total_amount),
         credit: 0,
-        ...partyInfo,
       });
     });
 
@@ -724,10 +719,12 @@ export const getLedger = async (req, res) => {
       if (p.payment_status === "Paid") {
         rows.push({
           date: p.created_at,
+          ...partyField,
+          vch_no: `POS-${p.id}`,
+          ref_no: null,
           vch_type: "POS",
           debit: 0,
           credit: Number(p.total),
-          ...partyInfo,
         });
       }
     });
@@ -740,10 +737,12 @@ export const getLedger = async (req, res) => {
     salesReturn.forEach((s) => {
       rows.push({
         date: s.return_date,
+        ...partyField,
+        vch_no: s.return_no,
+        ref_no: s.auto_voucher_no,
         vch_type: "Sales Return",
         debit: Number(s.grand_total),
         credit: 0,
-        ...partyInfo,
       });
     });
 
@@ -755,10 +754,12 @@ export const getLedger = async (req, res) => {
     purchaseOrders.forEach((p) => {
       rows.push({
         date: p.created_at,
+        ...partyField,
+        vch_no: p.PO_no,
+        ref_no: p.Manual_PO_ref,
         vch_type: "Purchase Order",
         debit: 0,
         credit: Number(p.total),
-        ...partyInfo,
       });
     });
 
@@ -770,10 +771,12 @@ export const getLedger = async (req, res) => {
     purchaseReturn.forEach((p) => {
       rows.push({
         date: p.return_date,
+        ...partyField,
+        vch_no: p.return_no,
+        ref_no: p.auto_voucher_no,
         vch_type: "Purchase Return",
         debit: Number(p.grand_total),
         credit: 0,
-        ...partyInfo,
       });
     });
 
@@ -785,10 +788,12 @@ export const getLedger = async (req, res) => {
     adjustments.forEach((a) => {
       rows.push({
         date: a.voucher_date,
+        ...partyField,
+        vch_no: a.voucher_no,
+        ref_no: a.manual_voucher_no,
         vch_type: "Adjustment",
         debit: Number(a.total_value),
         credit: 0,
-        ...partyInfo,
       });
     });
 
@@ -801,25 +806,27 @@ export const getLedger = async (req, res) => {
       if (Number(j.from_id) === account_id) {
         rows.push({
           date: j.date,
+          ...partyField,
+          vch_no: j.voucher_no,
+          ref_no: j.transaction_id,
           vch_type: j.voucher_type,
           debit: Number(j.amount),
           credit: 0,
-          ...partyInfo,
         });
       }
 
       if (Number(j.balance_type) === account_id) {
         rows.push({
           date: j.date,
+          ...partyField,
+          vch_no: j.voucher_no,
+          ref_no: j.transaction_id,
           vch_type: j.voucher_type,
           debit: 0,
           credit: Number(j.amount),
-          ...partyInfo,
         });
       }
     });
-
-    // If party exists, add a creation/opening row containing party details (inside ledger)
 
     // ---------------- SORT & RUNNING BALANCE ----------------
     rows.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -833,7 +840,6 @@ export const getLedger = async (req, res) => {
     // ---------------- RESPONSE ----------------
     return res.json({
       success: true,
-      account_id: account_id,
       opening_balance: Number(accountInfo?.accountBalance || 0),
       closing_balance: running.toFixed(2),
       ledger: rows,
