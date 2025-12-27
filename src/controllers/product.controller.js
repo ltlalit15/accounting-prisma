@@ -1710,13 +1710,14 @@ export const getInventoryDetails = async (req, res) => {
     let allTransactionsForLedger = [];
 
     // A. PURCHASES (from Vouchers)
-    const purchaseItems = await prisma.voucher_items.findMany({
-      where: {
-        item_name: product.item_name,
-        vouchers: { company_id: companyId, voucher_type: "Purchase" },
-      },
-      include: { vouchers: true },
-    });
+   const purchaseItems = await prisma.voucher_items.findMany({
+  where: {
+    product_id: productId,   // 🔥 YAHI MAIN FIX
+    vouchers: { company_id: companyId, voucher_type: "Purchase" },
+  },
+  include: { vouchers: true },
+});
+
     purchaseItems.forEach((p) => {
       allTransactionsForLedger.push({
         date: p.vouchers.date,
@@ -1828,26 +1829,35 @@ export const getInventoryDetails = async (req, res) => {
       include: { salesorder: true, warehouse: true },
     });
     deliveryChallanItems.forEach((dc) => {
-      allTransactionsForLedger.push({
-        date: dc.salesorder.quotation_date || dc.salesorder.created_at,
-        rawType: "DELIVERY_CHALLAN",
-        // DYNAMIC: This is a reasonable label as the table doesn't have a type field
-        vchType: "Delivery Challan",
-        particulars:
-          dc.salesorder.qoutation_to_customer_name ||
-          dc.salesorder.bill_to_customer_name ||
-          "N/A",
-        vchNo: dc.salesorder.Challan_no,
-        autoVoucherNo:
-          dc.salesorder.Manual_challan_no || dc.salesorder.Challan_no,
-        rate: Number(dc.rate),
-        quantity: -Number(dc.qty), // Outflow
-        // DYNAMIC: Use the actual linked warehouse
-        warehouseName: dc.warehouse?.warehouse_name || "Unassigned Warehouse",
-        description: dc.item_name,
-        narration: dc.salesorder.notes || "",
-      });
-    });
+  allTransactionsForLedger.push({
+    date: dc.salesorder.quotation_date || dc.salesorder.created_at,
+
+    // 🔥 YAHI MAIN CHANGE HAI
+    rawType: "SALE",
+    vchType: "Sales Order",
+
+    particulars:
+      dc.salesorder.qoutation_to_customer_name ||
+      dc.salesorder.bill_to_customer_name ||
+      "N/A",
+
+    vchNo: dc.salesorder.SO_no || dc.salesorder.Challan_no,
+    autoVoucherNo:
+      dc.salesorder.Manual_SO_ref ||
+      dc.salesorder.Manual_challan_no ||
+      dc.salesorder.Challan_no,
+
+    rate: Number(dc.rate),
+    quantity: -Number(dc.qty),   // stock same rahega
+
+    warehouseName:
+      dc.warehouse?.warehouse_name || "Unassigned Warehouse",
+
+    description: dc.item_name,
+    narration: dc.salesorder.notes || "",
+  });
+});
+
 
     // F. STOCK TRANSFERS
     const transferItems = await prisma.transfer_items.findMany({

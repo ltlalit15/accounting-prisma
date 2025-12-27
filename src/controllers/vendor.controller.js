@@ -133,12 +133,13 @@ export const createVendor = async (req, res) => {
       enable_gst,
       gstIn,
       type,
+      accounting_id,
     } = req.body;
 
-    if (!company_id || !name_english || !type) {
+    if (!company_id || !name_english || !type || !accounting_id) {
       return res.status(400).json({
         success: false,
-        message: "company_id and name_english are required",
+        message: "company_id and name_english accounting_id are required",
       });
     }
 
@@ -164,6 +165,7 @@ export const createVendor = async (req, res) => {
     const vendor = await prisma.vendorscustomer.create({
       data: {
         company_id: parseInt(company_id),
+        accounting_id: Number(accounting_id),
         name_english,
         name_arabic,
         company_name,

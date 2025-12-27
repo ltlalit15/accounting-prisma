@@ -6,6 +6,7 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
 model plans {
   id                       Int               @id @default(autoincrement())
   plan_name                String            @db.VarChar(100)
@@ -62,52 +63,47 @@ model role_permissions {
 }
 
 model users {
-  id                    Int       @id @default(autoincrement())
-  name                  String
-  phone                 String?
-  email                 String    @unique
-  password              String
-  role                  Role
-  profile               String?
-  startDate             DateTime?
-  expireDate            DateTime?
-  UserStatus            String?
-  created_at            DateTime  @default(now())
-  created_by            Int?
-  user_role             String?
-  address               String?   @db.VarChar(500)
-  city                  String?   @db.VarChar(100)
-  company_dark_logo_url String?   @db.VarChar(500)
-  company_icon_url      String?   @db.VarChar(500)
-  company_logo_url      String?   @db.VarChar(500)
-  country               String?   @db.VarChar(100)
-  currency              String?   @db.VarChar(50)
-  favicon_url           String?   @db.VarChar(500)
-  postal_code           String?   @db.VarChar(20)
-  state                 String?   @db.VarChar(100)
-  account_holder        String?   @db.VarChar(150)
-  account_number        String?   @db.VarChar(50)
-  bank_name             String?   @db.VarChar(150)
-  ifsc_code             String?   @db.VarChar(50)
-  notes                 String?   @db.VarChar(1000)
-  terms_and_conditions  String?   @db.VarChar(1000)
-
+  id                       Int                        @id @default(autoincrement())
+  name                     String
+  phone                    String?
+  email                    String                     @unique
+  password                 String
+  role                     Role
+  profile                  String?
+  startDate                DateTime?
+  expireDate               DateTime?
+  UserStatus               String?
+  created_at               DateTime                   @default(now())
+  created_by               Int?
+  user_role                String?
+  address                  String?                    @db.VarChar(500)
+  city                     String?                    @db.VarChar(100)
+  company_dark_logo_url    String?                    @db.VarChar(500)
+  company_icon_url         String?                    @db.VarChar(500)
+  company_logo_url         String?                    @db.VarChar(500)
+  country                  String?                    @db.VarChar(100)
+  currency                 String?                    @db.VarChar(50)
+  favicon_url              String?                    @db.VarChar(500)
+  postal_code              String?                    @db.VarChar(20)
+  state                    String?                    @db.VarChar(100)
+  account_holder           String?                    @db.VarChar(150)
+  account_number           String?                    @db.VarChar(50)
+  bank_name                String?                    @db.VarChar(150)
+  ifsc_code                String?                    @db.VarChar(50)
+  notes                    String?                    @db.VarChar(1000)
+  terms_and_conditions     String?                    @db.VarChar(1000)
   accounts                 accounts[]
   adjustments              adjustments[]
+  journal_company_entries  journal_entries[]          @relation("CompanyJournalEntries")
+  journal_created_entries  journal_entries[]          @relation("JournalCreatedBy")
   password_change_requests password_change_requests[]
   transactions             transactions[]
   user_plans               user_plans[]
+  createdByUser            users?                     @relation("CreatedUsersRelation", fields: [created_by], references: [id])
+  createdUsers             users[]                    @relation("CreatedUsersRelation")
   vendorscustomer          vendorscustomer[]
 
-  // Company owning journal entries
-  journal_company_entries journal_entries[] @relation("CompanyJournalEntries")
-
-  // CreatedBy for journal entries
-  journal_created_entries journal_entries[] @relation("JournalCreatedBy")
-
-  // * Only ONE relation for created_by (no duplicate)
-  createdByUser users?  @relation("CreatedUsersRelation", fields: [created_by], references: [id])
-  createdUsers  users[] @relation("CreatedUsersRelation")
+  @@index([created_by], map: "users_created_by_fkey")
 }
 
 model roles {
@@ -153,25 +149,23 @@ model sub_of_subgroups {
 }
 
 model accounts {
-  id                 Int      @id @default(autoincrement())
-  company_id         Int
-  subgroup_id        Int
-  sub_of_subgroup_id Int?
-  account_number     String?
-  ifsc_code          String?
-  bank_name_branch   String?
-  created_at         DateTime @default(now())
-  accountBalance     Decimal  @default(0.00) @db.Decimal(10, 2)
-
-  company         users             @relation(fields: [company_id], references: [id])
-  sub_of_subgroup sub_of_subgroups? @relation(fields: [sub_of_subgroup_id], references: [id])
-  parent_account  parent_accounts   @relation(fields: [subgroup_id], references: [id])
-
-  // inverse for journal_lines.account
-  journal_lines journal_lines[] @relation("AccountJournalLines")
-
+  id                   Int               @id @default(autoincrement())
+  company_id           Int
+  subgroup_id          Int
+  sub_of_subgroup_id   Int?
+  account_number       String?
+  ifsc_code            String?
+  bank_name_branch     String?
+  created_at           DateTime          @default(now())
+  accountBalance       Decimal           @default(0.00) @db.Decimal(10, 2)
+  company              users             @relation(fields: [company_id], references: [id])
+  sub_of_subgroup      sub_of_subgroups? @relation(fields: [sub_of_subgroup_id], references: [id])
+  parent_account       parent_accounts   @relation(fields: [subgroup_id], references: [id])
   from_contra_vouchers contra_vouchers[] @relation("from_contra_vouchers")
   to_contra_vouchers   contra_vouchers[] @relation("to_contra_vouchers")
+  journal_lines        journal_lines[]   @relation("AccountJournalLines")
+
+
 
   @@index([company_id])
   @@index([sub_of_subgroup_id])
@@ -207,11 +201,13 @@ model vendorscustomer {
   enable_gst          Boolean?           @default(false)
   gstIn               String?
   type                venderCustomertype
+  accounting_id       Int
   created_at          DateTime           @default(now())
   invoices            pos_invoices[]
   company             users              @relation(fields: [company_id], references: [id])
 
   @@index([company_id], map: "vendorscustomer_company_id_fkey")
+  @@index([accounting_id], map: "idx_vendorscustomer_accounting_id")
 }
 
 model transactions {
@@ -247,10 +243,10 @@ model warehouses {
   state                String?                @db.VarChar(100)
   pos_invoice_products pos_invoice_products[]
   product_warehouses   product_warehouses[]
+  purchase_items       purchaseorderitems[]
+  sales_return_items   sales_return_items[]
   salesorderitems      salesorderitems[]      @relation("SOI_Warehouse")
   transfer_items       transfer_items[]
-  purchase_items       purchaseorderitems[]
-  sales_return_items sales_return_items[]
 }
 
 model item_category {
@@ -288,10 +284,10 @@ model products {
   product_warehouses product_warehouses[]
   item_category      item_category?         @relation(fields: [item_category_id], references: [id])
   unit_detail        unit_details?          @relation(fields: [unit_detail_id], references: [id])
-  transfer_items     transfer_items[]
-  salesorderitems    salesorderitems[]      @relation("SOItemProduct")
   purchase_items     purchaseorderitems[]
-  sales_return_items sales_return_items[] 
+  sales_return_items sales_return_items[]
+  salesorderitems    salesorderitems[]      @relation("SOItemProduct")
+  transfer_items     transfer_items[]
 
   @@index([item_category_id], map: "products_item_category_id_fkey")
   @@index([unit_detail_id], map: "products_unit_detail_id_fkey")
@@ -344,7 +340,6 @@ model services {
 model vouchers {
   id                  Int                   @id @default(autoincrement())
   company_id          Int
-  purchase_order_id   Int?  
   voucher_type        String                @db.VarChar(50)
   voucher_number      String                @db.VarChar(100)
   date                DateTime              @db.Date
@@ -365,6 +360,7 @@ model vouchers {
   customer_id         Int?
   vendor_id           Int?
   manual_voucher_no   String?               @db.VarChar(255)
+  purchase_order_id   Int?
   voucher_attachments voucher_attachments[]
   voucher_items       voucher_items[]
 }
@@ -393,6 +389,7 @@ model voucher_items {
   tax_type    String?  @default("None") @db.VarChar(20)
   tax_rate    Decimal? @default(0.00) @db.Decimal(5, 2)
   tax_amount  Decimal? @default(0.00) @db.Decimal(10, 2)
+  product_id  Int?
   vouchers    vouchers @relation(fields: [voucher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "voucher_items_ibfk_1")
 
   @@index([voucher_id], map: "voucher_id")
@@ -663,7 +660,6 @@ model salesorder {
 model salesorderitems {
   id             Int         @id @default(autoincrement())
   sales_order_id Int
-  product_id     Int?
   item_name      String      @db.VarChar(255)
   qty            Decimal?    @default(0.00) @db.Decimal(10, 2)
   rate           Decimal?    @default(0.00) @db.Decimal(15, 2)
@@ -673,9 +669,10 @@ model salesorderitems {
   created_at     DateTime    @default(now()) @db.Timestamp(0)
   updated_at     DateTime    @default(now()) @db.Timestamp(0)
   warehouse_id   Int?
+  product_id     Int?
   salesorder     salesorder  @relation(fields: [sales_order_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesOrderItems")
+  product        products?   @relation("SOItemProduct", fields: [product_id], references: [id], onDelete: Cascade)
   warehouse      warehouses? @relation("SOI_Warehouse", fields: [warehouse_id], references: [id])
-  product        products?   @relation("SOItemProduct", fields: [product_id], references: [id],onDelete: Cascade)
 
   @@index([sales_order_id], map: "fk_salesOrderItems")
   @@index([warehouse_id], map: "salesorderitems_warehouse_id_fkey")
@@ -715,7 +712,6 @@ model sales_return_items {
   id              Int          @id @default(autoincrement())
   sales_return_id Int
   product_id      Int?
-  warehouse_id    Int? 
   item_name       String       @db.VarChar(255)
   quantity        Decimal      @db.Decimal(10, 2)
   rate            Decimal?     @default(0.00) @db.Decimal(15, 2)
@@ -725,11 +721,14 @@ model sales_return_items {
   created_at      DateTime     @default(now()) @db.Timestamp(0)
   updated_at      DateTime     @default(now()) @db.Timestamp(0)
   narration       String?      @db.VarChar(255)
+  warehouse_id    Int?
   sales_return    sales_return @relation(fields: [sales_return_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesReturnItems")
-  product         products?   @relation(fields: [product_id], references: [id])
-  warehouse       warehouses? @relation(fields: [warehouse_id], references: [id])
+  product         products?    @relation(fields: [product_id], references: [id])
+  warehouse       warehouses?  @relation(fields: [warehouse_id], references: [id])
 
   @@index([sales_return_id], map: "fk_salesReturnItems")
+  @@index([product_id], map: "sales_return_items_product_id_fkey")
+  @@index([warehouse_id], map: "sales_return_items_warehouse_id_fkey")
 }
 
 model purchaseorder {
@@ -817,8 +816,6 @@ model purchaseorder {
 
 model purchaseorderitems {
   id                Int           @id @default(autoincrement())
-  product_id        Int?        
-  warehouse_id      Int? 
   purchase_order_id Int
   item_name         String
   qty               Decimal       @db.Decimal(10, 2)
@@ -826,14 +823,14 @@ model purchaseorderitems {
   tax_percent       Decimal       @default(0.00) @db.Decimal(5, 2)
   discount          Decimal       @default(0.00) @db.Decimal(15, 2)
   amount            Decimal       @db.Decimal(15, 2)
-  purchaseorder     purchaseorder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
-
-
+  product_id        Int?
+  warehouse_id      Int?
   product           products?     @relation(fields: [product_id], references: [id])
+  purchaseorder     purchaseorder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
   warehouse         warehouses?   @relation(fields: [warehouse_id], references: [id])
 
   @@index([purchase_order_id])
-   @@index([product_id])
+  @@index([product_id])
   @@index([warehouse_id])
 }
 
@@ -905,60 +902,55 @@ model userroles {
 }
 
 model journal_entries {
-  id                Int       @id @default(autoincrement())
+  id                Int                   @id @default(autoincrement())
   company_id        Int
-  voucher_no_auto   String    @db.VarChar(100)
-  manual_voucher_no String?   @db.VarChar(100)
-  voucher_type      String?   @db.VarChar(50)
+  voucher_no_auto   String                @db.VarChar(100)
+  manual_voucher_no String?               @db.VarChar(100)
+  voucher_type      String?               @db.VarChar(50)
   voucher_date      DateTime
-  narration         String?   @db.Text
-  total_debit       Decimal?  @default(0.00) @db.Decimal(18, 2)
-  total_credit      Decimal?  @default(0.00) @db.Decimal(18, 2)
+  narration         String?               @db.Text
+  total_debit       Decimal?              @default(0.00) @db.Decimal(18, 2)
+  total_credit      Decimal?              @default(0.00) @db.Decimal(18, 2)
   created_by        Int?
-  created_at        DateTime  @default(now())
-  updated_at        DateTime? @default(now())
-
-  // relations (named)
-  company     users                 @relation("CompanyJournalEntries", fields: [company_id], references: [id], map: "fk_journal_company")
-  lines       journal_lines[]
-  attachments journal_attachments[]
-
-  created_by_user users? @relation("JournalCreatedBy", fields: [created_by], references: [id])
+  created_at        DateTime              @default(now())
+  updated_at        DateTime?             @default(now())
+  attachments       journal_attachments[]
+  company           users                 @relation("CompanyJournalEntries", fields: [company_id], references: [id], map: "fk_journal_company")
+  created_by_user   users?                @relation("JournalCreatedBy", fields: [created_by], references: [id])
+  lines             journal_lines[]
 
   @@unique([company_id, voucher_no_auto], map: "unique_company_voucher")
   @@index([company_id], map: "idx_journal_company")
+  @@index([created_by], map: "journal_entries_created_by_fkey")
 }
 
 model journal_lines {
-  id               Int       @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   journal_entry_id Int
   account_id       Int
-  seq              Int       @default(0) // UI order
-  debit_amount     Decimal?  @default(0.00) @db.Decimal(18, 2)
-  credit_amount    Decimal?  @default(0.00) @db.Decimal(18, 2)
-  narration        String?   @db.VarChar(500)
-  created_at       DateTime  @default(now())
+  seq              Int             @default(0)
+  debit_amount     Decimal?        @default(0.00) @db.Decimal(18, 2)
+  credit_amount    Decimal?        @default(0.00) @db.Decimal(18, 2)
+  narration        String?         @db.VarChar(500)
+  created_at       DateTime        @default(now())
   updated_at       DateTime?
+  account          accounts        @relation("AccountJournalLines", fields: [account_id], references: [id], map: "journal_lines_account_id_fkey")
+  journal_entry    journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade, map: "journal_lines_journal_entry_id_fkey")
 
-  // relations
-  journal_entry journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade, map: "journal_lines_journal_entry_id_fkey")
-  account       accounts        @relation("AccountJournalLines", fields: [account_id], references: [id], map: "journal_lines_account_id_fkey")
-
-  @@index([journal_entry_id], map: "journal_lines_journal_entry_id_idx")
-  @@index([account_id], map: "journal_lines_account_id_idx")
+  @@index([journal_entry_id])
+  @@index([account_id])
 }
 
 model journal_attachments {
-  id               Int      @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   journal_entry_id Int
-  file_name        String   @db.VarChar(255)
-  file_url         String   @db.VarChar(500)
-  file_type        String?  @db.VarChar(100)
+  file_name        String          @db.VarChar(255)
+  file_url         String          @db.VarChar(500)
+  file_type        String?         @db.VarChar(100)
   size             Int?
-  public_id        String?  @db.VarChar(255)
-  uploaded_at      DateTime @default(now())
-
-  journal_entry journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+  public_id        String?         @db.VarChar(255)
+  uploaded_at      DateTime        @default(now())
+  journal_entry    journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
 
   @@index([journal_entry_id])
 }

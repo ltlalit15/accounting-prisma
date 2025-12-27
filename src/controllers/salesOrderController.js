@@ -4911,7 +4911,10 @@ export const createOrUpdateSalesOrder = async (req, res) => {
             },
           });
 
-        for (const itemToDelete of itemsToDelete) {
+       for (const itemToDelete of itemsToDelete) {
+
+  // ✅ ONLY INVENTORY ITEMS
+  if (!itemToDelete.product_id) continue;
 
   // ✅ RESTORE PRODUCT MASTER STOCK
   await tx.products.update({
@@ -4921,19 +4924,22 @@ export const createOrUpdateSalesOrder = async (req, res) => {
     },
   });
 
-  // ✅ RESTORE WAREHOUSE STOCK
-  await tx.product_warehouses.update({
-    where: {
-      product_id_warehouse_id: {
-        product_id: itemToDelete.product_id,
-        warehouse_id: itemToDelete.warehouse_id,
+  // ✅ RESTORE WAREHOUSE STOCK (if warehouse exists)
+  if (itemToDelete.warehouse_id) {
+    await tx.product_warehouses.update({
+      where: {
+        product_id_warehouse_id: {
+          product_id: itemToDelete.product_id,
+          warehouse_id: itemToDelete.warehouse_id,
+        },
       },
-    },
-    data: {
-      stock_qty: { increment: Number(itemToDelete.qty) },
-    },
-  });
+      data: {
+        stock_qty: { increment: Number(itemToDelete.qty) },
+      },
+    });
+  }
 }
+
 
 
           if (itemsToDelete.length > 0) {
@@ -5122,6 +5128,47 @@ if (item.product_id) {
 
           }
         }
+
+         if (
+    body.auto_invoice === true &&
+    body.items &&
+    Array.isArray(body.items)
+  ) {
+    const existingInvoice = await tx.pos_invoice.findFirst({
+      where: {
+        source: "SALES_ORDER",
+        source_id: newOrder.id,
+      },
+    });
+
+    if (!existingInvoice) {
+      const invoice = await tx.pos_invoice.create({
+        data: {
+          company_id: newOrder.company_id,
+          customer_id: body.customer_id || null,
+          total: body.total ? Number(body.total) : newOrder.total,
+          created_at: new Date(),
+          source: "SALES_ORDER",
+          source_id: newOrder.id,
+        },
+      });
+
+      for (const item of body.items) {
+        if (!item.product_id) continue;
+
+        await tx.pos_invoice_products.create({
+          data: {
+            invoice_id: invoice.id,
+            product_id: item.product_id,
+            warehouse_id: item.warehouse_id,
+            quantity: Number(item.qty),
+            price: Number(item.rate),
+            total: Number(item.qty) * Number(item.rate),
+          },
+        });
+      }
+    }
+  }
 
         return await tx.salesorder.findUnique({
           where: { id: newOrder.id },

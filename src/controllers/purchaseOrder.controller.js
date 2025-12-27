@@ -1792,6 +1792,7 @@ for (const item of items) {
   await tx.voucher_items.create({
     data: {
       voucher_id: voucher.id,
+      product_id: item.product_id,
       item_name: item.item_name,
       quantity: item.qty,
       rate: item.rate,
