@@ -716,7 +716,7 @@ if (data.sub_of_subgroup_id) {
     });
   }
 };
-       
+
 export const deleteVendor = async (req, res) => {
   try {
     const { id } = req.params;

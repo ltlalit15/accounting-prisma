@@ -599,36 +599,49 @@ export const deleteAccount = async (req, res) => {
 
 export const getLedger = async (req, res) => {
   try {
-    const account_id = Number(req.params.account_id);
+    const subgroup_id = Number(req.params.subgroup_id);
     const company_id = Number(req.params.company_id);
 
-    if (!account_id || !company_id) {
+    if (!subgroup_id || !company_id) {
       return res
         .status(400)
-        .json({ success: false, message: "company_id & account_id required" });
+        .json({ success: false, message: "company_id & subgroup_id required" });
     }
 
     // ensure account exists for given company
-    const accountInfo = await prisma.accounts.findFirst({
-      where: { id: account_id, company_id },
-      select: { accountBalance: true },
+    const accounts = await prisma.accounts.findMany({
+      where: {
+        company_id,
+        subgroup_id,
+      },
+      select: {
+        id: true,
+        accountBalance: true,
+      },
     });
-    if (!accountInfo) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Account not found for given company_id/account_id",
-          ledger: [],
-        });
+
+    if (!accounts.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No accounts found for this subgroup",
+        ledger: [],
+      });
     }
+
+    const accountIds = accounts.map((a) => a.id);
 
     // parties linked to this account (vendorscustomer rows that reference this account)
     const partiesForAccount = await prisma.vendorscustomer.findMany({
-      where: { company_id, account_id: account_id },
+      where: {
+        company_id,
+        account_id: { in: accountIds },
+      },
+
       select: {
         id: true,
         account_id: true,
+        creation_date: true,
+        created_at: true,
         name_english: true,
         account_type: true,
         account_name: true,
@@ -640,7 +653,8 @@ export const getLedger = async (req, res) => {
       "sample:",
       partiesForAccount.slice(0, 3)
     );
-    console.log("getLedger params:", { account_id, company_id });
+    console.log("getLedger params:", { subgroup_id, company_id });
+
     const partyIds = partiesForAccount.map((p) => p.id);
     const partyNames = partiesForAccount
       .map((p) => (p.name_english || "").toLowerCase())
@@ -651,24 +665,14 @@ export const getLedger = async (req, res) => {
     });
     const rows = [];
 
-    // add an initial/creation row for each party so they always appear in ledger
-    partiesForAccount.forEach((p) => {
-      rows.push({
-        date: p.creation_date || p.created_at || new Date(0),
-        debit: 0,
-        credit: 0,
-        vendor_customer_id: p.id,
-        name: p.name_english || null,
-        account_type: p.account_type || null,
-        account_name: p.account_name || null,
-      });
-    });
-
     // VOUCHERS
     const vouchers = await prisma.vouchers.findMany({
       where: {
         company_id,
-        OR: [{ from_account: account_id }, { to_account: account_id }],
+        OR: [
+          { from_account: { in: accountIds } },
+          { to_account: { in: accountIds } },
+        ],
       },
     });
     const voucherAccountIds = [
@@ -693,7 +697,8 @@ export const getLedger = async (req, res) => {
     });
 
     vouchers.forEach((v) => {
-      const isDebit = v.from_account === account_id;
+      const isDebit = accountIds.includes(v.from_account);
+
       const relatedAccount = isDebit ? v.to_account : v.from_account;
       let p = voucherPartyMap[relatedAccount];
       // fallback: vouchers may reference vendorscustomer by customer_id/vendor_id
@@ -721,11 +726,15 @@ export const getLedger = async (req, res) => {
     const contra = await prisma.contra_vouchers.findMany({
       where: {
         company_id,
-        OR: [{ account_from_id: account_id }, { account_to_id: account_id }],
+        OR: [
+          { account_from_id: { in: accountIds } },
+          { account_to_id: { in: accountIds } },
+        ],
       },
     });
     contra.forEach((c) => {
-      const isDebit = c.account_from_id === account_id;
+      const isDebit = accountIds.includes(c.account_from_id);
+
       rows.push({
         date: c.voucher_date,
         debit: isDebit ? Number(c.amount) : 0,
@@ -741,7 +750,7 @@ export const getLedger = async (req, res) => {
     const income = await prisma.income_voucher_entries.findMany({
       where: {
         income_vouchers: { company_id },
-        income_account: String(account_id),
+        income_account: { in: accountIds.map(String) },
       },
       include: { income_vouchers: true },
     });
@@ -759,7 +768,7 @@ export const getLedger = async (req, res) => {
 
     // EXPENSE
     const expense = await prisma.expensevouchers.findMany({
-      where: { company_id, paid_from_account_id: account_id },
+      where: { company_id, paid_from_account_id: { in: accountIds } },
     });
     expense.forEach((e) => {
       rows.push({
@@ -778,7 +787,9 @@ export const getLedger = async (req, res) => {
       where: {
         company_id,
         payment_status: "Paid",
-        customer: { account_id: account_id },
+        customer: {
+          account_id: { in: accountIds },
+        },
       },
       include: {
         customer: {
@@ -897,7 +908,7 @@ export const getLedger = async (req, res) => {
       where: { company_id },
     });
     journal.forEach((j) => {
-      if (Number(j.from_id) === account_id) {
+      if (accountIds.includes(Number(j.from_id))) {
         rows.push({
           date: j.date,
           debit: Number(j.amount),
@@ -908,7 +919,8 @@ export const getLedger = async (req, res) => {
           account_name: null,
         });
       }
-      if (Number(j.balance_type) === account_id) {
+
+      if (accountIds.includes(Number(j.balance_type))) {
         rows.push({
           date: j.date,
           debit: 0,
@@ -921,14 +933,38 @@ export const getLedger = async (req, res) => {
       }
     });
 
-    // filter to only rows that are linked to the parties for this account
+    // filter to only rows that are linked to the parties for this subgroup's accounts
     console.log("ledger rows before filter:", rows.length);
-    const filteredRows = rows.filter((r) => r.vendor_customer_id !== null);
+    let filteredRows = rows.filter((r) => r.vendor_customer_id !== null);
     console.log("ledger rows after party-filter:", filteredRows.length);
+
+    // Add creation/opening rows only for parties that have NO transactions,
+    // so a party with transactions doesn't get an extra zero-value duplicate row.
+    const existingPartyIds = new Set(
+      filteredRows.map((r) => r.vendor_customer_id)
+    );
+    partiesForAccount.forEach((p) => {
+      if (!existingPartyIds.has(p.id)) {
+        filteredRows.push({
+          date: p.creation_date || p.created_at || new Date(0),
+          debit: 0,
+          credit: 0,
+          vendor_customer_id: p.id,
+          name: p.name_english || null,
+          account_type: p.account_type || null,
+          account_name: p.account_name || null,
+        });
+      }
+    });
+    console.log("ledger rows after adding creation rows:", filteredRows.length);
 
     // sort & running balance
     filteredRows.sort((a, b) => new Date(a.date) - new Date(b.date));
-    let running = Number(accountInfo?.accountBalance || 0);
+    let running = accounts.reduce(
+      (sum, a) => sum + Number(a.accountBalance || 0),
+      0
+    );
+
     const ledger = filteredRows.map((r) => {
       running = running + Number(r.credit || 0) - Number(r.debit || 0);
       return { ...r, running_balance: running.toFixed(2) };
@@ -936,9 +972,12 @@ export const getLedger = async (req, res) => {
 
     return res.json({
       success: true,
-      account_id,
-      opening_balance: Number(accountInfo?.accountBalance || 0),
-      closing_balance: running.toFixed(2),
+
+      subgroup_id,
+      opening_balance: accounts.reduce(
+        (sum, a) => sum + Number(a.accountBalance || 0),
+        0
+      ),
       ledger,
     });
   } catch (err) {
@@ -1019,6 +1058,7 @@ const buildLedgerForAccount = async (account_id, company_id) => {
 
   contra.forEach((c) => {
     const isDebit = c.account_from_id === account_id;
+
     rows.push({
       date: c.voucher_date,
       vch_type: "Contra",
@@ -1069,7 +1109,7 @@ const buildLedgerForAccount = async (account_id, company_id) => {
 
   let running = Number(accountInfo.accountBalance || 0);
   const ledger = rows.map((r) => {
-    running = running + r.credit - r.debit;
+    running = running + (Number(r.credit) || 0) - (Number(r.debit) || 0);
     const { vch_type, ...rest } = r;
     return { ...rest, running_balance: running.toFixed(2) };
   });
@@ -1081,7 +1121,6 @@ const buildLedgerForAccount = async (account_id, company_id) => {
     ledger,
   };
 };
-
 
 export const getLedgerBySubOfSubgroup = async (req, res) => {
   try {
