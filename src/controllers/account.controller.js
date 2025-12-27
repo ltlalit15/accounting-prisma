@@ -614,13 +614,11 @@ export const getLedger = async (req, res) => {
       select: { accountBalance: true },
     });
     if (!accountInfo) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Account not found for given company_id/account_id",
-          ledger: [],
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Account not found for given company_id/account_id",
+        ledger: [],
+      });
     }
 
     // parties linked to this account (vendorscustomer rows that reference this account)
@@ -955,192 +953,167 @@ Total Credit            +15731
 Closing Balance        = -91134.10
 */
 
-const buildLedgerForAccount = async (account_id, company_id) => {
-  const accountInfo = await prisma.accounts.findFirst({
-    where: { id: account_id, company_id },
-    select: { accountBalance: true },
-  });
-
-  if (!accountInfo) return null;
-
-  /* ===== LOAD ALL PARTIES ===== */
-  const parties = await prisma.vendorscustomer.findMany({
-    where: { company_id },
-    select: {
-      id: true,
-      account_id: true,
-      name_english: true,
-      account_type: true,
-      account_name: true,
+export const buildLedgerForAccount = async (company_id, account_id) => {
+  // 1️⃣ Fetch account and linked vendor/customers
+  const account = await prisma.accounts.findUnique({
+    where: { id: account_id },
+    include: {
+      vendorscustomer: true, // linked vendors/customers
     },
   });
+  if (!account) throw new Error("Account not found");
 
-  const partyById = {};
-  const partyByAccount = {};
-  parties.forEach((p) => {
-    partyById[p.id] = p;
-    if (p.account_id) partyByAccount[p.account_id] = p;
+  let ledger = [];
+
+  // 2️⃣ Fetch journal entries
+  const journalLines = await prisma.journal_lines.findMany({
+    where: { account_id },
+    include: { journal_entry: true },
   });
 
-  let rows = [];
-
-  /* ===== VOUCHERS ===== */
-  const vouchers = await prisma.vouchers.findMany({
-    where: {
-      company_id,
-      OR: [{ from_account: account_id }, { to_account: account_id }],
-    },
-  });
-
-  vouchers.forEach((v) => {
-    const isDebit = v.from_account === account_id;
-    const relatedAccount = isDebit ? v.to_account : v.from_account;
-    const party = partyByAccount[relatedAccount] || null;
-
-    rows.push({
-      date: v.date,
-      vch_type: v.voucher_type,
-      debit: isDebit ? Number(v.transfer_amount) : 0,
-      credit: isDebit ? 0 : Number(v.transfer_amount),
-      vendor_customer_id: party?.id || null,
-      vendor_customer_name: party?.name_english || null,
-      account_type: party?.account_type || null,
-      account_name: party?.account_name || null,
+  journalLines.forEach((line) => {
+    ledger.push({
+      date: line.journal_entry.voucher_date,
+      debit: parseFloat(line.debit_amount || 0),
+      credit: parseFloat(line.credit_amount || 0),
+      vendor_customer_id: null,
+      name: null,
+      account_type: account.account_type || "Accounts Payable",
+      account_name: account.account_name || "",
     });
   });
 
-  /* ===== CONTRA ===== */
-  const contra = await prisma.contra_vouchers.findMany({
+  // 3️⃣ Fetch contra vouchers
+  const contraVouchers = await prisma.contra_vouchers.findMany({
     where: {
       company_id,
       OR: [{ account_from_id: account_id }, { account_to_id: account_id }],
     },
   });
 
-  contra.forEach((c) => {
-    const isDebit = c.account_from_id === account_id;
-    rows.push({
-      date: c.voucher_date,
-      vch_type: "Contra",
-      debit: isDebit ? Number(c.amount) : 0,
-      credit: isDebit ? 0 : Number(c.amount),
+  contraVouchers.forEach((cv) => {
+    ledger.push({
+      date: cv.voucher_date,
+      debit: cv.account_to_id === account_id ? parseFloat(cv.amount) : 0,
+      credit: cv.account_from_id === account_id ? parseFloat(cv.amount) : 0,
       vendor_customer_id: null,
-      vendor_customer_name: null,
-      account_type: null,
-      account_name: null,
+      name: null,
+      account_type: account.account_type || "Accounts Payable",
+      account_name: account.account_name || "",
     });
   });
 
-  /* ===== JOURNAL ===== */
-  const journal = await prisma.transactions.findMany({
-    where: { company_id },
+  // 4️⃣ Fetch vouchers with vendor/customer preloaded
+  const vouchers = await prisma.vouchers.findMany({
+    where: {
+      company_id,
+      OR: [{ from_account: account_id }, { to_account: account_id }],
+    },
+    include: {
+      vendor: true, // vendor relation
+      customer: true, // customer relation
+    },
   });
 
-  journal.forEach((j) => {
-    if (Number(j.from_id) === account_id) {
-      rows.push({
-        date: j.date,
-        vch_type: j.voucher_type,
-        debit: Number(j.amount),
-        credit: 0,
-        vendor_customer_id: null,
-        vendor_customer_name: null,
-        account_type: null,
-        account_name: null,
-      });
-    }
+  vouchers.forEach((v) => {
+    let vendorCustomer = v.vendor || v.customer || null;
+    let type = v.vendor
+      ? "Vendor"
+      : v.customer
+      ? "Customer"
+      : "Accounts Payable";
 
-    if (Number(j.balance_type) === account_id) {
-      rows.push({
-        date: j.date,
-        vch_type: j.voucher_type,
-        debit: 0,
-        credit: Number(j.amount),
-        vendor_customer_id: null,
-        vendor_customer_name: null,
-        account_type: null,
-        account_name: null,
-      });
-    }
+    ledger.push({
+      date: v.date,
+      debit:
+        v.to_account === account_id ? parseFloat(v.transfer_amount || 0) : 0,
+      credit:
+        v.from_account === account_id ? parseFloat(v.transfer_amount || 0) : 0,
+      vendor_customer_id: vendorCustomer?.id || null,
+      name: vendorCustomer?.name_english || null,
+      account_type: vendorCustomer?.account_type || type,
+      account_name: vendorCustomer?.account_name || "",
+      company_info: vendorCustomer?.company || null,
+    });
   });
 
-  /* ===== SORT & RUNNING ===== */
-  rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+  // 5️⃣ Sort ledger by date
+  ledger.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  let running = Number(accountInfo.accountBalance || 0);
-  const ledger = rows.map((r) => {
-    running = running + r.credit - r.debit;
-    const { vch_type, ...rest } = r;
-    return { ...rest, running_balance: running.toFixed(2) };
+  // 6️⃣ Calculate running balance
+  let runningBalance = parseFloat(account.accountBalance || 0);
+  ledger = ledger.map((item) => {
+    runningBalance = runningBalance + item.debit - item.credit;
+    return { ...item, running_balance: runningBalance.toFixed(2) };
   });
 
   return {
-    account_id,
-    opening_balance: Number(accountInfo.accountBalance || 0),
-    closing_balance: running.toFixed(2),
+    success: true,
+    account_id: account.id,
+    opening_balance: parseFloat(account.accountBalance || 0).toFixed(2),
+    closing_balance: runningBalance.toFixed(2),
     ledger,
   };
 };
-
-
 export const getLedgerBySubOfSubgroup = async (req, res) => {
   try {
-    const company_id = Number(req.params.company_id);
-    const sub_of_subgroup_id = Number(req.params.sub_of_subgroup_id);
+    const { company_id, sub_of_subgroup_id } = req.params;
 
-    if (!company_id || !sub_of_subgroup_id) {
-      return res.status(400).json({
-        success: false,
-        message: "company_id & sub_of_subgroup_id required",
-      });
-    }
-
-    /* ===== FETCH ACCOUNTS ===== */
-    const accounts = await prisma.accounts.findMany({
+    const vendorCustomers = await prisma.vendorscustomer.findMany({
       where: {
-        company_id,
-        sub_of_subgroup_id,
+        company_id: Number(company_id),
+        sub_of_subgroup_id: Number(sub_of_subgroup_id),
       },
-      select: {
-        id: true,
-        account_number: true,
+      include: {
+        sub_of_subgroup: {
+          include: {
+            parent_account: true, // ✅ CORRECT
+          },
+        },
+      },
+      orderBy: {
+        created_at: "asc",
       },
     });
 
-    if (!accounts.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No accounts found for given subgroup",
-        data: [],
-      });
-    }
+    let runningBalance = 0;
+    const openingBalance = 0;
 
-    /* ===== BUILD LEDGERS ===== */
-    const result = [];
+    const ledger = vendorCustomers.map((vc) => {
+      const balance = Number(vc.account_balance || 0);
 
-    for (const acc of accounts) {
-      const ledgerData = await buildLedgerForAccount(acc.id, company_id);
-      if (ledgerData) {
-        result.push({
-          account_id: acc.id,
-          account_number: acc.account_number,
-          ...ledgerData,
-        });
-      }
-    }
+      const debit = balance > 0 ? balance : 0;
+      const credit = balance < 0 ? Math.abs(balance) : 0;
+
+      runningBalance += debit - credit;
+
+      return {
+        date: vc.created_at,
+        debit,
+        credit,
+        vendor_customer_id: vc.id,
+        name: vc.name_english,
+        account_type: vc.sub_of_subgroup?.parent_account?.subgroup_name || null,
+        account_name: vc.sub_of_subgroup?.parent_account?.main_category || null,
+        running_balance: runningBalance.toFixed(2),
+      };
+    });
 
     return res.json({
       success: true,
-      company_id,
-      sub_of_subgroup_id,
-      total_accounts: result.length,
-      data: result,
+      account_id:
+        vendorCustomers.length > 0
+          ? vendorCustomers[0].sub_of_subgroup?.parent_account?.id
+          : null,
+      opening_balance: openingBalance,
+      closing_balance: runningBalance.toFixed(2),
+      ledger,
     });
-  } catch (err) {
-    console.error("Ledger By Subgroup Error:", err);
+  } catch (error) {
+    console.error("Ledger Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to fetch ledger",
     });
   }
 };
