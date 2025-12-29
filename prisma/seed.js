@@ -12,7 +12,7 @@ async function main() {
     data: {
       name: "Super Admin",
       email: "admin@example.com",
-      password: hashedPassword, // 👈 Hashed password
+      password: hashedPassword,
       role: "SUPERADMIN",
       UserStatus: "ACTIVE",
     },

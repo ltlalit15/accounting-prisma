@@ -20,7 +20,7 @@ router.get("/", getAllAccounts);
 router.get("/company/:company_id", getAccountsByCompanyId);
 router.put("/:id", updateAccount);
 router.delete("/:id", deleteAccount);
-router.get("/ledger/:company_id/:subgroup_id",getLedger)
+router.get("/ledger/:company_id/:subgroup_id",getLedger);
 router.get(
   "/ledger/company/:company_id/subgroup/:sub_of_subgroup_id",
   getLedgerBySubOfSubgroup

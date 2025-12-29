@@ -640,6 +640,7 @@ export const getLedger = async (req, res) => {
         id: true,
         account_id: true,
         account_balance: true,
+        balance_type: true,   // ⭐ ADD THIS
         creation_date: true,
         created_at: true,
         name_english: true,
@@ -697,7 +698,8 @@ export const getLedger = async (req, res) => {
     });
 
     vouchers.forEach((v) => {
-      const isDebit = accountIds.includes(v.from_account);
+     const isDebit = accountIds.includes(v.to_account);
+
 
       const relatedAccount = isDebit ? v.to_account : v.from_account;
       let p = voucherPartyMap[relatedAccount];
@@ -733,7 +735,8 @@ export const getLedger = async (req, res) => {
       },
     });
     contra.forEach((c) => {
-      const isDebit = accountIds.includes(c.account_from_id);
+     const isDebit = accountIds.includes(c.account_to_id);
+
 
       rows.push({
         date: c.voucher_date,
@@ -773,8 +776,8 @@ export const getLedger = async (req, res) => {
     expense.forEach((e) => {
       rows.push({
         date: e.voucher_date,
-        debit: Number(e.total_amount),
-        credit: 0,
+        debit: 0,
+        credit: Number(e.total_amount),
         vendor_customer_id: null,
         name: null,
         account_type: null,
@@ -825,8 +828,8 @@ export const getLedger = async (req, res) => {
       });
       rows.push({
         date: s.return_date,
-        debit: Number(s.grand_total),
-        credit: 0,
+        debit: 0,
+        credit: Number(s.grand_total),
         vendor_customer_id: p?.id || null,
         name: p?.name_english || null,
         account_type: p?.account_type || null,
@@ -894,8 +897,8 @@ export const getLedger = async (req, res) => {
     adjustments.forEach((a) => {
       rows.push({
         date: a.voucher_date,
-        debit: Number(a.total_value),
-        credit: 0,
+        debit:  a.balance_type === "debit"  ? Number(a.total_value) : 0,
+        credit: a.balance_type === "credit" ? Number(a.total_value) : 0,
         vendor_customer_id: null,
         name: null,
         account_type: null,
@@ -908,7 +911,7 @@ export const getLedger = async (req, res) => {
       where: { company_id },
     });
     journal.forEach((j) => {
-      if (accountIds.includes(Number(j.from_id))) {
+      if (accountIds.includes(Number(j.to_id))) {
         rows.push({
           date: j.date,
           debit: Number(j.amount),
@@ -920,7 +923,7 @@ export const getLedger = async (req, res) => {
         });
       }
 
-      if (accountIds.includes(Number(j.balance_type))) {
+      if (accountIds.includes(Number(j.from_id))) {
         rows.push({
           date: j.date,
           debit: 0,
@@ -938,16 +941,18 @@ export const getLedger = async (req, res) => {
     let filteredRows = rows.filter((r) => r.vendor_customer_id !== null);
     console.log("ledger rows after party-filter:", filteredRows.length);
 
-    // Add creation/opening rows only for parties that have NO transactions,
-    // so a party with transactions doesn't get an extra zero-value duplicate row.
+
     const existingPartyIds = new Set(
       filteredRows.map((r) => r.vendor_customer_id)
     );
     partiesForAccount.forEach((p) => {
       if (!existingPartyIds.has(p.id)) {
-        const bal = Number(p.account_balance || 0);
-        const debit = bal < 0 ? Math.abs(bal) : 0;
-        const credit = bal > 0 ? bal : 0;
+    const bal = Number(p.account_balance || 0);
+   const type = (p.balance_type || "").toLowerCase();
+
+const debit  = type === "debit"  ? bal : 0;
+const credit = type === "credit" ? bal : 0;
+
         filteredRows.push({
           date: p.creation_date || p.created_at || new Date(0),
           debit,
@@ -963,13 +968,22 @@ export const getLedger = async (req, res) => {
 
     // sort & running balance
     filteredRows.sort((a, b) => new Date(a.date) - new Date(b.date));
-    // Start running from 0 — opening balances are added as creation rows above
-    let running = 0;
+   const runningMap = {}; // vendor_customer_id => balance
 
-    const ledger = filteredRows.map((r) => {
-      running = running + Number(r.credit || 0) - Number(r.debit || 0);
-      return { ...r, running_balance: running.toFixed(2) };
-    });
+const ledger = filteredRows.map((r) => {
+  const vid = r.vendor_customer_id;
+
+  if (!runningMap[vid]) runningMap[vid] = 0;
+
+  runningMap[vid] =
+    runningMap[vid] + Number(r.credit || 0) - Number(r.debit || 0);
+
+  return {
+    ...r,
+    running_balance: runningMap[vid].toFixed(2),
+  };
+});
+
 
     return res.json({
       success: true,
