@@ -43,6 +43,7 @@ app.use(
       "https://erp-accounting-new.netlify.app",
       "https://invoice360-software.netlify.app",
       "https://accounting-erp.netlify.app",
+      "https://zirak-book.netlify.app"
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     credentials: true,
