@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createOrUpdatePurchaseOrder, deletePurchaseOrder, getPurchaseOrderById, getPurchaseOrdersByCompanyId } from "../controllers/purchaseOrder.controller.js";
+import { createOrUpdatePurchaseOrder, deletePurchaseOrder, getPurchaseOrderById, getPurchaseOrdersByCompanyId, createPurchaseOrderFromSalesOrder } from "../controllers/purchaseOrder.controller.js";
 import upload from "../middlewares/multer.js";
 
 const router = Router();
@@ -14,10 +14,11 @@ router.patch("/update-status/:id", updatePurchaseOrderStatus);
 router.delete("/delete-purchase/:id", deletePurchaseOrder);
 */}
 
-router.post("/create-purchase-order",createOrUpdatePurchaseOrder);
+router.post("/create-purchase-order", createOrUpdatePurchaseOrder);
+router.post("/create-from-sales-order/:so_id", createPurchaseOrderFromSalesOrder);
 router.put("/create-purchase-order/:id", createOrUpdatePurchaseOrder);
 
-  router.get("/company/:companyId", getPurchaseOrdersByCompanyId);
+router.get("/company/:companyId", getPurchaseOrdersByCompanyId);
 router.get("/:id", getPurchaseOrderById);
 router.delete("/:id", deletePurchaseOrder);
 

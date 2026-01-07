@@ -105,6 +105,7 @@ import prisma from "../config/db.js";
 //   }
 // };
 
+// CREATE Vendor/Customer (Auto-Ledger Creation)
 export const createVendor = async (req, res) => {
   try {
     const {
@@ -113,7 +114,6 @@ export const createVendor = async (req, res) => {
       name_arabic,
       company_name,
       google_location,
-      account_type,
       balance_type,
       account_name,
       account_balance,
@@ -133,77 +133,150 @@ export const createVendor = async (req, res) => {
       enable_gst,
       gstIn,
       type,
+      // Optional manual overrides (usually null)
       sub_of_subgroup_id,
       account_id,
     } = req.body;
 
-    if (!company_id || !name_english || !type || !sub_of_subgroup_id) {
+    if (!company_id || !name_english || !type) {
       return res.status(400).json({
         success: false,
-        message:
-          "company_id and name_english sub_of_subgroup_id account_id are required",
+        message: "company_id, name_english, and type are required",
       });
     }
 
-    // 📤 Upload files to Cloudinary (tempFilePath expected)
+    const companyIdInt = parseInt(company_id);
+    const isVendor = type === 'vender'; // Check spelling consistency with frontend/schema
+    const isCustomer = type === 'customer';
+
+    // Default COA Mapping
+    let targetAccountType = req.body.account_type;
+    let fallbackParentGroup = "";
+
+    if (!targetAccountType) {
+      if (isVendor) {
+        targetAccountType = "Sundry Creditors";
+        fallbackParentGroup = "Current Liabilities";
+      } else if (isCustomer) {
+        targetAccountType = "Sundry Debtors";
+        fallbackParentGroup = "Current Assets";
+      }
+    }
+
+    // 📤 Upload files to Cloudinary
     let idCardImageUrl = null;
     let anyFileUrl = null;
 
     if (req.files?.id_card_image) {
       idCardImageUrl = await uploadToCloudinary(
-        req.files.id_card_image, // <-- pass whole file object (NOT buffer)
+        req.files.id_card_image,
         "vendorsCustomer/id_cards"
       );
     }
 
     if (req.files?.any_file) {
       anyFileUrl = await uploadToCloudinary(
-        req.files.any_file, // <-- pass whole file object
+        req.files.any_file,
         "vendorsCustomer/files"
       );
     }
 
-    // 🟢 Save Vendor
-    const vendor = await prisma.vendorscustomer.create({
-      data: {
-        company_id: parseInt(company_id),
-        sub_of_subgroup_id: Number(sub_of_subgroup_id),
-        account_id: Number(account_id),
-        name_english,
-        name_arabic,
-        company_name,
-        google_location,
-        id_card_image: idCardImageUrl,
-        any_file: anyFileUrl,
-        account_type,
-        balance_type,
-        account_name,
-        account_balance: account_balance ? parseFloat(account_balance) : 0.0,
-        creation_date: creation_date ? new Date(creation_date) : undefined,
-        bank_account_number,
-        bank_ifsc,
-        bank_name_branch,
-        country,
-        state,
-        pincode,
-        address,
-        state_code,
-        shipping_address,
-        phone,
-        email,
-        type,
-        credit_period_days: credit_period_days
-          ? parseInt(credit_period_days)
-          : 0,
-        enable_gst: enable_gst === true || enable_gst === "true",
-        gstIn,
-      },
+    // 🟢 TRANSACTION: Account + Entity
+    const vendor = await prisma.$transaction(async (tx) => {
+
+      // 1. Find Subgroup
+      let targetSubgroup = null;
+
+      // If manual ID provided, use it
+      if (sub_of_subgroup_id) {
+        targetSubgroup = await tx.sub_of_subgroups.findUnique({ where: { id: Number(sub_of_subgroup_id) } });
+      }
+
+      // Else Auto-Find
+      if (!targetSubgroup && targetAccountType) {
+        targetSubgroup = await tx.sub_of_subgroups.findFirst({
+          where: {
+            name: targetAccountType,
+            parent_account: { company_id: companyIdInt }
+          }
+        });
+      }
+
+      // Fallback
+      if (!targetSubgroup && fallbackParentGroup) {
+        targetSubgroup = await tx.sub_of_subgroups.findFirst({
+          where: {
+            parent_account: {
+              company_id: companyIdInt,
+              subgroup_name: fallbackParentGroup
+            }
+          }
+        });
+      }
+
+      let finalAccountId = account_id ? Number(account_id) : null;
+
+      // 2. Create Ledger Account (Leaf Node) if not provided
+      if (!finalAccountId && targetSubgroup) {
+        const newAccount = await tx.accounts.create({
+          data: {
+            company_id: companyIdInt,
+            subgroup_id: targetSubgroup.subgroup_id, // Parent
+            sub_of_subgroup_id: targetSubgroup.id,   // Subgroup
+            account_name: name_english,
+            accountBalance: parseFloat(account_balance || 0),
+            // Note: We might want to set 'account_number' if we have logic for it
+          }
+        });
+        finalAccountId = newAccount.id;
+      }
+
+      if (!finalAccountId) {
+        console.warn(`COA Gap: Could not auto-assign Ledger Account for ${name_english} (${type}). Created without Account ID.`);
+      }
+
+      // 3. Create Vendor/Customer Record
+      return await tx.vendorscustomer.create({
+        data: {
+          company_id: companyIdInt,
+          sub_of_subgroup_id: targetSubgroup?.id || null, // Best effort link
+          account_id: finalAccountId,                     // LINKED!
+
+          name_english,
+          name_arabic,
+          company_name,
+          google_location,
+          id_card_image: idCardImageUrl,
+          any_file: anyFileUrl,
+          account_type: targetAccountType, // Save the type name
+          balance_type,
+          account_name: account_name || name_english,
+          account_balance: account_balance ? parseFloat(account_balance) : 0.0,
+          creation_date: creation_date ? new Date(creation_date) : undefined,
+          bank_account_number,
+          bank_ifsc,
+          bank_name_branch,
+          country,
+          state,
+          pincode,
+          address,
+          state_code,
+          shipping_address,
+          phone,
+          email,
+          type,
+          credit_period_days: credit_period_days ? parseInt(credit_period_days) : 0,
+          enable_gst: enable_gst === true || enable_gst === "true",
+          gstIn,
+        },
+      });
     });
 
     res.status(201).json({
       success: true,
       message: "Vendor created successfully",
       data: vendor,
+      accountId: vendor.account_id
     });
   } catch (error) {
     console.error("❌ Error creating vendor:", error);
@@ -620,12 +693,12 @@ export const updateVendor = async (req, res) => {
     }
 
     // Numeric / boolean fields
-// ✅ Relation: company
-if (data.company_id) {
-  updatePayload.company = {
-    connect: { id: Number(data.company_id) },
-  };
-}
+    // ✅ Relation: company
+    if (data.company_id) {
+      updatePayload.company = {
+        connect: { id: Number(data.company_id) },
+      };
+    }
 
     if (data.account_balance !== undefined)
       updatePayload.account_balance = Number(data.account_balance);
@@ -661,11 +734,11 @@ if (data.company_id) {
     }
 
     // ✅ Relation: sub_of_subgroup
-if (data.sub_of_subgroup_id) {
-  updatePayload.sub_of_subgroup = {
-    connect: { id: Number(data.sub_of_subgroup_id) },
-  };
-}
+    if (data.sub_of_subgroup_id) {
+      updatePayload.sub_of_subgroup = {
+        connect: { id: Number(data.sub_of_subgroup_id) },
+      };
+    }
 
     // 5️⃣ Handle uploaded files
     if (req.files?.id_card_image?.[0]) {

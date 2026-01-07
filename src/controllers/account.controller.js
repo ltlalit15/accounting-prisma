@@ -43,6 +43,7 @@ export const getParentAccountsByCompanyId = async (req, res) => {
     // Fetch all parent accounts for this company
     const parentAccounts = await prisma.parent_accounts.findMany({
       where: { company_id: parseInt(company_id) },
+      include: { sub_of_subgroups: true },
       orderBy: { id: "desc" },
     });
 
@@ -244,7 +245,7 @@ export const getAccountsByCompanyId = async (req, res) => {
       where: { company_id: parseInt(company_id) },
       orderBy: { created_at: "desc" },
       include: {
-        parent_account: { select: { id: true, subgroup_name: true } },
+        parent_account: { select: { id: true, subgroup_name: true, main_category: true } },
         sub_of_subgroup: { select: { id: true, name: true } },
       },
     });
@@ -274,10 +275,28 @@ export const updateAccount = async (req, res) => {
       ifsc_code,
       bank_name_branch,
       accountBalance,
+      account_name, // Capture the name from request
     } = req.body;
 
+    const accountId = parseInt(id);
+
+    // If account_name is provided, we might need to update the sub_of_subgroup name
+    if (account_name) {
+      const currentAccount = await prisma.accounts.findUnique({
+        where: { id: accountId },
+        select: { sub_of_subgroup_id: true }
+      });
+
+      if (currentAccount && currentAccount.sub_of_subgroup_id) {
+        await prisma.sub_of_subgroups.update({
+          where: { id: currentAccount.sub_of_subgroup_id },
+          data: { name: account_name }
+        });
+      }
+    }
+
     const updated = await prisma.accounts.update({
-      where: { id: parseInt(id) },
+      where: { id: accountId },
       data: {
         subgroup_id: parseInt(subgroup_id),
         sub_of_subgroup_id: sub_of_subgroup_id
@@ -288,6 +307,9 @@ export const updateAccount = async (req, res) => {
         bank_name_branch,
         accountBalance,
       },
+      include: { // Include relations to return full data if needed
+        sub_of_subgroup: true
+      }
     });
 
     res.status(200).json({
@@ -698,7 +720,7 @@ export const getLedger = async (req, res) => {
     });
 
     vouchers.forEach((v) => {
-     const isDebit = accountIds.includes(v.to_account);
+      const isDebit = accountIds.includes(v.to_account);
 
 
       const relatedAccount = isDebit ? v.to_account : v.from_account;
@@ -735,7 +757,7 @@ export const getLedger = async (req, res) => {
       },
     });
     contra.forEach((c) => {
-     const isDebit = accountIds.includes(c.account_to_id);
+      const isDebit = accountIds.includes(c.account_to_id);
 
 
       rows.push({
@@ -843,15 +865,15 @@ export const getLedger = async (req, res) => {
     });
     const matchedPOs = partyNames.length
       ? purchaseOrders.filter((po) => {
-          const fields = [
-            po.bill_to_vendor_name,
-            po.quotation_from_vendor_name,
-            po.payment_made_vendor_name,
-            po.vendor_ref,
-            po.ship_to_vendor_name,
-          ];
-          return fields.some((f) => f && partyNames.includes(f.toLowerCase()));
-        })
+        const fields = [
+          po.bill_to_vendor_name,
+          po.quotation_from_vendor_name,
+          po.payment_made_vendor_name,
+          po.vendor_ref,
+          po.ship_to_vendor_name,
+        ];
+        return fields.some((f) => f && partyNames.includes(f.toLowerCase()));
+      })
       : [];
     matchedPOs.forEach((p) => {
       rows.push({
@@ -897,7 +919,7 @@ export const getLedger = async (req, res) => {
     adjustments.forEach((a) => {
       rows.push({
         date: a.voucher_date,
-        debit:  a.balance_type === "debit"  ? Number(a.total_value) : 0,
+        debit: a.balance_type === "debit" ? Number(a.total_value) : 0,
         credit: a.balance_type === "credit" ? Number(a.total_value) : 0,
         vendor_customer_id: null,
         name: null,
@@ -947,11 +969,11 @@ export const getLedger = async (req, res) => {
     );
     partiesForAccount.forEach((p) => {
       if (!existingPartyIds.has(p.id)) {
-    const bal = Number(p.account_balance || 0);
-   const type = (p.balance_type || "").toLowerCase();
+        const bal = Number(p.account_balance || 0);
+        const type = (p.balance_type || "").toLowerCase();
 
-const debit  = type === "debit"  ? bal : 0;
-const credit = type === "credit" ? bal : 0;
+        const debit = type === "debit" ? bal : 0;
+        const credit = type === "credit" ? bal : 0;
 
         filteredRows.push({
           date: p.creation_date || p.created_at || new Date(0),
@@ -968,21 +990,21 @@ const credit = type === "credit" ? bal : 0;
 
     // sort & running balance
     filteredRows.sort((a, b) => new Date(a.date) - new Date(b.date));
-   const runningMap = {}; // vendor_customer_id => balance
+    const runningMap = {}; // vendor_customer_id => balance
 
-const ledger = filteredRows.map((r) => {
-  const vid = r.vendor_customer_id;
+    const ledger = filteredRows.map((r) => {
+      const vid = r.vendor_customer_id;
 
-  if (!runningMap[vid]) runningMap[vid] = 0;
+      if (!runningMap[vid]) runningMap[vid] = 0;
 
-  runningMap[vid] =
-    runningMap[vid] + Number(r.credit || 0) - Number(r.debit || 0);
+      runningMap[vid] =
+        runningMap[vid] + Number(r.credit || 0) - Number(r.debit || 0);
 
-  return {
-    ...r,
-    running_balance: runningMap[vid].toFixed(2),
-  };
-});
+      return {
+        ...r,
+        running_balance: runningMap[vid].toFixed(2),
+      };
+    });
 
 
     return res.json({
@@ -1076,8 +1098,8 @@ export const buildLedgerForAccount = async (company_id, account_id) => {
     let type = v.vendor
       ? "Vendor"
       : v.customer
-      ? "Customer"
-      : "Accounts Payable";
+        ? "Customer"
+        : "Accounts Payable";
 
     ledger.push({
       date: v.date,

@@ -1,5 +1,8 @@
 
 {/* 
+
+import { AccountingService } from "../services/AccountingService.js";
+
 // Create Purchase Order
 export const createPurchaseOrder = async (req, res) => {
   try {
@@ -495,6 +498,7 @@ export const updatePurchaseOrderStatus = async (req, res) => {
 
 import { uploadToCloudinary } from "../config/cloudinary.js";
 import prisma from "../config/db.js";
+import { AccountingService } from "../services/AccountingService.js";
 
 // Helper function to convert base64 to buffer
 const base64ToBuffer = (base64String) => {
@@ -1414,42 +1418,42 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
 
     if (req.files) {
 
-  // MULTIPLE IMAGES: files[]
-  if (req.files.files) {
-    const filesArr = Array.isArray(req.files.files)
-      ? req.files.files
-      : [req.files.files];
+      // MULTIPLE IMAGES: files[]
+      if (req.files.files) {
+        const filesArr = Array.isArray(req.files.files)
+          ? req.files.files
+          : [req.files.files];
 
-    body.additional_info.files = [];
+        body.additional_info.files = [];
 
-    for (const file of filesArr) {
-      const url = await uploadToCloudinary(file, "purchase_order_files");
-      if (url) body.additional_info.files.push(url);
+        for (const file of filesArr) {
+          const url = await uploadToCloudinary(file, "purchase_order_files");
+          if (url) body.additional_info.files.push(url);
+        }
+      }
+
+      // SINGLE FILE UPLOADS — ALWAYS USE index [0]
+
+      if (req.files.logo_url) {
+        const url = await uploadToCloudinary(req.files.logo_url[0], "purchase_logo");
+        if (url) body.company_info.logo_url = url;
+      }
+
+      if (req.files.signature_url) {
+        const url = await uploadToCloudinary(req.files.signature_url[0], "purchase_signature");
+        if (url) body.additional_info.signature_url = url;
+      }
+
+      if (req.files.photo_url) {
+        const url = await uploadToCloudinary(req.files.photo_url[0], "purchase_photo");
+        if (url) body.additional_info.photo_url = url;
+      }
+
+      if (req.files.attachment_url) {
+        const url = await uploadToCloudinary(req.files.attachment_url[0], "purchase_attachment");
+        if (url) body.additional_info.attachment_url = url;
+      }
     }
-  }
-
-  // SINGLE FILE UPLOADS — ALWAYS USE index [0]
-
-  if (req.files.logo_url) {
-    const url = await uploadToCloudinary(req.files.logo_url[0], "purchase_logo");
-    if (url) body.company_info.logo_url = url;
-  }
-
-  if (req.files.signature_url) {
-    const url = await uploadToCloudinary(req.files.signature_url[0], "purchase_signature");
-    if (url) body.additional_info.signature_url = url;
-  }
-
-  if (req.files.photo_url) {
-    const url = await uploadToCloudinary(req.files.photo_url[0], "purchase_photo");
-    if (url) body.additional_info.photo_url = url;
-  }
-
-  if (req.files.attachment_url) {
-    const url = await uploadToCloudinary(req.files.attachment_url[0], "purchase_attachment");
-    if (url) body.additional_info.attachment_url = url;
-  }
-}
 
     // ================= EXISTING ORDER FETCH =================
     let existingOrder = null;
@@ -1469,11 +1473,11 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
       }
 
       existingItems = existingOrder.purchaseorderitems || [];
-       if (!req.files?.files) {
-    body.additional_info.files = existingOrder?.files ?? [];
-  }
+      if (!req.files?.files) {
+        body.additional_info.files = existingOrder?.files ?? [];
+      }
     }
-    
+
 
     // ================= REQUIRED FIELDS FOR STEP COMPLETION =================
     const requiredFields = {
@@ -1593,22 +1597,22 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
 
     const company = hasCompanyInfoInBody
       ? {
-          company_id: body.company_info.company_id ? Number(body.company_info.company_id) : null,
-          company_name: body.company_info.company_name ?? "",
-          company_address: body.company_info.company_address ?? "",
-          company_email: body.company_info.company_email ?? "",
-          company_phone: body.company_info.company_phone ?? "",
-          logo_url: body.company_info.logo_url ?? existingOrder?.logo_url ?? "",
-          bank_name: body.company_info.bank_name ?? existingOrder?.bank_name ?? "",
-          account_no: body.company_info.account_no ?? existingOrder?.account_no ?? "",
-          account_holder: body.company_info.account_holder ?? existingOrder?.account_holder ?? "",
-          ifsc_code: body.company_info.ifsc_code ?? existingOrder?.ifsc_code ?? "",
-          bank_details: body.company_info.bank_details ?? existingOrder?.bank_details ?? "",
-          terms: body.company_info.terms ?? existingOrder?.terms ?? "",
-          notes: body.company_info.notes ?? existingOrder?.notes ?? "",
-        }
+        company_id: body.company_info.company_id ? Number(body.company_info.company_id) : null,
+        company_name: body.company_info.company_name ?? "",
+        company_address: body.company_info.company_address ?? "",
+        company_email: body.company_info.company_email ?? "",
+        company_phone: body.company_info.company_phone ?? "",
+        logo_url: body.company_info.logo_url ?? existingOrder?.logo_url ?? "",
+        bank_name: body.company_info.bank_name ?? existingOrder?.bank_name ?? "",
+        account_no: body.company_info.account_no ?? existingOrder?.account_no ?? "",
+        account_holder: body.company_info.account_holder ?? existingOrder?.account_holder ?? "",
+        ifsc_code: body.company_info.ifsc_code ?? existingOrder?.ifsc_code ?? "",
+        bank_details: body.company_info.bank_details ?? existingOrder?.bank_details ?? "",
+        terms: body.company_info.terms ?? existingOrder?.terms ?? "",
+        notes: body.company_info.notes ?? existingOrder?.notes ?? "",
+      }
       : orderId
-      ? {
+        ? {
           company_id: existingOrder.company_id,
           company_name: existingOrder.company_name,
           company_address: existingOrder.company_address,
@@ -1623,20 +1627,20 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
           terms: existingOrder.terms,
           notes: existingOrder.notes,
         }
-      : {};
+        : {};
 
     // ================= ITEMS =================
     const items = body.items
       ? body.items.map((i) => ({
-          item_name: i.item_name,
-          product_id: i.product_id ? Number(i.product_id) : null,
-          warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
-          qty: Number(i.qty ?? 0),
-          rate: Number(i.rate ?? 0),
-          tax_percent: Number(i.tax_percent ?? 0),
-          discount: Number(i.discount ?? 0),
-          amount: Number(i.amount ?? 0),
-        }))
+        item_name: i.item_name,
+        product_id: i.product_id ? Number(i.product_id) : null,
+        warehouse_id: i.warehouse_id ? Number(i.warehouse_id) : null,
+        qty: Number(i.qty ?? 0),
+        rate: Number(i.rate ?? 0),
+        tax_percent: Number(i.tax_percent ?? 0),
+        discount: Number(i.discount ?? 0),
+        amount: Number(i.amount ?? 0),
+      }))
       : existingItems;
 
     // ================= DB PAYLOAD =================
@@ -1721,93 +1725,109 @@ export const createOrUpdatePurchaseOrder = async (req, res) => {
         include: { purchaseorderitems: true },
       });
     } else {
-    saved = await prisma.$transaction(async (tx) => {
+      saved = await prisma.$transaction(async (tx) => {
 
-  // 1️⃣ CREATE PURCHASE ORDER
-  const order = await tx.purchaseorder.create({
-    data: {
-      ...dbData,
-      created_at: new Date(),
-    },
-  });
+        // 1️⃣ CREATE PURCHASE ORDER
+        const order = await tx.purchaseorder.create({
+          data: {
+            ...dbData,
+            created_at: new Date(),
+          },
+        });
 
-  // 2️⃣ CREATE ITEMS + UPDATE STOCK
-  for (const item of items) {
+        // 2️⃣ CREATE ITEMS + UPDATE STOCK
+        for (const item of items) {
 
-    // 🔹 CREATE PURCHASE ITEM
-    await tx.purchaseorderitems.create({
-      data: {
-        ...item,
-        purchase_order_id: order.id,
-      },
-    });
+          // 🔹 CREATE PURCHASE ITEM
+          await tx.purchaseorderitems.create({
+            data: {
+              ...item,
+              purchase_order_id: order.id,
+            },
+          });
 
-    // 🔹 SAFETY CHECK
-    if (!item.product_id || !item.warehouse_id) continue;
+          // 🔹 SAFETY CHECK
+          if (!item.product_id || !item.warehouse_id) continue;
 
-    const qty = Number(item.qty);
+          const qty = Number(item.qty);
 
-    // 3️⃣ PRODUCT MASTER STOCK ↑
-    await tx.products.update({
-      where: { id: item.product_id },
-      data: {
-        total_stock: { increment: qty },
-      },
-    });
+          // 3️⃣ PRODUCT MASTER STOCK ↑
+          await tx.products.update({
+            where: { id: item.product_id },
+            data: {
+              total_stock: { increment: qty },
+            },
+          });
 
-    // 4️⃣ WAREHOUSE STOCK ↑ (UPSERT)
-    await tx.product_warehouses.upsert({
-      where: {
-        product_id_warehouse_id: {
-          product_id: item.product_id,
-          warehouse_id: item.warehouse_id,
-        },
-      },
-      update: {
-        stock_qty: { increment: qty },
-      },
-      create: {
-        product_id: item.product_id,
-        warehouse_id: item.warehouse_id,
-        stock_qty: qty,
-      },
-    });
-  }
-// ================= 🔥 CREATE PURCHASE VOUCHER =================
-const voucher = await tx.vouchers.create({
-  data: {
-    company_id: order.company_id,
-    voucher_type: "Purchase",
-    voucher_number: `PUR-${Date.now()}`,
-    manual_voucher_no: order.Bill_no || null,
-    purchase_order_id: order.id,
-    date: new Date(),
-    from_name: order.quotation_from_vendor_name,
-    notes: "Auto generated from Purchase Order",
-  },
-});
+          // 4️⃣ WAREHOUSE STOCK ↑ (UPSERT)
+          await tx.product_warehouses.upsert({
+            where: {
+              product_id_warehouse_id: {
+                product_id: item.product_id,
+                warehouse_id: item.warehouse_id,
+              },
+            },
+            update: {
+              stock_qty: { increment: qty },
+            },
+            create: {
+              product_id: item.product_id,
+              warehouse_id: item.warehouse_id,
+              stock_qty: qty,
+            },
+          });
+        }
+        // ================= 🔥 CREATE PURCHASE VOUCHER =================
+        const voucher = await tx.vouchers.create({
+          data: {
+            company_id: order.company_id,
+            voucher_type: "Purchase",
+            voucher_number: `PUR-${Date.now()}`,
+            manual_voucher_no: order.Bill_no || null,
+            purchase_order_id: order.id,
+            date: new Date(),
+            from_name: order.quotation_from_vendor_name,
+            notes: "Auto generated from Purchase Order",
+          },
+        });
 
-// ================= 🔥 CREATE VOUCHER ITEMS =================
-for (const item of items) {
-  await tx.voucher_items.create({
-    data: {
-      voucher_id: voucher.id,
-      product_id: item.product_id,
-      item_name: item.item_name,
-      quantity: item.qty,
-      rate: item.rate,
-      amount: Number(item.qty) * Number(item.rate),
-    },
-  });
-}
+        // ================= 🔥 CREATE VOUCHER ITEMS =================
+        for (const item of items) {
+          await tx.voucher_items.create({
+            data: {
+              voucher_id: voucher.id,
+              product_id: item.product_id,
+              item_name: item.item_name,
+              quantity: item.qty,
+              rate: item.rate,
+              amount: Number(item.qty) * Number(item.rate),
+            },
+          });
+        }
 
-  // 5️⃣ RETURN FULL ORDER
-  return await tx.purchaseorder.findUnique({
-    where: { id: order.id },
-    include: { purchaseorderitems: true },
-  });
-});
+        // 5️⃣ RETURN FULL ORDER
+        return await tx.purchaseorder.findUnique({
+          where: { id: order.id },
+          include: { purchaseorderitems: true },
+        });
+      });
 
+    }
+
+    // ============ AUTO LEDGER POSTING ============
+    // Check if Bill step is completed
+    const isBillCompleted = (steps.bill && (steps.bill.status === 'completed' || steps.bill.status === 'Paid')) ||
+      (saved && (saved.bill_status === 'completed' || saved.bill_status === 'Paid'));
+
+    // Ensure we have a Bill No
+    const billNo = steps.bill?.Bill_no || saved?.Bill_no;
+
+    if (saved && isBillCompleted && billNo) {
+      await AccountingService.postPurchaseBill(
+        saved,
+        items, // Available in scope
+        saved.company_id
+      );
     }
 
     // ================= RESPONSE =================
@@ -2395,7 +2415,7 @@ export const getPurchaseOrderById = async (req, res) => {
 
         {
           step: "purchase_order",
-          status:stepStatus(order.Manual_PO_ref),
+          status: stepStatus(order.Manual_PO_ref),
           data: {
             PO_no: order.PO_no,
             Manual_PO_ref: order.Manual_PO_ref
@@ -2518,6 +2538,73 @@ export const deletePurchaseOrder = async (req, res) => {
       message: "Failed to delete purchase order",
       error: error.message,
     });
+  }
+};
+
+// ==========================================
+// NEW: Create Purchase Order from Sales Order
+// ==========================================
+export const createPurchaseOrderFromSalesOrder = async (req, res) => {
+  try {
+    const { so_id } = req.params;
+    const { vendor_id } = req.body; // Optional: directly assign a vendor
+
+    // 1. Fetch Sales Order
+    const salesOrder = await prisma.salesorder.findUnique({
+      where: { id: Number(so_id) },
+      include: { salesorderitems: true }
+    });
+
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: "Sales Order not found" });
+    }
+
+    // 2. Map Items (SO Items -> PO Items)
+    const poItems = salesOrder.salesorderitems.map(item => ({
+      item_name: item.item_name,
+      product_id: item.product_id,
+      qty: Number(item.qty),
+      rate: 0, // Rate must be filled by user
+      amount: 0,
+      tax_percent: 0,
+      discount: 0
+    }));
+
+    // 3. Prepare PO Data
+    // We create a basic draft. User needs to fill Vendor info.
+    const poData = {
+      company_id: salesOrder.company_id,
+      company_name: salesOrder.company_name,
+      company_address: salesOrder.company_address,
+      company_email: salesOrder.company_email,
+      company_phone: salesOrder.company_phone,
+
+      quotation_from_vendor_name: "",
+      notes: `Created from Sales Order #${salesOrder.SO_no}`,
+
+      purchase_order_status: "Pending",
+      created_at: new Date(),
+
+      purchaseorderitems: {
+        create: poItems
+      }
+    };
+
+    // 4. Create Draft PO
+    const purchaseOrder = await prisma.purchaseorder.create({
+      data: poData,
+      include: { purchaseorderitems: true }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Purchase Order created from Sales Order successfully",
+      data: purchaseOrder
+    });
+
+  } catch (error) {
+    console.error("Create PO from SO Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

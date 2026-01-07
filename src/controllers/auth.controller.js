@@ -624,7 +624,7 @@ export const createCompany = async (req, res) => {
     /* =========================
        4️⃣ FILE UPLOADS (PROFILE + LOGOS)
     ========================= */
-    let profile_url = null;
+    let profile = null;
     let company_icon_url = null;
     let favicon_url = null;
     let company_logo_url = null;
@@ -632,7 +632,7 @@ export const createCompany = async (req, res) => {
 
     if (req.files) {
       if (req.files.profile) {
-        profile_url = await uploadToCloudinary(
+        profile = await uploadToCloudinary(
           req.files.profile,
           "company_profiles"
         );
@@ -680,7 +680,7 @@ export const createCompany = async (req, res) => {
         startDate: new Date(startDate),
         expireDate: new Date(expireDate),
 
-        profile_url, // ✅ NEW FIELD
+        profile, // ✅ NEW FIELD
 
         address,
         country,
@@ -719,7 +719,7 @@ export const createCompany = async (req, res) => {
         startDate: true,
         expireDate: true,
 
-        profile_url: true, // ✅ RETURN PROFILE
+        profile: true, // ✅ RETURN PROFILE
 
         address: true,
         country: true,
@@ -1658,11 +1658,11 @@ export const getAllCompanies = async (req, res) => {
         end_date: p.end_date,
         plan: p.plan
           ? {
-              id: p.plan.id,
-              plan_name: format(p.plan.plan_name),
-              duration: p.plan.duration,
-              amount: p.plan.amount,
-            }
+            id: p.plan.id,
+            plan_name: format(p.plan.plan_name),
+            duration: p.plan.duration,
+            amount: p.plan.amount,
+          }
           : null,
       })),
 
